@@ -1,0 +1,13 @@
+hub-config.json
+hub-state.json
+hub.lock
+runs.jsonl
+status.html
+site/
+logs/
+__pycache__/
+sweep.json
+sweep-report.html
+sync-log.jsonl
+sources/
+briefs/
