@@ -203,7 +203,7 @@ APPS = [
              "HD images with zoom, plus guided tours through the collection",
              "Track what you've seen as you wander",
          ]),
-    dict(slug="classical-journey", kind="listen", dir=None, title="The Classical Journey",
+    dict(slug="classical-journey", kind="listen", dir="classical-journey", title="The Classical Journey",
          emoji="🎼", hue=15,
          tagline="Every piece worth hearing, in order — Gregorian chant to now, with what to listen for.",
          badges=["PWA", "offline", "links out"],
