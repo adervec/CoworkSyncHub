@@ -97,6 +97,7 @@ folder steps (the File System Access API); Firefox and Safari can't open folders
 | Learning Pit | **Progress › Ask a tutor** (grown-up profiles only — kid mode has no panel) | fs | coach | streak, mastery, forecast, sittings, sticking points | under the panel |
 | Music Studio | **🤝 Cowork** in the top bar | fs | coach | albums, briefs, prompts, which tracks are still gaps | in the dialog |
 | The Long Gallery | **Progress → "A second opinion"** | fs | coach | what you've seen/rated/noted + major works missed | under the panel |
+| The Classical Journey | **Progress → "Ask for a programme"** | fs | coach | what you've heard/loved/noted + landmarks missed | under the panel |
 | The portal (adervec.github.io/portal/) | "ask your coach" under the character sheet | fs | review | your cross-app week | under the panel |
 | The hub's own briefs | `briefs/` next to `coworkhub.py` (see §7) | — | daily, weekly | the sync-log digest | `briefs/<period>/reply.json` + status.html |
 

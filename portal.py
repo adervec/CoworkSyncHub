@@ -64,6 +64,7 @@ APPS = [
              "Import TXT, DOCX, PDF, EPUB — or OCR-grab text from images",
              "~30 themes and animated reader faces",
              "Text-to-speech, voice and clap control",
+             "Trackyread: a reading log of every book, with notes and a fading-memory check",
              "Typing and speaking minigames, audiobook recording",
              "Measured reading stats and an editable table of contents",
          ]),
@@ -136,10 +137,10 @@ APPS = [
          tagline="Record yourself and get ten scored attributes — then train the weak ones.",
          badges=["PWA", "Drive sync"],
          features=[
-             "Reading passages, improv, articulation drills, or your own text",
+             "962 public-domain passages, 158 exercises, 65 targeted drills",
              "Ten attributes scored 0–100, from pace to projection",
              "Free speaking toward a chosen target tone or emotion",
-             "Projects — read a whole book passage by passage",
+             "Reading projects — import a document and work through it passage by passage",
              "Trends, an activity heatmap, A/B compare, AI-coach export",
          ]),
     dict(slug="Mise", kind="cook", dir=None, title="Mise", emoji="\U0001F373", hue=75,
@@ -193,13 +194,25 @@ APPS = [
              "A backup folder an agent can co-author album designs into",
          ]),
     dict(slug="long-gallery", kind="art", dir="long-gallery", title="The Long Gallery", emoji="\U0001F5BC️", hue=335,
-         tagline="A museum in a single page — thousands of works from the Olmec heads to now, with their stories.",
+         tagline="A museum in a single page — 5,600 works from the Olmec heads to now, each with its story.",
          badges=["PWA", "offline"],
          features=[
-             "Six eras, Antiquity to Modern, across movements, regions, and themes",
+             "Six eras, Antiquity to Modern, across movements, regions and themes",
+             "Nine media, from painting and sculpture to manuscript, textile and installation",
              "Every work with its story: what it is, its context, and a hidden detail",
              "HD images with zoom, plus guided tours through the collection",
              "Track what you've seen as you wander",
+         ]),
+    dict(slug="classical-journey", kind="listen", dir=None, title="The Classical Journey",
+         emoji="🎼", hue=15,
+         tagline="Every piece worth hearing, in order — Gregorian chant to now, with what to listen for.",
+         badges=["PWA", "offline", "links out"],
+         features=[
+             "2,444 works by 535 composers across seven eras",
+             "Each one: what it is, the world it came from, and what to listen for",
+             "69 theory stops, placed where history invented the idea",
+             "Plays a free Internet Archive recording, and links out to six services",
+             "Your progress, ratings and notes stay in your browser",
          ]),
 ]
 
@@ -569,7 +582,7 @@ var STATS=["STR","DEX","END","PSI","INT","CHR","VIT"];
 var KIND={lift:{STR:1,VIT:.3},cardio:{END:1,VIT:.4},ride:{END:1,VIT:.4},read:{INT:1,PSI:.3},
   chess:{INT:.7,PSI:.7},practice:{DEX:1,CHR:.4},write:{DEX:.8,PSI:.3},speak:{CHR:1,PSI:.3},
   paint:{DEX:.8,PSI:.5},cook:{VIT:1,DEX:.3},checkin:{VIT:.6,PSI:.4},focus:{PSI:1},
-  aim:{DEX:1,PSI:.4},study:{INT:1,PSI:.3},compose:{PSI:.8,CHR:.6},art:{PSI:.8,INT:.4}};
+  aim:{DEX:1,PSI:.4},study:{INT:1,PSI:.3},compose:{PSI:.8,CHR:.6},art:{PSI:.8,INT:.4},listen:{PSI:.7,INT:.5}};
 function activity(){var ev=[];try{ev=JSON.parse(localStorage.getItem(AKEY)||"[]")}catch(err){}
   if(!Array.isArray(ev))ev=[];
   ev=ev.filter(function(x){return Array.isArray(x)&&x.length>=3&&APPKIND[x[1]]});

@@ -102,13 +102,14 @@ for the hub — feed it `{app, channels, actions}` and listen for `cowork-action
 words are the hub's own (idle / PENDING / answered / STALE). Docs + live demo:
 <https://adervec.github.io/cowork>; browser self-test: `/cowork-selftest.html`.
 
-All fifteen apps wear it: GymTracker, Tachyread and SpeechImprover in data mode around their own
+All sixteen apps wear it: GymTracker, Tachyread and SpeechImprover in data mode around their own
 folder logic; ChessRetabled, GuitarPicker, Mise, Handwriting Helper, MicroMiniger, Black Mirror
-Bike Ride, Bodybuilding Progress Coach, Marksman, Run315, Learning Pit, Music Studio and The Long
-Gallery in fs mode with a single `coach` channel — the data they already have (a brief, a report,
-a cook log, scores, a paint queue, rides, body-comp + pose numbers, shot groups, training load,
-review schedules, album prompts, what you've looked at; never photos) becomes
-`coach/request.json`, the agent's `coach/reply.json` shows in-app. The portal itself has a
+Bike Ride, Bodybuilding Progress Coach, Marksman, Run315, Learning Pit, Music Studio, The Long
+Gallery and The Classical Journey in fs mode with a single `coach` channel — the data they
+already have (a brief, a report, a cook log, scores, a paint queue, rides, body-comp + pose
+numbers, shot groups, training load, review schedules, album prompts, what you've looked at,
+what you've listened to; never photos) becomes `coach/request.json`, and the agent's
+`coach/reply.json` shows in-app. The portal itself has a
 `review` channel. Every one of those folders is hub-ready: `coworkhub.py add`.
 
 Two of the newcomers needed care. Music Studio already had a folder hand-off where an agent edits
@@ -176,7 +177,7 @@ Never blocks a deploy — the only hard stop is the credential audit on `site/` 
 **Character sheet**: every app appends `[unixSeconds, slug, kind, amount]` to the
 same-origin `localStorage["portal-activity"]` when you actually do something (a set, a
 section, a ride, a cook, a shot group, a run, a sitting, a generated track, a picture really
-looked at — `amount` ≈ minutes ÷ 10). Only real work counts: Run315's public demo is a
+looked at, a piece heard — `amount` ≈ minutes ÷ 10). Only real work counts: Run315's public demo is a
 synthetic athlete and reports nothing, and Learning Pit's selftest is excluded. The portal turns that into
 STR / DEX / END / PSI / INT / CHR / VIT with a 14-day half-life, lists which app feeds which
 stat, and reads habits off the last week vs the three before it (going strong / steady /
