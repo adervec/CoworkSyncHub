@@ -1,0 +1,58 @@
+# Reusable: run after an app's Pages deploy. Checks the LIVE site in headless Chrome and, if it is
+# healthy, tags the deployed commit (deploy-YYYYMMDD-HHMM) so every release can be found and
+# rolled back to. Called from each app's deploy workflow:
+#
+#   after-deploy:
+#     needs: deploy
+#     uses: adervec/CoworkSyncHub/.github/workflows/after-deploy.yml@main
+#     with:
+#       url: https://adervec.github.io/<App>/
+#     permissions:
+#       contents: write
+name: After deploy
+
+on:
+  workflow_call:
+    inputs:
+      url:
+        description: The live URL that was just deployed
+        required: true
+        type: string
+      ref:
+        description: The commit that was deployed (default: the commit that triggered the caller)
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  live-check-and-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the house live check
+        uses: actions/checkout@v4
+        with:
+          repository: adervec/CoworkSyncHub
+          path: hub
+          sparse-checkout: live-check.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm i --no-save --prefix hub playwright-core@1.62.0
+      - name: Live check
+        run: node hub/live-check.mjs "${{ inputs.url }}"
+      - name: Checkout the app (for tagging)
+        uses: actions/checkout@v4
+        with:
+          path: app
+          ref: ${{ inputs.ref || github.event.workflow_run.head_sha || github.sha }}
+      - name: Tag the release
+        working-directory: app
+        run: |
+          tag="deploy-$(date -u +%Y%m%d-%H%M)"
+          git tag -a "$tag" -m "Deployed to ${{ inputs.url }} and passed the live check"
+          git push origin "$tag"
+          echo "Tagged $(git rev-parse --short HEAD) as $tag" >> "$GITHUB_STEP_SUMMARY"
