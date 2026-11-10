@@ -8,7 +8,7 @@
 // an update (silenceable), an offline pill, and systemTheme() for picking a default theme.
 //
 // Adopting it in an app is two lines:
-//   <script src="https://adervec.github.io/font.js"></script>          (in <head>, not deferred)
+//   a script tag with src https://adervec.github.io/font.js, in <head>, not deferred
 //   body { font-family: var(--app-font, <the app's old font stack>); }
 // and, somewhere in the app's settings:
 //   <app-font-picker></app-font-picker>
@@ -17,11 +17,14 @@
 // The choice lives in localStorage, so on adervec.github.io — one origin for every app —
 // picking a font in one app changes it in all of them.
 // ponytail: family only, four choices. Add sizes or uploads here if anyone ever asks.
+// This file must never contain the characters that close an HTML script element, so that a
+// single-file app can inline it verbatim (see standards.mjs: <script data-house="font.js">).
 (function () {
   if (window.appFont) return;
   var KEY = 'maker-font';
-  // fonts/ sits beside this script wherever it is served from
-  var BASE = new URL('fonts/', document.currentScript.src).href;
+  // fonts/ sits beside this script wherever it is served from. An app that INLINES this script (a
+  // single-file app) has no script src, so it sets window.appFontBase to its own fonts/ folder.
+  var BASE = window.appFontBase || new URL('fonts/', (document.currentScript && document.currentScript.src) || location.href).href;
   var options = [
     { id: 'atkinson', label: 'Atkinson Hyperlegible', stack: '"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
     { id: 'system', label: 'System', stack: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },

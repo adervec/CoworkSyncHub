@@ -68,6 +68,8 @@
   ok('diagnostics carry build, browser, storage and the last errors', /Build:/.test(diag) && /Browser:/.test(diag) && /Storage:/.test(diag) && /boom: selftest/.test(diag));
   ok('systemTheme reports light or dark', /^(light|dark)$/.test(appFont.systemTheme()));
   localStorage.removeItem(key);
+  var src = await (await fetch('font.js')).text();
+  ok('font.js can be inlined verbatim (no closing script tag inside)', !/<\/script/i.test(src));
   localStorage.removeItem('maker-font');
   document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
 })();

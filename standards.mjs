@@ -75,7 +75,7 @@ function load(app) {
 // Each returns [status, note]: 'ok' | 'warn' | 'FAIL' | '?' | '-' (not applicable)
 // font.js counts only when the page really loads it (a <script src> or a script element created with
 // that src); a comment that mentions the URL, or an inlined partial copy, does not.
-const FONTJS = /<script[^>]*\ssrc\s*=\s*["']https:\/\/adervec\.github\.io\/font\.js|\.src\s*=\s*["']https:\/\/adervec\.github\.io\/font\.js/;
+const FONTJS = /<script[^>]*\ssrc\s*=\s*["']https:\/\/adervec\.github\.io\/font\.js|\.src\s*=\s*["']https:\/\/adervec\.github\.io\/font\.js|<script[^>]*\sdata-house\s*=\s*["']font\.js["']/; // ...or a full copy inlined by a single-file app's build, marked <script data-house="font.js">
 const ok = (note = '') => ['ok', note], warn = (note) => ['warn', note], fail = (note) => ['FAIL', note];
 
 const CHECKS = [
@@ -156,7 +156,7 @@ const CHECKS = [
   ['whatsnew', "What's new after updates", (a) => {
     const m = a.all.match(/name=["']app-whatsnew["'][^>]*content=["']([^"']+)["']|content=["']([^"']+)["'][^>]*name=["']app-whatsnew["']/);
     if (!m) return fail('no <meta name="app-whatsnew">');
-    const file = (m[1] || m[2]).replace(/^\.?\//, '');
+    const file = (m[1] || m[2]).replace(/%BASE_URL%/g, '').replace(/^\.?\//, ''); // Vite's %BASE_URL% becomes the base path at build time
     const found = a.files.find((f) => f === file || f.endsWith('/' + file));
     if (!found) return fail(`declares ${file} but the repo has no such file`);
     try { const j = JSON.parse(readFileSync(path.join(a.root, found), 'utf8')); return Array.isArray(j) && j.length && Array.isArray(j[0].items) && j[0].items.length ? ok() : fail(found + ' is empty or not [{date, items}]'); } catch (e) { return fail(found + ' is not valid JSON'); }
@@ -255,6 +255,7 @@ function selftest() {
   eq(check('theme', fake('const THEMES = [...new Set(works.flatMap(w => w.themes))]')), '-', 'subject-tag "themes" are not colour themes');
   eq(check('theme', fake('document.documentElement.setAttribute("data-theme", localStorage.getItem("t") || "ember")')), 'FAIL', 'a theme default that ignores the device fails');
   eq(check('theme', fake('data-theme ... matchMedia("(prefers-color-scheme: light)")')), 'ok', 'a device-aware default passes');
+  eq(check('a11y', fake('<script data-house="font.js">(function(){})()</script>')), 'ok', 'a marked inlined copy of font.js counts');
   console.log('standards.mjs selftest: ok');
 }
 
