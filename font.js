@@ -2,8 +2,10 @@
 // reader-chosen override. Published at https://adervec.github.io/font.js.
 // Because every app loads it, it also carries the house standards that need no app code:
 // storage the browser will not evict, a visible build stamp (<app-build-info>, under the font
-// picker), a notice when a new version is ready, a notice instead of a silent crash, and the
-// accessibility floor (an "Allow pinch-zoom" option, off by default; reduced motion; focus ring).
+// picker), a notice when a new version is ready, a notice instead of a silent crash, the
+// accessibility floor (an "Allow pinch-zoom" option, off by default; reduced motion; focus ring),
+// an About panel (<app-about>: version, licence, data, storage, diagnostics), a what's-new card after
+// an update (silenceable), an offline pill, and systemTheme() for picking a default theme.
 //
 // Adopting it in an app is two lines:
 //   <script src="https://adervec.github.io/font.js"></script>          (in <head>, not deferred)
@@ -123,6 +125,13 @@
           info.style.cssText = 'display:block;margin-top:.35em;font-size:.85em;opacity:.7';
           this.appendChild(info);
         }
+        // ...and the About panel (version, licence, data, storage, what's new, diagnostics).
+        // A page that places its own <app-about>, or sets no-about here, gets none added.
+        if (!this.hasAttribute('no-about') && !document.querySelector('app-about')) {
+          var about = document.createElement('app-about');
+          about.style.cssText = 'display:block;margin-top:.5em';
+          this.appendChild(about);
+        }
       }
     });
   }
@@ -171,7 +180,7 @@
       return b;
     };
     bar.append(text, btn('Reload', function () { location.reload(); }), btn('Later', function () { bar.remove(); }));
-    (document.body || document.documentElement).appendChild(bar);
+    document.documentElement.appendChild(bar); // on <html>, so an app re-rendering <body> cannot wipe it
   }
   try {
     if ('serviceWorker' in navigator) {
@@ -216,17 +225,21 @@
     var more = document.createElement('pre');
     more.style.cssText = 'display:none;flex-basis:100%;margin:0;max-height:30vh;overflow:auto;white-space:pre-wrap;font:12px/1.35 ui-monospace,Consolas,monospace;opacity:.9';
     more.textContent = String(detail || '').slice(0, 4000);
+    var copy = btn('Copy diagnostics', function () { copyDiagnostics(copy); });
     bar.append(text,
       btn('Reload', function () { location.reload(); }),
       btn('Details', function () { more.style.display = more.style.display === 'none' ? 'block' : 'none'; }),
+      copy,
       btn('Dismiss', function () { bar.remove(); }),
       more);
-    var add = function () { (document.body || document.documentElement).appendChild(bar); };
-    document.body ? add() : document.addEventListener('DOMContentLoaded', add);
+    document.documentElement.appendChild(bar); // on <html>, so an app re-rendering <body> cannot wipe it
   }
+  var recentErrors = []; // the last few real errors, for the diagnostics report
   function onCrash(msg, stack) {
     var s = String(msg || '') + (stack ? '\n' + stack : '');
     if (!msg || NOISE.test(s)) return;
+    recentErrors.push(new Date().toISOString() + '  ' + s.slice(0, 1500));
+    if (recentErrors.length > 10) recentErrors.shift();
     crashNotice(s);
   }
   window.addEventListener('error', function (e) {
@@ -238,6 +251,223 @@
     onCrash(r && (r.message || String(r)), r && r.stack);
   });
 
+  // ---- About this app, what's new, diagnostics, offline and storage (house standards) ----------------
+  // An app describes itself with optional <meta> tags; every one has a default:
+  //   <meta name="app-name" content="Mise">                 (default: the page title)
+  //   <meta name="app-whatsnew" content="whatsnew.json">     (no default: no what's-new without it)
+  //   <meta name="app-license" content="MIT">                (default: MIT)
+  //   <meta name="app-source" content="https://github.com/…"> (default: github.com/adervec/<first path segment>)
+  //   <meta name="app-data-note" content="…">                 (default: the house wording below)
+  // whatsnew.json is newest first: [{ "date": "2026-11-10", "version": "optional", "items": ["…", "…"] }]
+  var meta = function (n) { var m = document.querySelector('meta[name="' + n + '"]'); return m && m.content ? m.content : ''; };
+  var appName = function () { return meta('app-name') || (document.title || location.pathname).replace(/\s+[—–|-]\s+.*$/, ''); };
+  var appKey = function () { return location.pathname.split('/')[1] || 'root'; };
+  var sourceUrl = function () { return meta('app-source') || (location.host === 'adervec.github.io' && appKey() !== 'root' ? 'https://github.com/adervec/' + appKey() : ''); };
+  var DATA_NOTE = 'Your data stays in this browser on this device. If you connect Google Drive, a copy is kept in a private app folder that only this app can read, not in your Drive files.';
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
+  };
+
+  // What's new: shown once after an update, never on a first visit. Silenced across every app by
+  // the "Show what's new after updates" option (localStorage maker-whatsnew-off).
+  var WN_OFF = 'maker-whatsnew-off';
+  var whatsNewP = null;
+  function whatsNew() {
+    var url = meta('app-whatsnew');
+    if (!url) return Promise.resolve([]);
+    return whatsNewP || (whatsNewP = fetch(new URL(url, location.href), { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (j) { return Array.isArray(j) ? j.filter(function (e) { return e && Array.isArray(e.items) && e.items.length; }) : []; })
+      .catch(function () { return []; }));
+  }
+  var entryId = function (e) { return (e.version || '') + '|' + (e.date || '') + '|' + e.items[0]; };
+  var whatsNewSilenced = function () { return store.get(WN_OFF) === '1'; };
+  function setWhatsNewSilenced(off) { store.set(WN_OFF, off ? '1' : null); document.dispatchEvent(new CustomEvent('app-whatsnew-change')); }
+  function listEl(entries) {
+    var box = document.createElement('div');
+    entries.forEach(function (e) {
+      var h = document.createElement('div');
+      h.style.cssText = 'font-weight:700;margin:.5em 0 .2em';
+      h.textContent = [e.version && 'Version ' + e.version, e.date].filter(Boolean).join(' · ') || 'Update';
+      var ul = document.createElement('ul');
+      ul.style.cssText = 'margin:0;padding-left:1.2em';
+      e.items.forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+      box.append(h, ul);
+    });
+    return box;
+  }
+  function showWhatsNew(entries) {
+    if (document.getElementById('app-whatsnew')) return;
+    var card = document.createElement('div');
+    card.id = 'app-whatsnew';
+    card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', "What's new");
+    card.style.cssText = 'position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147482999;' +
+      'width:min(440px,calc(100vw - 24px));max-height:60vh;overflow:auto;padding:14px 16px;border-radius:12px;' +
+      'background:#1d2430;color:#f2ece1;font:14px/1.4 var(--app-font,system-ui,sans-serif);box-shadow:0 8px 28px rgba(0,0,0,.5)';
+    var title = document.createElement('div');
+    title.style.cssText = 'font-size:1.1em;font-weight:700';
+    title.textContent = "What's new in " + appName();
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:12px';
+    var btn = function (label, fn) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = label; b.addEventListener('click', fn);
+      b.style.cssText = 'font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:7px;padding:4px 10px;cursor:pointer';
+      return b;
+    };
+    row.append(btn("Don't show these", function () { setWhatsNewSilenced(true); card.remove(); }), btn('OK', function () { card.remove(); }));
+    card.append(title, listEl(entries), row);
+    document.documentElement.appendChild(card);
+  }
+  function checkWhatsNew() {
+    return whatsNew().then(function (list) {
+      if (!list.length) return;
+      var k = 'maker-seen:' + appKey(), seen = store.get(k), newest = entryId(list[0]);
+      store.set(k, newest);
+      if (!seen || seen === newest || whatsNewSilenced()) return; // first visit, nothing new, or silenced
+      var fresh = [];
+      for (var i = 0; i < list.length && i < 5 && entryId(list[i]) !== seen; i++) fresh.push(list[i]);
+      if (fresh.length) showWhatsNew(fresh);
+    });
+  }
+  document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', checkWhatsNew) : checkWhatsNew();
+
+  // Offline: a small pill while the device has no connection, so a failed sync is not a mystery.
+  function offlinePill() {
+    var id = 'app-offline', el = document.getElementById(id);
+    if (navigator.onLine) { if (el) el.remove(); return; }
+    if (el) return;
+    el = document.createElement('div');
+    el.id = id; el.setAttribute('role', 'status');
+    el.textContent = 'Offline — changes are saved on this device';
+    el.style.cssText = 'position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:2147482998;padding:4px 10px;border-radius:999px;' +
+      'background:#3a3f4b;color:#fff;font:12px/1.3 var(--app-font,system-ui,sans-serif);opacity:.92;pointer-events:none';
+    document.documentElement.appendChild(el); // on <html>, so an app re-rendering <body> cannot wipe it
+  }
+  window.addEventListener('online', offlinePill);
+  window.addEventListener('offline', offlinePill);
+  document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', offlinePill) : offlinePill();
+
+  // Storage: how much this site is using, and whether the browser has promised to keep it.
+  function storageInfo() {
+    if (!(navigator.storage && navigator.storage.estimate)) return Promise.resolve(null);
+    return Promise.all([navigator.storage.estimate(), navigator.storage.persisted ? navigator.storage.persisted() : false])
+      .then(function (r) { return { usage: r[0].usage || 0, quota: r[0].quota || 0, persisted: !!r[1] }; })
+      .catch(function () { return null; });
+  }
+  var mb = function (n) { return n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : (n / 1e6).toFixed(n < 1e7 ? 1 : 0) + ' MB'; };
+  var storageText = function (s) {
+    return s ? mb(s.usage) + ' used of ' + mb(s.quota) + ' available' + (s.persisted ? ' · kept by the browser' : ' · the browser may clear it if space runs low')
+      : 'Not reported by this browser';
+  };
+
+  // Diagnostics: one paste that tells an agent what it needs. No personal data: no account, no
+  // app content, only versions, settings of this script, and the last errors.
+  function diagnostics() {
+    return Promise.all([storageInfo(), navigator.serviceWorker && navigator.serviceWorker.getRegistration ? navigator.serviceWorker.getRegistration().catch(function () { return null; }) : null])
+      .then(function (r) {
+        var s = r[0], reg = r[1];
+        return [
+          appName() + ' diagnostics · ' + new Date().toISOString(),
+          'Page: ' + location.origin + location.pathname,
+          'Build: ' + buildLabel(),
+          'Browser: ' + navigator.userAgent,
+          'Screen: ' + innerWidth + '×' + innerHeight + ' @' + (window.devicePixelRatio || 1) + 'x · ' + (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') + ' system theme',
+          'Online: ' + navigator.onLine,
+          'Storage: ' + storageText(s),
+          'Service worker: ' + (reg ? (reg.active ? reg.active.state : 'none active') + (reg.waiting ? ' · update waiting' : '') : 'not registered'),
+          'Font: ' + get() + ' · pinch-zoom ' + (zoomAllowed() ? 'on' : 'off') + ' · what\'s new ' + (whatsNewSilenced() ? 'silenced' : 'on'),
+          'Recent errors: ' + (recentErrors.length ? '\n  ' + recentErrors.join('\n  ') : 'none'),
+        ].join('\n');
+      });
+  }
+  function copyDiagnostics(button) {
+    return diagnostics().then(function (text) {
+      var done = function (ok) { if (button) { var t = button.textContent; button.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(function () { button.textContent = t; }, 1500); } return text; };
+      return navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(text).then(function () { return done(true); }, function () { return done(false); }) : done(false);
+    });
+  }
+
+  // <app-about>: a collapsed "About this app" panel. <app-font-picker> adds one by itself unless the
+  // page places its own (or the picker has the no-about attribute).
+  if (window.customElements && !customElements.get('app-about')) {
+    customElements.define('app-about', class extends HTMLElement {
+      connectedCallback() {
+        if (this.firstChild) return;
+        var d = document.createElement('details');
+        var sum = document.createElement('summary');
+        sum.textContent = 'About ' + appName();
+        sum.style.cursor = 'pointer';
+        var body = document.createElement('div');
+        body.style.cssText = 'margin-top:.5em;display:grid;gap:.45em;font-size:.95em';
+        var line = function (label, value) {
+          var p = document.createElement('div');
+          var b = document.createElement('b'); b.textContent = label + ': ';
+          p.append(b, value); return p;
+        };
+        var src = sourceUrl(), a;
+        if (src) { a = document.createElement('a'); a.href = src; a.target = '_blank'; a.rel = 'noopener'; a.textContent = src.replace(/^https:\/\//, ''); }
+        var stor = document.createElement('span'); stor.textContent = '…';
+        var net = document.createElement('span');
+        var setNet = function () { net.textContent = navigator.onLine ? 'online' : 'offline'; };
+        setNet(); window.addEventListener('online', setNet); window.addEventListener('offline', setNet);
+        body.append(
+          line('Version', buildLabel()),
+          line('Licence', meta('app-license') || 'MIT'),
+          line('Your data', meta('app-data-note') || DATA_NOTE),
+          line('Storage', stor),
+          line('Connection', net));
+        if (a) body.appendChild(line('Source', a));
+        var wn = document.createElement('div');
+        body.appendChild(wn);
+        if (meta('app-whatsnew')) {
+          var wl = document.createElement('label');
+          var wc = document.createElement('input');
+          wc.type = 'checkbox'; wc.checked = !whatsNewSilenced();
+          wc.addEventListener('change', function () { setWhatsNewSilenced(!wc.checked); });
+          document.addEventListener('app-whatsnew-change', function () { wc.checked = !whatsNewSilenced(); });
+          wl.append(wc, " Show what's new after updates");
+          body.appendChild(wl);
+        }
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px';
+        var copy = document.createElement('button');
+        copy.type = 'button'; copy.textContent = 'Copy diagnostics';
+        copy.addEventListener('click', function () { copyDiagnostics(copy); });
+        var dl = document.createElement('button');
+        dl.type = 'button'; dl.textContent = 'Download diagnostics';
+        dl.addEventListener('click', function () {
+          diagnostics().then(function (t) {
+            var u = URL.createObjectURL(new Blob([t], { type: 'text/plain' })), x = document.createElement('a');
+            x.href = u; x.download = appKey() + '-diagnostics.txt'; document.body.appendChild(x); x.click(); x.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 1000);
+          });
+        });
+        row.append(copy, dl);
+        body.appendChild(row);
+        d.append(sum, body);
+        this.appendChild(d);
+        d.addEventListener('toggle', function () {
+          if (!d.open) return;
+          storageInfo().then(function (s) { stor.textContent = storageText(s); });
+          whatsNew().then(function (list) {
+            wn.textContent = '';
+            if (!list.length) return;
+            var h = document.createElement('b'); h.textContent = "What's new";
+            wn.append(h, listEl(list.slice(0, 5)));
+          });
+        });
+      }
+    });
+  }
+
+  // The device's light/dark preference, for an app picking its DEFAULT theme: use it only when the
+  // reader has not chosen a theme themselves; never let it override a saved choice.
+  var darkQuery = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+  function systemTheme() { return darkQuery && darkQuery.matches ? 'dark' : 'light'; }
+
   window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice,
-    zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice };
+    zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice,
+    diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,
+    whatsNew: whatsNew, checkWhatsNew: checkWhatsNew, setWhatsNewSilenced: setWhatsNewSilenced };
 })();

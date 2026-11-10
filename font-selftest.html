@@ -1,6 +1,8 @@
 <!doctype html><meta charset="utf-8"><title>font.js self-test</title><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="app-name" content="Selftest">
+<meta name="app-whatsnew" content="data:application/json,%5B%7B%22date%22%3A%222026-11-10%22%2C%22items%22%3A%5B%22Second%20thing%22%5D%7D%2C%7B%22date%22%3A%222026-11-01%22%2C%22items%22%3A%5B%22First%20thing%22%5D%7D%5D">
 <style>body { font-family: var(--app-font, serif); }</style>
-<script>localStorage.removeItem('maker-font');</script>
+<script>localStorage.removeItem('maker-font'); localStorage.removeItem('maker-seen:font-selftest.html'); localStorage.removeItem('maker-whatsnew-off');</script>
 <script src="font.js"></script>
 <app-font-picker></app-font-picker><pre id="log">running…</pre>
 <script>
@@ -44,6 +46,28 @@
   ok('the crash notice shows once', document.querySelectorAll('#app-crash-notice').length === 1);
   crash.remove();
   localStorage.removeItem('maker-zoom');
+  var key = Object.keys(localStorage).filter(function (k) { return k.indexOf('maker-seen:') === 0; })[0];
+  await appFont.checkWhatsNew();
+  ok("a first visit records what's new silently", !document.getElementById('app-whatsnew') && !!localStorage.getItem(key || 'maker-seen:font-selftest.html'));
+  key = Object.keys(localStorage).filter(function (k) { return k.indexOf('maker-seen:') === 0; })[0];
+  localStorage.setItem(key, 'older|2026-10-01|Old');
+  await appFont.checkWhatsNew();
+  var wn = document.getElementById('app-whatsnew');
+  ok("after an update, what's new shows the new entries", wn && /Second thing/.test(wn.textContent) && /First thing/.test(wn.textContent) && /Selftest/.test(wn.textContent));
+  wn.querySelector('button').click(); // "Don't show these"
+  localStorage.setItem(key, 'older|2026-10-01|Old');
+  await appFont.checkWhatsNew();
+  ok("silencing stops the card", !document.getElementById('app-whatsnew') && localStorage.getItem('maker-whatsnew-off') === '1');
+  appFont.setWhatsNewSilenced(false);
+  var about = document.querySelector('app-font-picker app-about details');
+  ok('the picker carries an About panel', !!about && /About Selftest/.test(about.querySelector('summary').textContent));
+  about.open = true; about.dispatchEvent(new Event('toggle'));
+  await new Promise(function (r) { setTimeout(r, 200); });
+  ok("About shows version, licence, data, storage and what's new", /Version:/.test(about.textContent) && /Licence: MIT/.test(about.textContent) && /Your data:/.test(about.textContent) && /Storage: .*(MB|GB|browser)/.test(about.textContent) && /Second thing/.test(about.textContent));
+  var diag = await appFont.diagnostics();
+  ok('diagnostics carry build, browser, storage and the last errors', /Build:/.test(diag) && /Browser:/.test(diag) && /Storage:/.test(diag) && /boom: selftest/.test(diag));
+  ok('systemTheme reports light or dark', /^(light|dark)$/.test(appFont.systemTheme()));
+  localStorage.removeItem(key);
   localStorage.removeItem('maker-font');
   document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
 })();
