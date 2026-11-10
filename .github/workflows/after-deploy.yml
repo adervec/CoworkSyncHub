@@ -15,11 +15,11 @@ on:
   workflow_call:
     inputs:
       url:
-        description: The live URL that was just deployed
+        description: "The live URL that was just deployed"
         required: true
         type: string
       ref:
-        description: The commit that was deployed (default: the commit that triggered the caller)
+        description: "The commit that was deployed; defaults to the commit that triggered the caller"
         required: false
         type: string
         default: ''
