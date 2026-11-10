@@ -17,6 +17,13 @@
   ok('unknown id falls back to the default', appFont.get() === 'atkinson' && sel.value === 'atkinson');
   await document.fonts.load('16px "Atkinson Hyperlegible"');
   ok('the font file actually loads', document.fonts.check('16px "Atkinson Hyperlegible"'));
+  var info = document.querySelector('app-font-picker app-build-info');
+  ok('the build stamp shows under the picker', info && /^Build .*\d{4}/.test(info.textContent));
+  appFont.updateNotice(); appFont.updateNotice();
+  var bars = document.querySelectorAll('#app-update-notice');
+  ok('the update notice shows once, with a Reload button', bars.length === 1 && /Reload/.test(bars[0].textContent));
+  bars[0].querySelectorAll('button')[1].click();
+  ok('Later dismisses the notice', !document.getElementById('app-update-notice'));
   localStorage.removeItem('maker-font');
   document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
 })();

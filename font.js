@@ -1,5 +1,8 @@
 // font.js — the house font for every app: Atkinson Hyperlegible by default, and one
 // reader-chosen override. Published at https://adervec.github.io/font.js.
+// Because every app loads it, it also carries three small house standards (see "House
+// extras" at the bottom): storage that the browser will not evict, a visible build stamp
+// (<app-build-info>, shown under the font picker), and a notice when a new version is ready.
 //
 // Adopting it in an app is two lines:
 //   <script src="https://adervec.github.io/font.js"></script>          (in <head>, not deferred)
@@ -70,9 +73,78 @@
         document.addEventListener('app-font-change', function () { select.value = get(); });
         label.append((this.getAttribute('label') || 'Font') + ' ', select);
         this.appendChild(label);
+        // Every app has this picker in its settings, so the running build is shown under it.
+        // Opt out with <app-font-picker no-build>, and place <app-build-info> yourself.
+        if (!this.hasAttribute('no-build') && !document.querySelector('app-build-info')) {
+          var info = document.createElement('app-build-info');
+          info.style.cssText = 'display:block;margin-top:.35em;font-size:.85em;opacity:.7';
+          this.appendChild(info);
+        }
       }
     });
   }
 
-  window.appFont = { options: options, get: get, set: set };
+  // ---- House extras. This is the one script every app loads, so three small house
+  // ---- standards live here rather than being copied into eighteen codebases.
+
+  // 1. Data safety: ask the browser not to evict this origin's storage under disk pressure.
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted().then(function (kept) { if (!kept) navigator.storage.persist(); }).catch(function () {});
+    }
+  } catch (e) { /* not available (old browser, file://) */ }
+
+  // 2. Updates are visible: <app-build-info> names the build that is actually running.
+  // An app may declare <meta name="app-version" content="1.4.2">; otherwise the page's own
+  // Last-Modified time identifies the build (a cached page keeps the header it was served with).
+  function buildLabel() {
+    var meta = document.querySelector('meta[name="app-version"]');
+    var when = new Date(document.lastModified);
+    var built = isNaN(when) ? '' : when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    return (meta && meta.content ? 'Version ' + meta.content + (built ? ' · ' : '') : 'Build ') + built;
+  }
+  if (window.customElements && !customElements.get('app-build-info')) {
+    customElements.define('app-build-info', class extends HTMLElement {
+      connectedCallback() { if (!this.textContent) this.textContent = buildLabel(); }
+    });
+  }
+
+  // 3. ...and the reader is told when a newer build is ready. Set window.appUpdateNotice = false
+  // before this script in an app that shows its own.
+  function updateNotice() {
+    if (window.appUpdateNotice === false || document.getElementById('app-update-notice')) return;
+    var bar = document.createElement('div');
+    bar.id = 'app-update-notice';
+    bar.setAttribute('role', 'status');
+    bar.style.cssText = 'position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483000;' +
+      'display:flex;gap:12px;align-items:center;max-width:calc(100vw - 24px);padding:10px 14px;border-radius:10px;' +
+      'background:#1d2430;color:#f2ece1;font:14px/1.3 var(--app-font,system-ui,sans-serif);box-shadow:0 6px 24px rgba(0,0,0,.45)';
+    var text = document.createElement('span');
+    text.textContent = 'A new version is ready.';
+    var btn = function (label, fn) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = label; b.addEventListener('click', fn);
+      b.style.cssText = 'font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:7px;padding:4px 10px;cursor:pointer';
+      return b;
+    };
+    bar.append(text, btn('Reload', function () { location.reload(); }), btn('Later', function () { bar.remove(); }));
+    (document.body || document.documentElement).appendChild(bar);
+  }
+  try {
+    if ('serviceWorker' in navigator) {
+      var sw = navigator.serviceWorker;
+      var hadController = !!sw.controller; // a first install is not an update
+      sw.addEventListener('controllerchange', function () { if (hadController) updateNotice(); });
+      sw.getRegistration().then(function (reg) {
+        if (!reg) return;
+        if (reg.waiting && sw.controller) updateNotice();
+        reg.addEventListener('updatefound', function () {
+          var next = reg.installing;
+          if (next) next.addEventListener('statechange', function () { if (next.state === 'installed' && sw.controller) updateNotice(); });
+        });
+      }).catch(function () {});
+    }
+  } catch (e) { /* file:// or a locked-down browser */ }
+
+  window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice };
 })();
