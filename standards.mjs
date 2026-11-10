@@ -21,7 +21,8 @@ const USER = 'adervec';
 
 // ---- approved exceptions to "no third-party requests" (user, 2026-11-10) --------------------------
 // Google sign-in for Drive sync is allowed everywhere; these are per app.
-const ALWAYS_OK = /^(adervec\.github\.io|accounts\.google\.com|apis\.google\.com|www\.googleapis\.com|oauth2\.googleapis\.com|[a-z0-9-]+\.googleusercontent\.com)$/;
+// Map tiles are an approved exception for any app with a map.
+const ALWAYS_OK = /^(tile\.openstreetmap\.org|[a-c]\.tile\.openstreetmap\.org|adervec\.github\.io|accounts\.google\.com|apis\.google\.com|www\.googleapis\.com|oauth2\.googleapis\.com|[a-z0-9-]+\.googleusercontent\.com)$/;
 const EXCEPTIONS = {
   Run315: /tile|openstreetmap|arcgisonline|carto|stadiamaps|thunderforest/, // map tiles
   Tachyread: /fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|tessdata|unpkg\.com/, // font loader, MediaPipe, Tesseract, pdf.js
@@ -32,6 +33,11 @@ const EXCEPTIONS = {
 };
 // Hosts that are links or API endpoints the user explicitly connects, not page loads.
 const NOT_A_LOAD = /^(github\.com|www\.strava\.com|strava\.com|connect\.garmin\.com|api\.anthropic\.com|api\.elevenlabs\.io|archive\.org|commons\.wikimedia\.org|upload\.wikimedia\.org|[a-z]+\.wikipedia\.org|www\.youtube\.com|youtu\.be|open\.spotify\.com|music\.apple\.com|claude\.ai)$/;
+
+// Tracked files that are authoring inputs, not part of the published app (per app folder).
+const SOURCE_ONLY = {
+  Mise: /^(alcohol-guide|coffee-guide|tea-guide|solid-protein-prep-guide|protein-mix-calculator|kitchen_masterclass)\.html$/, // extracted into src/data by scripts/extract.mjs
+};
 
 // ---- the portal's apps ----------------------------------------------------------------------------
 function portalApps() {
@@ -52,7 +58,7 @@ function load(app) {
   const files = git(root, 'ls-files').split('\n').filter(Boolean);
   const text = [];
   for (const f of files) {
-    if (!SRC_EXT.test(f) || SKIP.test(f)) continue;
+    if (!SRC_EXT.test(f) || SKIP.test(f) || SOURCE_ONLY[app.dir]?.test(f)) continue;
     let t; try { t = readFileSync(path.join(root, f), 'utf8'); } catch { continue; }
     // drop inlined data blobs: a single very long line is data, not code
     text.push({ f, t: t.split('\n').filter((l) => l.length < 4000).join('\n') });
@@ -129,9 +135,9 @@ const CHECKS = [
     });
     return bad.length ? fail(`${bad.length} UTC day(s): ${bad.slice(0, 3).join(', ')}${bad.length > 3 ? ' …' : ''}`) : ok();
   }],
-  ['branch', 'One branch: work on main', (a) => {
+  ['branch', 'Work on main (GymTracker model)', (a) => {
     const cur = git(a.root, 'branch', '--show-current');
-    const others = git(a.root, 'branch', '-r').split('\n').map((s) => s.trim()).filter((b) => b && !/HEAD|\/main$|\/gh-pages$|dependabot/.test(b));
+    const others = git(a.root, 'branch', '-r').split('\n').map((s) => s.trim()).filter((b) => b && !/HEAD|\/main$|\/gh-pages$|dependabot|\/feat\//.test(b)); // short-lived feat/ branches are fine (GymTracker's model)
     if (cur !== 'main') return fail(`checked out on ${cur || '(detached)'}`);
     return others.length ? warn('other branches on GitHub: ' + others.map((b) => b.replace('origin/', '')).join(', ')) : ok();
   }],
