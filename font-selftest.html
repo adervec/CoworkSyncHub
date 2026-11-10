@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>font.js self-test</title>
+<style>body { font-family: var(--app-font, serif); }</style>
+<script>localStorage.removeItem('maker-font');</script>
+<script src="font.js"></script>
+<app-font-picker></app-font-picker><pre id="log">running…</pre>
+<script>
+(async function () {
+  var fails = [], ok = function (name, cond) { if (!cond) fails.push(name); };
+  var fam = function () { return getComputedStyle(document.body).fontFamily; };
+  ok('default is atkinson', appFont.get() === 'atkinson' && /Atkinson Hyperlegible/.test(fam()));
+  var sel = document.querySelector('app-font-picker select');
+  ok('picker lists every option', sel && sel.options.length === appFont.options.length);
+  sel.value = 'serif'; sel.dispatchEvent(new Event('change'));
+  ok('picker changes the body font', /^Georgia/.test(fam()) && appFont.get() === 'serif');
+  ok('choice is stored', localStorage.getItem('maker-font') === 'serif');
+  appFont.set('nonsense');
+  ok('unknown id falls back to the default', appFont.get() === 'atkinson' && sel.value === 'atkinson');
+  await document.fonts.load('16px "Atkinson Hyperlegible"');
+  ok('the font file actually loads', document.fonts.check('16px "Atkinson Hyperlegible"'));
+  localStorage.removeItem('maker-font');
+  document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
+})();
+</script>
