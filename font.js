@@ -1,8 +1,9 @@
 // font.js — the house font for every app: Atkinson Hyperlegible by default, and one
 // reader-chosen override. Published at https://adervec.github.io/font.js.
-// Because every app loads it, it also carries three small house standards (see "House
-// extras" at the bottom): storage that the browser will not evict, a visible build stamp
-// (<app-build-info>, shown under the font picker), and a notice when a new version is ready.
+// Because every app loads it, it also carries the house standards that need no app code:
+// storage the browser will not evict, a visible build stamp (<app-build-info>, under the font
+// picker), a notice when a new version is ready, a notice instead of a silent crash, and the
+// accessibility floor (an "Allow pinch-zoom" option, off by default; reduced motion; focus ring).
 //
 // Adopting it in an app is two lines:
 //   <script src="https://adervec.github.io/font.js"></script>          (in <head>, not deferred)
@@ -59,6 +60,37 @@
   apply();
   window.addEventListener('storage', function (e) { if (e.key === KEY) { apply(); document.dispatchEvent(new CustomEvent('app-font-change', { detail: get() })); } });
 
+  // ---- Accessibility floor (house standard). Pinch-zoom is a reader OPTION, off by default by the
+  // ---- maker's choice; reduced motion and a visible keyboard focus ring are always on.
+  var ZKEY = 'maker-zoom';
+  function zoomAllowed() { try { return localStorage.getItem(ZKEY) === '1'; } catch (e) { return false; } }
+  function applyZoom() {
+    // This runs from <head>, possibly before the page's own viewport tag is parsed: use the page's
+    // tag once it exists, and drop the stand-in this script made so there is only ever one.
+    var all = document.querySelectorAll('meta[name="viewport"]'), vp = all[all.length - 1];
+    for (var i = 0; i < all.length; i++) if (all[i].hasAttribute('data-app-zoom') && all.length > 1) { all[i].remove(); vp = document.querySelector('meta[name="viewport"]'); }
+    if (!vp) { vp = document.createElement('meta'); vp.name = 'viewport'; vp.setAttribute('data-app-zoom', ''); (document.head || document.documentElement).appendChild(vp); }
+    // keep the app's own viewport settings, and only add or remove the zoom limits
+    var parts = (vp.getAttribute('content') || 'width=device-width, initial-scale=1').split(',')
+      .map(function (p) { return p.trim(); })
+      .filter(function (p) { return p && !/^(maximum-scale|user-scalable)\s*=/i.test(p); });
+    if (!zoomAllowed()) parts.push('maximum-scale=1', 'user-scalable=no');
+    vp.setAttribute('content', parts.join(', '));
+  }
+  function setZoomAllowed(on) {
+    try { on ? localStorage.setItem(ZKEY, '1') : localStorage.removeItem(ZKEY); } catch (e) { /* private mode */ }
+    applyZoom(); document.dispatchEvent(new CustomEvent('app-zoom-change', { detail: !!on }));
+  }
+  applyZoom();
+  document.addEventListener('DOMContentLoaded', applyZoom);
+  window.addEventListener('storage', function (e) { if (e.key === ZKEY) { applyZoom(); document.dispatchEvent(new CustomEvent('app-zoom-change')); } });
+  var a11y = document.createElement('style');
+  // :where() keeps these at zero specificity, so an app's own focus style or motion still wins.
+  a11y.textContent =
+    ':where(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid #4c9ffe;outline-offset:2px}' +
+    '@media (prefers-reduced-motion: reduce){:where(*,*::before,*::after){animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}';
+  (document.head || document.documentElement).appendChild(a11y);
+
   // <app-font-picker label="Font"> — a plain labelled <select> in the light DOM, so it takes
   // on the surrounding app's own form styling.
   if (window.customElements && !customElements.get('app-font-picker')) {
@@ -73,6 +105,17 @@
         document.addEventListener('app-font-change', function () { select.value = get(); });
         label.append((this.getAttribute('label') || 'Font') + ' ', select);
         this.appendChild(label);
+        // The house zoom option sits with the font choice: both are "how the page reads".
+        if (!this.hasAttribute('no-zoom-option')) {
+          var zl = document.createElement('label');
+          zl.style.cssText = 'display:block;margin-top:.35em';
+          var zc = document.createElement('input');
+          zc.type = 'checkbox'; zc.checked = zoomAllowed();
+          zc.addEventListener('change', function () { setZoomAllowed(zc.checked); });
+          document.addEventListener('app-zoom-change', function () { zc.checked = zoomAllowed(); });
+          zl.append(zc, ' Allow pinch-zoom');
+          this.appendChild(zl);
+        }
         // Every app has this picker in its settings, so the running build is shown under it.
         // Opt out with <app-font-picker no-build>, and place <app-build-info> yourself.
         if (!this.hasAttribute('no-build') && !document.querySelector('app-build-info')) {
@@ -146,5 +189,55 @@
     }
   } catch (e) { /* file:// or a locked-down browser */ }
 
-  window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice };
+  // 4. Crashes are shown, not swallowed: an uncaught error gets a visible notice with a way out,
+  // instead of a frozen or blank screen. Shown once per page. Set window.appCrashNotice = false before
+  // this script in an app that has its own error screen.
+  // ponytail: noise filter is a short deny-list (benign browser warnings, extensions, opaque
+  // cross-origin "Script error."); extend it if a real app keeps tripping it.
+  var NOISE = /ResizeObserver loop|Script error\.?$|chrome-extension:|moz-extension:|safari-extension:|AbortError|The user aborted|NotAllowedError/;
+  var crashShown = false;
+  function crashNotice(detail) {
+    if (crashShown || window.appCrashNotice === false) return;
+    crashShown = true;
+    var bar = document.createElement('div');
+    bar.id = 'app-crash-notice';
+    bar.setAttribute('role', 'alert');
+    bar.style.cssText = 'position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:2147483001;' +
+      'display:flex;flex-wrap:wrap;gap:10px;align-items:center;max-width:calc(100vw - 24px);padding:10px 14px;border-radius:10px;' +
+      'background:#5c1d24;color:#fff;font:14px/1.3 var(--app-font,system-ui,sans-serif);box-shadow:0 6px 24px rgba(0,0,0,.45)';
+    var text = document.createElement('span');
+    text.textContent = 'Something went wrong. Your saved data is safe.';
+    var btn = function (label, fn) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = label; b.addEventListener('click', fn);
+      b.style.cssText = 'font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:7px;padding:4px 10px;cursor:pointer';
+      return b;
+    };
+    var more = document.createElement('pre');
+    more.style.cssText = 'display:none;flex-basis:100%;margin:0;max-height:30vh;overflow:auto;white-space:pre-wrap;font:12px/1.35 ui-monospace,Consolas,monospace;opacity:.9';
+    more.textContent = String(detail || '').slice(0, 4000);
+    bar.append(text,
+      btn('Reload', function () { location.reload(); }),
+      btn('Details', function () { more.style.display = more.style.display === 'none' ? 'block' : 'none'; }),
+      btn('Dismiss', function () { bar.remove(); }),
+      more);
+    var add = function () { (document.body || document.documentElement).appendChild(bar); };
+    document.body ? add() : document.addEventListener('DOMContentLoaded', add);
+  }
+  function onCrash(msg, stack) {
+    var s = String(msg || '') + (stack ? '\n' + stack : '');
+    if (!msg || NOISE.test(s)) return;
+    crashNotice(s);
+  }
+  window.addEventListener('error', function (e) {
+    if (e.target && e.target !== window) return; // a failed <img>/<script> load is not a crash
+    onCrash(e.message, e.error && e.error.stack);
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    onCrash(r && (r.message || String(r)), r && r.stack);
+  });
+
+  window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice,
+    zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice };
 })();

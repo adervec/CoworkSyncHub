@@ -1,4 +1,4 @@
-<!doctype html><meta charset="utf-8"><title>font.js self-test</title>
+<!doctype html><meta charset="utf-8"><title>font.js self-test</title><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>body { font-family: var(--app-font, serif); }</style>
 <script>localStorage.removeItem('maker-font');</script>
 <script src="font.js"></script>
@@ -24,6 +24,26 @@
   ok('the update notice shows once, with a Reload button', bars.length === 1 && /Reload/.test(bars[0].textContent));
   bars[0].querySelectorAll('button')[1].click();
   ok('Later dismisses the notice', !document.getElementById('app-update-notice'));
+  var vp = function () { return (document.querySelector('meta[name="viewport"]') || {}).content || ''; };
+  ok('pinch-zoom is off by default', /user-scalable=no/.test(vp()) && !appFont.zoomAllowed());
+  var zc = document.querySelector('app-font-picker input[type=checkbox]');
+  ok('the picker offers the zoom option', !!zc && !zc.checked);
+  zc.click();
+  ok('turning it on lifts the zoom limit', appFont.zoomAllowed() && !/user-scalable|maximum-scale/.test(vp()) && /width=device-width/.test(vp()));
+  zc.click();
+  ok('turning it off restores it, with one viewport tag', /user-scalable=no/.test(vp()) && document.querySelectorAll('meta[name="viewport"]').length === 1);
+  setTimeout(function () { throw new Error('ResizeObserver loop completed with undelivered notifications.'); }, 0);
+  await new Promise(function (r) { setTimeout(r, 30); });
+  ok('benign browser noise is not treated as a crash', !document.getElementById('app-crash-notice'));
+  setTimeout(function () { throw new Error('boom: selftest'); }, 0);
+  await new Promise(function (r) { setTimeout(r, 30); });
+  var crash = document.getElementById('app-crash-notice');
+  ok('an uncaught error shows the crash notice with Reload', crash && /Reload/.test(crash.textContent) && /boom: selftest/.test(crash.querySelector('pre').textContent));
+  Promise.reject(new Error('second'));
+  await new Promise(function (r) { setTimeout(r, 30); });
+  ok('the crash notice shows once', document.querySelectorAll('#app-crash-notice').length === 1);
+  crash.remove();
+  localStorage.removeItem('maker-zoom');
   localStorage.removeItem('maker-font');
   document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
 })();
