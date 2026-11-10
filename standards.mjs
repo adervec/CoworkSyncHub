@@ -126,7 +126,7 @@ const CHECKS = [
     }
     return hosts.size ? fail([...hosts].slice(0, 4).join(', ')) : ok();
   }],
-  ['updates', 'Build shown + update notice', (a) => a.has(FONTJS) ? (a.has(/appUpdateNotice\s*=\s*false/) && !a.has(/updatefound|controllerchange|onNeedRefresh|needRefresh/) ? fail('turns off the shared notice without its own') : ok()) : (a.has(/updatefound|controllerchange|onNeedRefresh|needRefresh|New version|Update available/) ? warn('own update handling (not font.js)') : fail('no update notice'))],
+  ['updates', 'Build shown + update notice', (a) => a.has(FONTJS) ? (a.has(/appUpdateNotice\s*=\s*false/) && !a.has(/updatefound|controllerchange|onNeedRefresh|needRefresh|version\.json|New version/) ? fail('turns off the shared notice without its own') : ok()) : (a.has(/updatefound|controllerchange|onNeedRefresh|needRefresh|version\.json|New version|New version|Update available/) ? warn('own update handling (not font.js)') : fail('no update notice'))],
   ['days', 'Local-day dates', (a) => {
     const bad = [];
     for (const { f, t } of a.text) if (!/(^|\/)(test[-_.]|selftest)|[-_.]test\.|\.test\./i.test(f)) t.split('\n').forEach((l, i) => {
@@ -256,6 +256,7 @@ function selftest() {
   eq(check('theme', fake('document.documentElement.setAttribute("data-theme", localStorage.getItem("t") || "ember")')), 'FAIL', 'a theme default that ignores the device fails');
   eq(check('theme', fake('data-theme ... matchMedia("(prefers-color-scheme: light)")')), 'ok', 'a device-aware default passes');
   eq(check('a11y', fake('<script data-house="font.js">(function(){})()</script>')), 'ok', 'a marked inlined copy of font.js counts');
+  eq(check('updates', fake('<script src="https://adervec.github.io/font.js"></script> window.appUpdateNotice = false; fetch(BASE + "version.json")')), 'ok', 'an own version.json check counts as its own update notice');
   console.log('standards.mjs selftest: ok');
 }
 
