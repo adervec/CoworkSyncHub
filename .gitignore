@@ -11,3 +11,6 @@ sweep-report.html
 sync-log.jsonl
 sources/
 briefs/
+
+# local launcher for resuming the Claude Code session in this folder
+RESUME CLAUDE*.ps1
