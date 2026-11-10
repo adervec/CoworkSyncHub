@@ -73,7 +73,9 @@ function load(app) {
 
 // ---- the checks -----------------------------------------------------------------------------------
 // Each returns [status, note]: 'ok' | 'warn' | 'FAIL' | '?' | '-' (not applicable)
-const FONTJS = /adervec\.github\.io\/font\.js/;
+// font.js counts only when the page really loads it (a <script src> or a script element created with
+// that src); a comment that mentions the URL, or an inlined partial copy, does not.
+const FONTJS = /<script[^>]*\ssrc\s*=\s*["']https:\/\/adervec\.github\.io\/font\.js|\.src\s*=\s*["']https:\/\/adervec\.github\.io\/font\.js/;
 const ok = (note = '') => ['ok', note], warn = (note) => ['warn', note], fail = (note) => ['FAIL', note];
 
 const CHECKS = [
@@ -150,6 +152,36 @@ const CHECKS = [
     if (a.has(FONTJS)) return a.has(/appCrashNotice\s*=\s*false/) && !own ? fail('turns off the shared notice without its own') : ok();
     return own ? warn('own error handling (not font.js)') : fail('uncaught errors are silent');
   }],
+  ['about', 'About panel + diagnostics + offline', (a) => a.has(FONTJS) ? (a.has(/no-about/) && !a.has(/<app-about|createElement\(\s*['"]app-about/) ? fail('hides the About panel and places none') : ok()) : fail('no About panel (font.js not loaded)')],
+  ['whatsnew', "What's new after updates", (a) => {
+    const m = a.all.match(/name=["']app-whatsnew["'][^>]*content=["']([^"']+)["']|content=["']([^"']+)["'][^>]*name=["']app-whatsnew["']/);
+    if (!m) return fail('no <meta name="app-whatsnew">');
+    const file = (m[1] || m[2]).replace(/^\.?\//, '');
+    const found = a.files.find((f) => f === file || f.endsWith('/' + file));
+    if (!found) return fail(`declares ${file} but the repo has no such file`);
+    try { const j = JSON.parse(readFileSync(path.join(a.root, found), 'utf8')); return Array.isArray(j) && j.length && Array.isArray(j[0].items) && j[0].items.length ? ok() : fail(found + ' is empty or not [{date, items}]'); } catch (e) { return fail(found + ' is not valid JSON'); }
+  }],
+  ['theme', 'Default theme follows the device', (a) => {
+    // Not applicable: MusicStudio's themes are per-album artwork palettes, not light/dark.
+    if (/^MusicStudio$/.test(a.app.dir)) return ['-', 'per-album palettes, not light/dark'];
+    // Only the web app's own colour themes count (not a desktop GUI, not "themes" as subject tags).
+    const web = a.text.filter((x) => !/\.py$/.test(x.f)).map((x) => x.t).join('\n');
+    const hasThemes = /data-theme|\bsetTheme\(|\bapplyTheme\(|themechip|theme-quick|(light|dark)[^\n]{0,30}\btheme\b|\btheme\b[^\n]{0,30}(light|dark)/i.test(web);
+    if (!hasThemes) return ['-', 'single theme'];
+    return a.has(/prefers-color-scheme|systemTheme\(\)/) ? ok() : fail('default theme ignores the device light/dark setting');
+  }],
+  ['live', 'Live check + release tag after deploy', (a) => {
+    const viaWorkflow = a.workflows.some((w) => /CoworkSyncHub\/\.github\/workflows\/after-deploy\.yml/.test(w.t));
+    const viaScript = ['scripts/deploy.mjs', 'deploy.sh'].map((f) => path.join(a.root, f)).filter(existsSync).some((f) => /live-check\.mjs/.test(readFileSync(f, 'utf8')));
+    const parent = path.dirname(a.root), viaParent = path.basename(a.root) === 'site' && existsSync(path.join(parent, 'deploy.sh')) && /live-check\.mjs/.test(readFileSync(path.join(parent, 'deploy.sh'), 'utf8'));
+    return viaWorkflow || viaScript || viaParent ? ok() : fail('deploy does not check the live site or tag the release');
+  }],
+  ['notes', 'Agent notes import the house standards', (a) => {
+    const here = path.join(a.root, 'CLAUDE.md'), up = path.join(path.dirname(a.root), 'CLAUDE.md');
+    const f = existsSync(here) ? here : (path.basename(a.root) === 'site' && existsSync(up) ? up : null);
+    if (!f) return fail('no CLAUDE.md');
+    return /HOUSE-STANDARDS\.md/.test(readFileSync(f, 'utf8')) ? ok() : fail('CLAUDE.md does not import ../CoworkSyncHub/HOUSE-STANDARDS.md');
+  }],
 ];
 
 function npmDeps(a) {
@@ -218,6 +250,11 @@ function selftest() {
   eq(check('data', { ...fake('<script src="https://adervec.github.io/font.js"></script> Export Import Erase everything'), code: 'Export Import Erase everything' }), 'ok', 'a comment saying never localStorage.clear() is fine');
   eq(check('pfp', fake('fetch("https://www.googleapis.com/oauth2/v3/userinfo") <img src="${esc(drivePic)}">')), 'ok', 'a picture drawn from a variable passes');
   eq(check('3p', fake('<a href="https://www.openstreetmap.org/x">map</a> fetch("https://api.dropboxapi.com/2/files")')), 'ok', 'links and connected APIs are not page loads');
+  eq(check('a11y', fake('/* house font: CoworkSyncHub/font.js, published at adervec.github.io/font.js */')), 'FAIL', 'a comment naming font.js is not loading it');
+  eq(check('a11y', fake('<script src="https://adervec.github.io/font.js"></script>')), 'ok', 'a real font.js load passes');
+  eq(check('theme', fake('const THEMES = [...new Set(works.flatMap(w => w.themes))]')), '-', 'subject-tag "themes" are not colour themes');
+  eq(check('theme', fake('document.documentElement.setAttribute("data-theme", localStorage.getItem("t") || "ember")')), 'FAIL', 'a theme default that ignores the device fails');
+  eq(check('theme', fake('data-theme ... matchMedia("(prefers-color-scheme: light)")')), 'ok', 'a device-aware default passes');
   console.log('standards.mjs selftest: ok');
 }
 
