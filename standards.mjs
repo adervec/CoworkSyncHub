@@ -145,14 +145,14 @@ const CHECKS = [
   }],
   ['a11y', 'Accessibility floor', (a) => {
     if (!a.has(FONTJS)) return a.has(/user-scalable\s*=\s*no|maximum-scale\s*=\s*1/) ? warn('blocks zoom itself, with no reader option') : fail('no house accessibility floor (font.js)');
-    return a.has(/no-zoom-option/) ? warn('hides the zoom option') : ok();
+    return a.has(/<app-font-picker[^>]*\sno-zoom-option|setAttribute\(\s*['"]no-zoom-option/) ? warn('hides the zoom option') : ok();
   }],
   ['crash', 'Crashes shown, not swallowed', (a) => {
     const own = a.has(/window\.onerror|addEventListener\(\s*['"](error|unhandledrejection)|ErrorBoundary|componentDidCatch/);
     if (a.has(FONTJS)) return a.has(/appCrashNotice\s*=\s*false/) && !own ? fail('turns off the shared notice without its own') : ok();
     return own ? warn('own error handling (not font.js)') : fail('uncaught errors are silent');
   }],
-  ['about', 'About panel + diagnostics + offline', (a) => a.has(FONTJS) ? (a.has(/no-about/) && !a.has(/<app-about|createElement\(\s*['"]app-about/) ? fail('hides the About panel and places none') : ok()) : fail('no About panel (font.js not loaded)')],
+  ['about', 'About panel + diagnostics + offline', (a) => a.has(FONTJS) ? (a.has(/<app-font-picker[^>]*\sno-about|setAttribute\(\s*['"]no-about/) && !a.has(/<app-about|createElement\(\s*['"]app-about/) ? fail('hides the About panel and places none') : ok()) : fail('no About panel (font.js not loaded)')],
   ['whatsnew', "What's new after updates", (a) => {
     const m = a.all.match(/name=["']app-whatsnew["'][^>]*content=["']([^"']+)["']|content=["']([^"']+)["'][^>]*name=["']app-whatsnew["']/);
     if (!m) return fail('no <meta name="app-whatsnew">');
@@ -257,6 +257,8 @@ function selftest() {
   eq(check('theme', fake('data-theme ... matchMedia("(prefers-color-scheme: light)")')), 'ok', 'a device-aware default passes');
   eq(check('a11y', fake('<script data-house="font.js">(function(){})()</script>')), 'ok', 'a marked inlined copy of font.js counts');
   eq(check('updates', fake('<script src="https://adervec.github.io/font.js"></script> window.appUpdateNotice = false; fetch(BASE + "version.json")')), 'ok', 'an own version.json check counts as its own update notice');
+  eq(check('a11y', fake('<script data-house="font.js">if (!this.hasAttribute("no-zoom-option")) {}</script><app-font-picker></app-font-picker>')), 'ok', "font.js's own source does not count as hiding the zoom option");
+  eq(check('a11y', fake('<script src="https://adervec.github.io/font.js"></script><app-font-picker no-zoom-option></app-font-picker>')), 'warn', 'a picker that hides the zoom option warns');
   console.log('standards.mjs selftest: ok');
 }
 
