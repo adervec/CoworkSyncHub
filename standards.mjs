@@ -92,7 +92,13 @@ const CHECKS = [
     if (a.has(FONTJS)) return a.has(/var\(--app-font/) ? (a.has(/app-font-picker|appFont\.(set|options)/) ? ok() : fail('no font picker')) : fail('loads font.js but nothing uses --app-font');
     return a.has(/Atkinson Hyperlegible/) && a.has(/fontFamily|font-family:\s*var\(--/) ? warn('own font system (not font.js)') : fail('no house font');
   }],
-  ['cowork', 'Cowork: shared engine (or own) + manifest', (a) => a.has(/github\.io\/cowork\.js/) && a.has(/cowork-manifest/) ? ok() : a.has(/cowork-manifest|cowork\.json/) ? warn('own cowork, no shared panel') : fail('no cowork')],
+  ['cowork', 'Cowork: shared engine (or own) + manifest', (a) => {
+    if (!a.has(/cowork-manifest|cowork\.json/)) return fail('no cowork manifest');
+    if (!a.has(/github\.io\/cowork\.js/)) return warn('own cowork, no shared panel');
+    // fs-mode apps should describe their channels (label, preview rows, undo); data-mode apps run their own engine
+    const fsMount = a.has(/\.mount\(/), described = a.has(/\bpreview\s*[:(]/) && a.has(/\bchannels\s*:\s*\{/);
+    return fsMount && !described ? warn('shared engine with defaults: give each channel a label, preview rows and undo') : ok();
+  }],
   ['license', 'Licence, notices, privacy note', (a) => {
     const lic = a.files.find((f) => /^(LICEN[CS]E|COPYING)(\.md|\.txt)?$/i.test(f));
     if (!lic) return fail('no LICENSE');
