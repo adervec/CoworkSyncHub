@@ -1,0 +1,128 @@
+<!doctype html><meta charset="utf-8"><title>cowork.js engine self-test</title>
+<body style="font:14px system-ui;margin:24px"><h1 id="r">running…</h1><pre id="log"></pre><div id="host"></div><div id="host1"></div>
+<script src="cowork.js"></script>
+<script>
+// An in-memory stand-in for the File System Access API: enough of FileSystemDirectoryHandle for the engine.
+var clock = 1e12;
+function FakeDir(name) { this.kind = 'directory'; this.name = name; this.kids = {}; }
+FakeDir.prototype.getDirectoryHandle = async function (n, o) {
+  if (!this.kids[n]) { if (!(o && o.create)) throw new DOMException('no ' + n, 'NotFoundError'); this.kids[n] = new FakeDir(n); }
+  if (this.kids[n].kind !== 'directory') throw new DOMException('not a dir', 'TypeMismatchError');
+  return this.kids[n];
+};
+FakeDir.prototype.getFileHandle = async function (n, o) {
+  if (!this.kids[n]) { if (!(o && o.create)) throw new DOMException('no ' + n, 'NotFoundError'); this.kids[n] = new FakeFile(n); }
+  return this.kids[n];
+};
+FakeDir.prototype.removeEntry = async function (n) { if (!this.kids[n]) throw new DOMException('no ' + n, 'NotFoundError'); delete this.kids[n]; };
+FakeDir.prototype.values = function () { var v = Object.values(this.kids), i = 0; return { [Symbol.asyncIterator]() { return this; }, next: async function () { return i < v.length ? { value: v[i++], done: false } : { done: true }; } }; };
+FakeDir.prototype.queryPermission = async function () { return 'granted'; };
+function FakeFile(name) { this.kind = 'file'; this.name = name; this.data = ''; this.mtime = 0; }
+FakeFile.prototype.getFile = async function () { var s = this; return { lastModified: s.mtime, text: async function () { return s.data; } }; };
+FakeFile.prototype.createWritable = async function () { var s = this, buf = ''; return { write: async function (t) { buf += t; }, close: async function () { s.data = buf; s.mtime = (clock += 1000); } }; };
+async function put(root, path, text) { var p = path.split('/'), d = root; for (var i = 0; i < p.length - 1; i++) d = await d.getDirectoryHandle(p[i], { create: true }); var f = await d.getFileHandle(p[p.length - 1], { create: true }); var w = await f.createWritable(); await w.write(text); await w.close(); }
+async function get(root, path) { try { var p = path.split('/'), d = root; for (var i = 0; i < p.length - 1; i++) d = await d.getDirectoryHandle(p[i]); return (await d.getFileHandle(p[p.length - 1])).data; } catch (e) { return null; } }
+
+(async function () {
+  var fails = [], log = [];
+  function ok(c, m) { (c ? log : fails).push(m); }
+  ['cowork-state:enginetest', 'cowork-state:v1test'].forEach(function (k) { localStorage.removeItem(k); });
+  ok(cowork.version === 2, 'version 2');
+  ok(cowork.isDue('5m', Date.now() - 6 * 60e3, Date.now()) && !cowork.isDue('5m', Date.now() - 60e3, Date.now()) && !cowork.isDue('off', 0, Date.now()) && cowork.isDue('hourly', 0, Date.now()), 'schedules: due after the interval, a never-run channel is due, manual never');
+
+  var applied = [], undone = [], coachSeen = [];
+  var manifest = { protocol: 'cowork-manifest', protocolVersion: 1, app: 'enginetest', channels: [
+    { name: 'coach', request: ['coach/request.json'], instructions: 'coach/INSTRUCTIONS.md', replyPath: 'coach/reply.json' },
+    { name: 'plan', request: ['plan/context.json'], replyDir: 'plan/inbox', replyPrefix: 'output-' }] };
+  var p = cowork.mount(document.getElementById('host'), {
+    app: 'enginetest', manifest: manifest,
+    files: function (ch) { return ch === 'coach' ? { 'coach/request.json': { requestHash: 'h-coach', payload: { n: 1 } }, 'coach/INSTRUCTIONS.md': '# coach' } : { 'plan/context.json': { payload: { week: 1 } } }; },
+    channels: {
+      coach: { label: 'Coach', review: false, apply: function (reply) { coachSeen.push(reply.say); return { summary: 'said ' + reply.say }; } },
+      plan: { label: 'Plan', schedule: 'daily',
+        preview: function (reply) { return reply.changes.map(function (c) { return { id: c.id, label: c.label, detail: c.old + ' -> ' + c.new }; }); },
+        apply: function (reply, ids) { applied.push(ids.join(',')); return { summary: ids.length + ' change(s)', undo: { ids: ids } }; },
+        undo: function (data) { undone.push(data.ids.join(',')); } },
+    },
+  });
+  var root = new FakeDir('folder');
+  await p.useFolder(root);
+  ok(JSON.parse(await get(root, 'cowork-machine.json')).deviceId === localStorage.getItem('cowork-device'), 'the first device to connect holds the sync claim');
+  ok(JSON.parse(await get(root, 'cowork.json')).app === 'enginetest' && (await get(root, 'coach/INSTRUCTIONS.md')) === '# coach' && !!(await get(root, 'plan/context.json')), 'connecting writes the manifest and every request file');
+  var st = JSON.parse(localStorage.getItem('cowork-state:enginetest'));
+  ok(st.reqHash.coach === 'h-coach' && !!st.reqHash.plan, 'the request fingerprint is remembered (declared, or a hash of what was written)');
+
+  // a report channel with review off applies by itself, once
+  await put(root, 'coach/reply.json', JSON.stringify({ requestHash: 'h-coach', say: 'rest more' }));
+  await p.refresh();
+  ok(coachSeen.join() === 'rest more', 'review off: the reply applies by itself');
+  await p.refresh();
+  ok(coachSeen.length === 1, 'a reply is never applied twice');
+  // a reply for an older request is held back
+  await put(root, 'coach/reply.json', JSON.stringify({ requestHash: 'h-old', say: 'stale advice' }));
+  await p.refresh();
+  ok(coachSeen.length === 1 && /older request/.test(p.channels[0].note), 'a reply that answers an older request is held back');
+
+  // review is the default: nothing changes until approved, and only the ticked rows
+  await put(root, 'plan/inbox/output-2026-11-10.json', JSON.stringify({ changes: [{ id: 'a', label: 'Monday: squat', old: 'rest', new: 'squat' }, { id: 'b', label: 'Tuesday: run', old: 'rest', new: 'run' }] }));
+  await p.refresh();
+  var plan = p.channels[1];
+  ok(!!plan.review && applied.length === 0 && cowork.stateOf(plan) === 'REVIEW', 'review on by default: the reply waits for approval');
+  var rows = p.shadowRoot.querySelectorAll('.rvcard input[type=checkbox]');
+  ok(rows.length === 2 && p.shadowRoot.querySelector('.rvcard').textContent.indexOf('rest -> squat') >= 0, 'the review card lists each proposed change');
+  rows[1].checked = false;
+  p.shadowRoot.querySelector('.rvcard button.primary').click();
+  await new Promise(function (r) { setTimeout(r, 50); });
+  ok(applied.join('|') === 'a', 'only the ticked change is applied');
+  ok(!(await get(root, 'plan/inbox/output-2026-11-10.json')) && !!(await get(root, 'plan/processed/output-2026-11-10.json')), 'a handled reply moves to processed/');
+  st = JSON.parse(localStorage.getItem('cowork-state:enginetest'));
+  var idx = st.history.map(function (e) { return e.kind; }).lastIndexOf('apply');
+  ok(st.history[idx].undo && st.history[idx].undo.ids[0] === 'a', 'the apply is in the history with its undo data');
+  await p.undo(idx);
+  ok(undone.join() === 'a', 'undo hands the app its undo data back');
+
+  // discard
+  await put(root, 'plan/inbox/output-2026-11-11.json', JSON.stringify({ changes: [{ id: 'c', label: 'x', old: 1, new: 2 }] }));
+  await p.refresh();
+  await p.discard('plan');
+  ok(applied.length === 1 && !!(await get(root, 'plan/processed/output-2026-11-11.json')), 'discard applies nothing and archives the reply');
+
+  // an agent that could not do the job
+  await put(root, 'plan/inbox/error-2026-11-12.json', JSON.stringify({ reason: 'no workouts this week' }));
+  await p.refresh();
+  ok(/agent reported: no workouts this week/.test(p.channels[1].note), "an agent's error file shows its reason");
+
+  // the per-channel review switch
+  p._st.review.plan = false;
+  await put(root, 'plan/inbox/output-2026-11-13.json', JSON.stringify({ changes: [{ id: 'd', label: 'y', old: 1, new: 2 }] }));
+  await p.refresh();
+  ok(applied.length === 2 && !p.channels[1].review, 'switching review off for one channel applies its replies directly');
+
+  // schedules run only on the sync device
+  p._st.sched.coach = '5m'; p._st.lastRun.coach = Date.now() - 6 * 60e3; p._st.lastRun.plan = Date.now();
+  var ran = await p.tick();
+  ok(ran.join() === 'coach', 'the scheduler runs what is due on the sync device');
+  await put(root, 'cowork-machine.json', JSON.stringify({ deviceId: 'another', name: 'the other laptop' }));
+  p._st.lastRun.coach = 0;
+  ran = await p.tick();
+  ok(ran.length === 0, 'a device that is not the sync device runs no schedules');
+  ok(/the other laptop/.test(p.shadowRoot.querySelector('details summary').textContent), 'the panel names the sync device');
+
+  // the old one-call setup still works, and now reviews by default
+  var v1 = [];
+  var q = cowork.mount(document.getElementById('host1'), { app: 'v1test', manifest: { protocol: 'cowork-manifest', protocolVersion: 1, app: 'v1test', channels: [{ name: 'coach', request: ['coach/request.json'], replyPath: 'coach/reply.json' }] },
+    files: function () { return { 'coach/request.json': { payload: {} } }; }, apply: function (ch, reply) { v1.push(ch + ':' + reply.text); } });
+  var r1 = new FakeDir('v1');
+  await q.useFolder(r1);
+  await put(r1, 'coach/reply.json', JSON.stringify({ text: 'hello' }));
+  await q.refresh();
+  ok(v1.length === 0 && !!q.channels[0].review, 'v1 setup: the reply waits for review (shown as raw content)');
+  ok(q.shadowRoot.querySelector('.rvcard pre').textContent.indexOf('hello') >= 0, 'v1 review shows the reply');
+  await q.approve('coach');
+  ok(v1.join() === 'coach:hello', 'v1 setup: approving calls the old apply(channel, reply)');
+
+  document.getElementById('r').textContent = fails.length ? 'FAIL ' + fails.length : 'SELFTEST PASS ' + log.length + ' checks';
+  document.getElementById('log').textContent = (fails.length ? 'FAILED:\n' + fails.join('\n') + '\n\n' : '') + 'passed:\n' + log.join('\n');
+  ['cowork-state:enginetest', 'cowork-state:v1test'].forEach(function (k) { localStorage.removeItem(k); });
+})().catch(function (e) { document.getElementById('r').textContent = 'FAIL crashed: ' + e.message; document.getElementById('log').textContent = e.stack; });
+</script>

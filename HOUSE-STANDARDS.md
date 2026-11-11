@@ -30,8 +30,16 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
 1. **Drive sync** to the private app folder (`drive.appdata`), and the signed-in Google **profile
    picture** shown beside the account (`<img src=picture referrerpolicy="no-referrer">`).
 2. **House font**: Atkinson Hyperlegible by default, reader-changeable (font.js).
-3. **Cowork**: the shared panel plus a `cowork.json` manifest (the exact "same style" rule is still
-   being decided).
+3. **Cowork** (the GymTracker / Tachyread style): named channels, each with fixed request files,
+   instructions and a reply format, declared in a `cowork.json` manifest; a schedule per channel
+   that runs only on the ONE sync device; replies checked automatically; a run history; and replies
+   that can never do more than asked: a fingerprint (`requestHash`) the reply must echo, never
+   applied twice, archived to `processed/`, and an error file when the agent cannot do the job.
+   **Review before applying is the default**, and can be switched off per channel. A reviewed
+   change should be undoable. The shared `cowork.js` (v2) does all of this: pass `channels` with
+   `label`, `schedule`, `review`, `preview(reply)` (rows to tick), `apply(reply, acceptedIds)` (return
+   `{ summary, undo }`) and `undo(data)`, plus an optional `brief()` for BRIEF.md. An app with its own
+   engine (GymTracker, Tachyread) must provide the same guarantees.
 4. **Licence and legal**: a `LICENSE` (MIT unless there is a reason); `THIRD-PARTY-NOTICES.md` for any
    bundled third-party code or fonts; an in-app note on where the data lives.
 5. **CI on every push** that runs the app's checks.

@@ -53,7 +53,7 @@ APPS = [
              "Adaptive workout plans and a fast set logger",
              "Picker-driven equipment setup: barbell, dumbbell, kettlebell, landmine…",
              "Per-exercise reference media and baked-in coaching guides",
-             "Biometrics plus Strava reconciliation",
+             "Biometrics, wearable recovery metrics, and Strava reconciliation",
              "Cloud sync via Google Drive, Dropbox, or OneDrive",
              "Offline-first — everything lives in your browser storage",
          ]),
@@ -63,7 +63,7 @@ APPS = [
          features=[
              "Import TXT, DOCX, PDF, EPUB — or OCR-grab text from images",
              "~30 themes and animated reader faces",
-             "Text-to-speech, voice and clap control",
+             "Listen mode: text-to-speech rendered ahead and pulled to your phone",
              "Trackyread: a reading log of every book, with notes and a fading-memory check",
              "Typing and speaking minigames, audiobook recording",
              "Measured reading stats and an editable table of contents",
@@ -87,6 +87,7 @@ APPS = [
              "Live tuner across 59 instruments and their tunings",
              "45+ public-domain songs, each with a synthesized backing band",
              "Karaoke with word-by-word lyrics and pitch scoring",
+             "Practice mode, MIDI input, MusicXML import, sight-reading",
              "Song editor, record-and-transcribe, theory games, courses",
          ]),
     dict(slug="BlackMirrorBikeRide", kind="ride", dir="BlackMirrorBikeRide", title="Black Mirror Bike Ride",
@@ -143,7 +144,7 @@ APPS = [
              "Reading projects — import a document and work through it passage by passage",
              "Trends, an activity heatmap, A/B compare, AI-coach export",
          ]),
-    dict(slug="Mise", kind="cook", dir=None, title="Mise", emoji="\U0001F373", hue=75,
+    dict(slug="Mise", kind="cook", dir="Mise", title="Mise", emoji="\U0001F373", hue=75,
          tagline="An interactive cookbook you can run — recipes execute as live, scheduled flow charts.",
          badges=["PWA", "offline", "voice"],
          features=[
@@ -164,14 +165,14 @@ APPS = [
              "Equipment packs: plain JSON defines drills, faces, and vocabulary",
          ]),
     dict(slug="Run315", kind="cardio", dir="Run315", title="Run315", emoji="\U0001F3C3", hue=190,
-         tagline="Self-hosted running analytics — Garmin sync, race projections, routes, trails, territory.",
-         badges=["self-hosted", "Garmin sync", "live demo"],
+         tagline="GymTracker for cardio — every Garmin and Strava number you have, analysed properly.",
+         badges=["PWA", "Drive sync", "Garmin + Strava", "demo athlete"],
          features=[
-             "Garmin Connect sync; best efforts mined from inside every run",
-             "Fitness / fatigue / form model, race projections, taper planning",
-             "Route builder, trail completion, and an interval territory game",
-             "Shoe mileage, weather correction, climbing and durability analysis",
-             "The live site is a frozen demo year — self-host it for your own data",
+             "Garmin and Strava arrive through a cowork folder, or a Garmin export archive",
+             "A fitness / fatigue model fitted to you, race projections, taper planning",
+             "Route builder, new-ground runs, trail completion, and a territory game",
+             "Replay, ghost races, records, year in review — and an SQL console over it all",
+             "No server, no account — press Load demo athlete to look around",
          ]),
     dict(slug="learning-pit", kind="study", dir="learning-pit", title="Learning Pit", emoji="\U0001F9E0", hue=55,
          tagline="Flashcards and learning games with spaced repetition — for readers and pre-readers alike.",
@@ -188,31 +189,53 @@ APPS = [
          badges=["PWA", "BYO API key", "local backup"],
          features=[
              "Albums in nested groups with full metadata and per-group themes",
-             "Generate songs and dialog; fill an album with a cost estimate first",
+             "Generate songs, dialog, sound effects and stems — cost estimate first",
              "Waveforms, trim/fade/gain, reorder, playlists, crossfaded mixdowns",
              "Export tagged tracks — and publish picked albums to a phone-synced folder",
-             "A backup folder an agent can co-author album designs into",
+             "Ratings, notes, and a taste profile an agent can read and design albums from",
          ]),
-    dict(slug="long-gallery", kind="art", dir="long-gallery", title="The Long Gallery", emoji="\U0001F5BC️", hue=335,
-         tagline="A museum in a single page — 5,600 works from the Olmec heads to now, each with its story.",
+    dict(slug="long-gallery", kind="art", dir="ArtGallery/site", title="The Long Gallery", emoji="\U0001F5BC️", hue=335,
+         tagline="A museum in a single page — 9,300 works from the Olmec heads to now, each with its story.",
          badges=["PWA", "offline"],
          features=[
              "Six eras, Antiquity to Modern, across movements, regions and themes",
-             "Nine media, from painting and sculpture to manuscript, textile and installation",
              "Every work with its story: what it is, its context, and a hidden detail",
-             "HD images with zoom, plus guided tours through the collection",
-             "Track what you've seen as you wander",
+             "HD zoom on every credited plate, plus guided tours through the collection",
+             "A map of where each work hangs; artist pages with portraits and timelines",
+             "Autoplay: a hands-free walk, timed or narrated with subtitles",
          ]),
-    dict(slug="classical-journey", kind="listen", dir="classical-journey", title="The Classical Journey",
+    dict(slug="classical-journey", kind="listen", dir="Classical Music/site", title="The Classical Journey",
          emoji="🎼", hue=15,
          tagline="Every piece worth hearing, in order — Gregorian chant to now, with what to listen for.",
          badges=["PWA", "offline", "links out"],
          features=[
-             "2,444 works by 535 composers across seven eras",
+             "8,300 works — the classical canon, plus a Journey for every other genre",
              "Each one: what it is, the world it came from, and what to listen for",
-             "69 theory stops, placed where history invented the idea",
-             "Plays a free Internet Archive recording, and links out to six services",
-             "Your progress, ratings and notes stay in your browser",
+             "Theory stops, placed where history invented the idea",
+             "Autoplay with spoken notes, a gym mode, and a blind listening quiz",
+             "Piece of the day, a weekly mix, and listening-history import",
+         ]),
+    dict(slug="InsightMaster", kind="focus", dir="InsightMaster", title="InsightMaster", emoji="\U0001F9D8", hue=180,
+         tagline="A meditation practice tracker whose timer teaches — it walks the technique step by step.",
+         badges=["PWA", "offline", "single file"],
+         download=("single file", "https://github.com/adervec/InsightMaster/blob/main/insight-hunter.html"),
+         features=[
+             "A guided timer: countdown ring, bells, and the current step called out in time",
+             "Open-ended sits, a settling-in countdown, vibration for silent sits",
+             "Plans, streaks, reminders, and stats on where the practice has gone",
+             "The content is data — ships with sitting meditation, replace it with your own",
+             "One file, no account; history exports to CSV",
+         ]),
+    dict(slug="CelebrityCrusher", kind="cardio", dir="CelebrityCrusher", title="Celebrity Crusher", emoji="\U0001F3C5",
+         hue=350,
+         tagline="389 celebrity fitness feats, judged against your own Strava and Garmin data.",
+         badges=["PWA", "offline", "Strava + Garmin import"],
+         features=[
+             "Which feats you've already beaten, which you'd clear today, which are a plan",
+             "Fitness / fatigue, estimated VO₂max, and a marathon projection with a second opinion",
+             "Goals: feat + date becomes a week-by-week build, exportable to your calendar",
+             "Pace curve against every timed feat, Eddington numbers, a three-year forecast",
+             "Zero dependencies — the same app runs as a local server with live OAuth sync",
          ]),
 ]
 
@@ -1035,13 +1058,12 @@ location.replace("/portal/"+location.search+location.hash);
 COWORK_DOC = """<section class="doc">
 <h2 class="eyebrow">// what it is</h2>
 <p>Every app here can hand its data to an AI agent and take the answer back, through a plain folder on
-your disk: the app writes a <code>cowork.json</code> manifest plus request files, an agent (Claude Code via
-CoworkSyncHub, Claude Desktop pointed at the folder, or a person) writes reply files beside them, the app
+your disk: the app writes a <code>cowork.json</code> manifest plus request files, an agent (Claude
+Cowork or Claude Code pointed at the folder, or a person) writes reply files beside them, the app
 imports the reply. Nothing goes through a server you don't run.</p>
 <h2 class="eyebrow">// one panel, every app</h2>
 <p>The panel below is the exact same component every app shows — same words, same states, same buttons —
-no matter what the app around it looks like. CoworkSyncHub shows the same panel for every connected
-app, where the buttons run the agent instead of writing files.</p>
+no matter what the app around it looks like.</p>
 <div id="demo"></div>
 <h2 class="eyebrow">// states</h2>
 <ul class="feat"><li><b>idle</b> — nothing asked yet.</li><li><b>PENDING</b> — a request is newer than any reply.</li>
@@ -1067,7 +1089,7 @@ cowork.mount(document.getElementById("sync"), {
 panel <code>{app, channels, actions}</code> and listen for <code>cowork-action</code>. Theme it only
 through <code>--cowork-*</code> custom properties; the rest is shadow DOM on purpose. Protocol details:
 <a href="https://github.com/adervec/CoworkSyncHub">CoworkSyncHub / COWORK-PROTOCOL.md</a>.
-Step-by-step setup and troubleshooting for every app, the hub, and the data sources (Garmin, Strava,
+Step-by-step setup and troubleshooting for every app, the briefs folder, and the data sources (Garmin, Strava,
 Drive, Bluetooth): <a href="https://github.com/adervec/CoworkSyncHub/blob/main/SETUP.md">SETUP.md</a>.</p>
 <h2 class="eyebrow">// the other two contracts</h2>
 <p>Because every app lives on this origin, they share two small localStorage notes with the portal:
@@ -1085,7 +1107,8 @@ COWORK_SELFTEST = """<!doctype html><meta charset="utf-8"><title>cowork.js self-
 <script>
 (async function(){
   var fails=[],log=[];function ok(c,m){(c?log:fails).push(m);}
-  ok(window.cowork&&cowork.version===1,"global + version");
+  ok(window.cowork&&cowork.version===2,"global + version");
+  ok(cowork.stateOf({review:{}})==="REVIEW","stateOf review");
   ok(cowork.stateOf({pending:true})==="PENDING","stateOf pending");
   ok(cowork.stateOf({pending:true,answered:true})==="answered","stateOf answered");
   ok(cowork.stateOf({pending:true,stale:true})==="STALE","stateOf stale");
@@ -1121,6 +1144,11 @@ COWORK_SELFTEST = """<!doctype html><meta charset="utf-8"><title>cowork.js self-
 def write_cowork():
     """Publish the shared cowork UI + its docs page + a browser self-test."""
     shutil.copy(BASE / "cowork.js", SITE / "cowork.js")
+    # the house font: font.js + the Atkinson Hyperlegible files it points at + its self-test
+    shutil.copy(BASE / "cowork-engine-test.html", SITE / "cowork-engine-test.html")  # the engine, against an in-memory folder
+    for f in ("font.js", "font-selftest.html"):
+        shutil.copy(BASE / f, SITE / f)
+    shutil.copytree(BASE / "fonts", SITE / "fonts", dirs_exist_ok=True)
     (SITE / "cowork").mkdir(exist_ok=True)
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -1279,7 +1307,7 @@ FORBID = re.compile(
 # ---------- legal / ToS / privacy / PG-content sweep over the app repos ----------
 # Advisory, never blocking: these are judgment calls for the maker, unlike the
 # credential audit above which hard-stops a deploy. Runs on every deploy and on
-# `python portal.py sweep`; the hub's `status` prints the cached summary line.
+# `python portal.py sweep`.
 SWEEP_PATH = BASE / "sweep.json"
 SWEEP_REPORT = BASE / "sweep-report.html"
 SWEEP_SKIP = {"node_modules", ".git", "dist", "build", ".cache", "site", "coverage", ".next",

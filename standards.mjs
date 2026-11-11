@@ -92,7 +92,7 @@ const CHECKS = [
     if (a.has(FONTJS)) return a.has(/var\(--app-font/) ? (a.has(/app-font-picker|appFont\.(set|options)/) ? ok() : fail('no font picker')) : fail('loads font.js but nothing uses --app-font');
     return a.has(/Atkinson Hyperlegible/) && a.has(/fontFamily|font-family:\s*var\(--/) ? warn('own font system (not font.js)') : fail('no house font');
   }],
-  ['cowork', 'Cowork panel + manifest (definition open)', (a) => a.has(/github\.io\/cowork\.js/) && a.has(/cowork-manifest/) ? ok() : a.has(/cowork-manifest|cowork\.json/) ? warn('own cowork, no shared panel') : fail('no cowork')],
+  ['cowork', 'Cowork: shared engine (or own) + manifest', (a) => a.has(/github\.io\/cowork\.js/) && a.has(/cowork-manifest/) ? ok() : a.has(/cowork-manifest|cowork\.json/) ? warn('own cowork, no shared panel') : fail('no cowork')],
   ['license', 'Licence, notices, privacy note', (a) => {
     const lic = a.files.find((f) => /^(LICEN[CS]E|COPYING)(\.md|\.txt)?$/i.test(f));
     if (!lic) return fail('no LICENSE');
