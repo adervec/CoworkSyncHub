@@ -757,6 +757,19 @@
     return lang();
   });
 
+  // ---- Home-screen registry for the portal ----------------------------------------------------------
+  // Browsers never tell one page what else is installed, so each app notes it itself in the shared
+  // same-origin 'portal-installed' map ({ <slug>: time }): when it is installed, and on every launch from
+  // the home screen. Nothing else is recorded; nothing leaves the device. The slug is the first path
+  // segment (adervec.github.io/<slug>/), the same as the portal's.
+  var homeSlug = decodeURIComponent(location.pathname.split('/')[1] || '');
+  function markInstalled() {
+    if (!homeSlug || /\.html?$/.test(homeSlug)) return;
+    try { var reg = JSON.parse(localStorage.getItem('portal-installed') || '{}'); reg[homeSlug] = Date.now(); localStorage.setItem('portal-installed', JSON.stringify(reg)); } catch (e) { /* private mode */ }
+  }
+  if (navigator.standalone || ['standalone', 'minimal-ui', 'fullscreen', 'window-controls-overlay'].some(function (m) { return matchMedia('(display-mode: ' + m + ')').matches; })) markInstalled();
+  window.addEventListener('appinstalled', markInstalled);
+
   // ---- Safety helpers (house standard 22) ------------------------------------------------------------
   // Every app shares the adervec.github.io origin, so one injected script could read every app's data.
   // Text from outside (imports, Drive, cowork replies, the URL, a profile name) never becomes markup.

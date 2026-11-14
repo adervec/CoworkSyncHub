@@ -1,0 +1,390 @@
+[
+  {
+    "slug": "GymTracker315",
+    "kind": "lift",
+    "dir": "GymTracker",
+    "title": "GymTracker",
+    "emoji": "🏋️",
+    "hue": 20,
+    "tagline": "A whole gym logbook in one HTML file — lifts, cardio, plans, and progress.",
+    "badges": [
+      "PWA",
+      "single file",
+      "Strava sync",
+      "cloud sync"
+    ],
+    "download": [
+      "single file",
+      "https://github.com/adervec/GymTracker315/blob/main/gym-tracker.html"
+    ],
+    "features": [
+      "Adaptive workout plans and a fast set logger",
+      "Picker-driven equipment setup: barbell, dumbbell, kettlebell, landmine…",
+      "Per-exercise reference media and baked-in coaching guides",
+      "Biometrics, wearable recovery metrics, and Strava reconciliation",
+      "Cloud sync via Google Drive, Dropbox, or OneDrive",
+      "Offline-first — everything lives in your browser storage"
+    ]
+  },
+  {
+    "slug": "Tachyread",
+    "kind": "read",
+    "dir": "Tachyread",
+    "title": "Tachyread",
+    "emoji": "⚡",
+    "hue": 270,
+    "tagline": "Speed reading one word at a time — RSVP on an optimal recognition point, up to ~1500 WPM.",
+    "badges": [
+      "Drive sync",
+      "⚠ flashing text"
+    ],
+    "features": [
+      "Import TXT, DOCX, PDF, EPUB — or OCR-grab text from images",
+      "~30 themes and animated reader faces",
+      "Listen mode: text-to-speech rendered ahead and pulled to your phone",
+      "Trackyread: a reading log of every book, with notes and a fading-memory check",
+      "Typing and speaking minigames, audiobook recording",
+      "Measured reading stats and an editable table of contents"
+    ]
+  },
+  {
+    "slug": "ChessRetabled",
+    "kind": "chess",
+    "dir": "ChessRetabled",
+    "title": "ChessRetabled",
+    "emoji": "♞",
+    "hue": 165,
+    "tagline": "A cel-shaded chess club in the browser — bots, lessons, puzzles, and 56 games.",
+    "badges": [
+      "PWA",
+      "offline",
+      "Drive sync"
+    ],
+    "features": [
+      "12 Stockfish-powered characters, 250 to 2850 Elo",
+      "37 validated tactics puzzles with rated training",
+      "Academy courses and practice-arena endgame drills",
+      "56 games — board, cards, logic — each with a strategy guide",
+      "Level, XP, streaks, and personal ratings",
+      "Full offline play once installed"
+    ]
+  },
+  {
+    "slug": "GuitarPicker",
+    "kind": "practice",
+    "dir": "GuitarPicker",
+    "title": "GuitarPicker",
+    "emoji": "🎸",
+    "hue": 45,
+    "tagline": "Zero-build guitar school — note highway, tuner, karaoke, and a synthesized backing band.",
+    "badges": [
+      "PWA",
+      "Drive sync"
+    ],
+    "features": [
+      "Streaming note highway with per-note grading",
+      "Live tuner across 59 instruments and their tunings",
+      "45+ public-domain songs, each with a synthesized backing band",
+      "Karaoke with word-by-word lyrics and pitch scoring",
+      "Practice mode, MIDI input, MusicXML import, sight-reading",
+      "Song editor, record-and-transcribe, theory games, courses"
+    ]
+  },
+  {
+    "slug": "BlackMirrorBikeRide",
+    "kind": "ride",
+    "dir": "BlackMirrorBikeRide",
+    "title": "Black Mirror Bike Ride",
+    "emoji": "🚴",
+    "hue": 130,
+    "tagline": "A homebrew Zwift — your real trainer over Bluetooth, low-poly worlds, real GPX routes.",
+    "badges": [
+      "PWA",
+      "Bluetooth",
+      "Drive sync"
+    ],
+    "features": [
+      "Reads power and heart rate over Web Bluetooth — zero drivers",
+      "A proper physics model behind every ride",
+      "Build your own low-poly 3D worlds",
+      "GPX import plus 34 bundled routes (~660 km)",
+      "Replay, ride history, and ghosts"
+    ]
+  },
+  {
+    "slug": "BodybuildingProgressCoach",
+    "kind": "checkin",
+    "dir": "BodybuildingProgressCoach",
+    "title": "Bodybuilding Progress Coach",
+    "emoji": "🗿",
+    "hue": 240,
+    "tagline": "Honest physique and posing tracking from your own photos — scored against the classics.",
+    "badges": [
+      "PWA",
+      "offline",
+      "AI optional"
+    ],
+    "features": [
+      "On-device pose analysis — nothing uploaded",
+      "Objective symmetry and proportion geometry first, opinion second",
+      "Per-division posing technique (24 mandatories) and live mirror practice",
+      "Body-composition trends corroborate the photos",
+      "Aligned progress timelapses"
+    ]
+  },
+  {
+    "slug": "HandwritingHelper",
+    "kind": "write",
+    "dir": "HandwritingHelper",
+    "title": "Handwriting Helper",
+    "emoji": "✍️",
+    "hue": 210,
+    "tagline": "Photograph a page of handwriting and get honest, measured scores — then drill.",
+    "badges": [
+      "PWA",
+      "offline"
+    ],
+    "features": [
+      "Per-line scores: slant, baseline, size, spacing, pen control, legibility",
+      "Right or left hand, print or cursive, plus mirror-prime mode",
+      "38 drills with printable guide sheets in true size",
+      "Review scan batches as a gallery, with duplicate detection",
+      "Streaks, trends, and full history"
+    ]
+  },
+  {
+    "slug": "MicroMiniger",
+    "kind": "paint",
+    "dir": "MicroMiniger",
+    "title": "MicroMiniger",
+    "emoji": "⚔️",
+    "hue": 0,
+    "tagline": "A miniature-collection manager — paint queue, photo studio, and offline photo-to-3D.",
+    "badges": [
+      "PWA",
+      "offline"
+    ],
+    "features": [
+      "Rich per-mini metadata, kitbash-aware, with provenance and value",
+      "Kanban paint queue, paint timer, deadlines",
+      "Multi-angle photos, 360° viewer, spin video and GIF export",
+      "Photo-to-3D mesh and Gaussian-splat viewer, STL/PLY export",
+      "Armies, points, and a battle log",
+      "Field-scoped search, bulk edit, CSV, one-file backup"
+    ]
+  },
+  {
+    "slug": "SpeechImprover",
+    "kind": "speak",
+    "dir": "SpeechImprover",
+    "title": "SpeechImprover",
+    "emoji": "🎙️",
+    "hue": 315,
+    "tagline": "Record yourself and get ten scored attributes — then train the weak ones.",
+    "badges": [
+      "PWA",
+      "Drive sync"
+    ],
+    "features": [
+      "962 public-domain passages, 158 exercises, 65 targeted drills",
+      "Ten attributes scored 0–100, from pace to projection",
+      "Free speaking toward a chosen target tone or emotion",
+      "Reading projects — import a document and work through it passage by passage",
+      "Trends, an activity heatmap, A/B compare, AI-coach export"
+    ]
+  },
+  {
+    "slug": "Mise",
+    "kind": "cook",
+    "dir": "Mise",
+    "title": "Mise",
+    "emoji": "🍳",
+    "hue": 75,
+    "tagline": "An interactive cookbook you can run — recipes execute as live, scheduled flow charts.",
+    "badges": [
+      "PWA",
+      "offline",
+      "voice"
+    ],
+    "features": [
+      "114 recipes plus techniques, ingredients, and equipment guides",
+      "Execute mode: station swimlanes, a moving playhead, countdowns, alarms",
+      "Voice control — play, pause, done, skip — with steps read aloud",
+      "A cook log of every finished cook, exportable",
+      "Field guides: coffee, tea, alcohol, protein prep — and a box-mix calculator"
+    ]
+  },
+  {
+    "slug": "MarksmanApp",
+    "kind": "aim",
+    "dir": "MarksmanApp",
+    "title": "Marksman",
+    "emoji": "🎯",
+    "hue": 100,
+    "tagline": "Foam-dart marksmanship, measured — photograph your target and get real metrics.",
+    "badges": [
+      "web + desktop",
+      "Drive sync",
+      "CLI"
+    ],
+    "features": [
+      "Mark up a photo of where your darts landed — precision, accuracy, bias",
+      "Tiered practice standards judge every session",
+      "Progress overall, by blaster category, and by specific blaster",
+      "Prints true-size target faces to shoot at",
+      "Equipment packs: plain JSON defines drills, faces, and vocabulary"
+    ]
+  },
+  {
+    "slug": "Run315",
+    "kind": "cardio",
+    "dir": "Run315",
+    "title": "Run315",
+    "emoji": "🏃",
+    "hue": 190,
+    "tagline": "GymTracker for cardio — every Garmin and Strava number you have, analysed properly.",
+    "badges": [
+      "PWA",
+      "Drive sync",
+      "Garmin + Strava",
+      "demo athlete"
+    ],
+    "features": [
+      "Garmin and Strava arrive through a cowork folder, or a Garmin export archive",
+      "A fitness / fatigue model fitted to you, race projections, taper planning",
+      "Route builder, new-ground runs, trail completion, and a territory game",
+      "Replay, ghost races, records, year in review — and an SQL console over it all",
+      "No server, no account — press Load demo athlete to look around"
+    ]
+  },
+  {
+    "slug": "learning-pit",
+    "kind": "study",
+    "dir": "learning-pit",
+    "title": "Learning Pit",
+    "emoji": "🧠",
+    "hue": 55,
+    "tagline": "Flashcards and learning games with spaced repetition — for readers and pre-readers alike.",
+    "badges": [
+      "PWA",
+      "offline",
+      "Drive sync",
+      "kid mode"
+    ],
+    "features": [
+      "23 modules from first words to full decks — plus make your own",
+      "Spaced repetition with sessions, streaks, exam mode, and undo",
+      "Games: match boards, duels, spelling, tracing on a slate",
+      "Kid mode with pictures, stickers, and read-aloud voices",
+      "Static files, no build — fully offline once installed"
+    ]
+  },
+  {
+    "slug": "MusicStudio",
+    "kind": "compose",
+    "dir": "MusicStudio",
+    "title": "Music Studio",
+    "emoji": "🎼",
+    "hue": 295,
+    "tagline": "An ElevenLabs album builder in your browser — curate prompts, generate songs, export albums.",
+    "badges": [
+      "PWA",
+      "BYO API key",
+      "local backup"
+    ],
+    "features": [
+      "Albums in nested groups with full metadata and per-group themes",
+      "Generate songs, dialog, sound effects and stems — cost estimate first",
+      "Waveforms, trim/fade/gain, reorder, playlists, crossfaded mixdowns",
+      "Export tagged tracks — and publish picked albums to a phone-synced folder",
+      "Ratings, notes, and a taste profile an agent can read and design albums from"
+    ]
+  },
+  {
+    "slug": "long-gallery",
+    "kind": "art",
+    "dir": "ArtGallery/site",
+    "title": "The Long Gallery",
+    "emoji": "🖼️",
+    "hue": 335,
+    "tagline": "A museum in a single page — 9,300 works from the Olmec heads to now, each with its story.",
+    "badges": [
+      "PWA",
+      "offline"
+    ],
+    "features": [
+      "Six eras, Antiquity to Modern, across movements, regions and themes",
+      "Every work with its story: what it is, its context, and a hidden detail",
+      "HD zoom on every credited plate, plus guided tours through the collection",
+      "A map of where each work hangs; artist pages with portraits and timelines",
+      "Autoplay: a hands-free walk, timed or narrated with subtitles"
+    ]
+  },
+  {
+    "slug": "classical-journey",
+    "kind": "listen",
+    "dir": "Classical Music/site",
+    "title": "The Classical Journey",
+    "emoji": "🎼",
+    "hue": 15,
+    "tagline": "Every piece worth hearing, in order — Gregorian chant to now, with what to listen for.",
+    "badges": [
+      "PWA",
+      "offline",
+      "links out"
+    ],
+    "features": [
+      "8,300 works — the classical canon, plus a Journey for every other genre",
+      "Each one: what it is, the world it came from, and what to listen for",
+      "Theory stops, placed where history invented the idea",
+      "Autoplay with spoken notes, a gym mode, and a blind listening quiz",
+      "Piece of the day, a weekly mix, and listening-history import"
+    ]
+  },
+  {
+    "slug": "InsightMaster",
+    "kind": "focus",
+    "dir": "InsightMaster",
+    "title": "InsightMaster",
+    "emoji": "🧘",
+    "hue": 180,
+    "tagline": "A meditation practice tracker whose timer teaches — it walks the technique step by step.",
+    "badges": [
+      "PWA",
+      "offline",
+      "single file"
+    ],
+    "download": [
+      "single file",
+      "https://github.com/adervec/InsightMaster/blob/main/insight-hunter.html"
+    ],
+    "features": [
+      "A guided timer: countdown ring, bells, and the current step called out in time",
+      "Open-ended sits, a settling-in countdown, vibration for silent sits",
+      "Plans, streaks, reminders, and stats on where the practice has gone",
+      "The content is data — ships with sitting meditation, replace it with your own",
+      "One file, no account; history exports to CSV"
+    ]
+  },
+  {
+    "slug": "CelebrityCrusher",
+    "kind": "cardio",
+    "dir": "CelebrityCrusher",
+    "title": "Celebrity Crusher",
+    "emoji": "🏅",
+    "hue": 350,
+    "tagline": "389 celebrity fitness feats, judged against your own Strava and Garmin data.",
+    "badges": [
+      "PWA",
+      "offline",
+      "Strava + Garmin import"
+    ],
+    "features": [
+      "Which feats you've already beaten, which you'd clear today, which are a plan",
+      "Fitness / fatigue, estimated VO₂max, and a marathon projection with a second opinion",
+      "Goals: feat + date becomes a week-by-week build, exportable to your calendar",
+      "Pace curve against every timed feat, Eddington numbers, a three-year forecast",
+      "Zero dependencies — the same app runs as a local server with live OAuth sync"
+    ]
+  }
+]

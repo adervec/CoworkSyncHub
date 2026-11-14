@@ -1,6 +1,6 @@
 // standards.mjs — check every app on the portal against the house standards and print a grid.
 //
-//   node standards.mjs              all portal apps (reads APPS from portal.py)
+//   node standards.mjs              all portal apps (reads apps.json)
 //   node standards.mjs gym tachy    only apps whose slug or folder starts with these
 //   node standards.mjs -v           also print why each check failed or warned
 //   node standards.mjs --offline    skip the GitHub API (deploy-gating check becomes "?")
@@ -10,7 +10,8 @@
 // expected pieces are present, not that they work. Each app's own tests cover "works".
 // The standards themselves are listed in CHECKS below; COWORK is reported but its definition is
 // still open.
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync, mkdtempSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,10 +43,7 @@ const SOURCE_ONLY = {
 
 // ---- the portal's apps ----------------------------------------------------------------------------
 function portalApps() {
-  const src = readFileSync(path.join(HUB, 'portal.py'), 'utf8');
-  const out = [];
-  for (const m of src.matchAll(/dict\(slug="([^"]+)",[^)]*?dir=(?:"([^"]+)"|None)/gs)) if (m[2]) out.push({ slug: m[1], dir: m[2] });
-  return out;
+  return JSON.parse(readFileSync(path.join(HUB, 'apps.json'), 'utf8')).filter((a) => a.dir).map((a) => ({ slug: a.slug, dir: a.dir }));
 }
 
 // ---- reading an app -------------------------------------------------------------------------------
@@ -228,6 +226,25 @@ const CHECKS = [
     const unpinned = a.workflows.flatMap((w) => [...w.t.matchAll(/uses:\s*([\w.-]+\/[\w.\/-]+)@(?![0-9a-f]{40})/g)].map((m) => m[1])).filter((u) => !u.startsWith('actions/') && !u.startsWith('adervec/'));
     return unpinned.length ? warn('third-party actions not pinned to a commit: ' + [...new Set(unpinned)].join(', ')) : ok();
   }],
+  ['datainv', 'Data inventory (app-data.json) covers the code', (a) => {
+    // standard 23: the app declares every place it keeps the reader's data, so the hub can back it up
+    // and "Erase everything" knows its own. House keys (font.js, portal) are the hub's to declare.
+    const f = a.files.find((x) => /(^|\/)app-data\.json$/.test(x) && !/node_modules|dist\//.test(x));
+    if (!f) return fail('no app-data.json (published beside index.html)');
+    let d; try { d = JSON.parse(readFileSync(path.join(a.root, f), 'utf8')); } catch (e) { return fail('app-data.json is not valid JSON: ' + e.message); }
+    if (!Number.isInteger(d.schema) || d.schema < 1) return fail('app-data.json needs "schema": a whole number, bumped when stored data changes shape');
+    for (const k of ['localStorage', 'indexedDB', 'drive']) if (!Array.isArray(d[k])) return fail(`app-data.json needs "${k}": [] (empty if unused)`);
+    const covered = (list, name) => list.some((p) => p === name || (p.endsWith('*') && name.startsWith(p.slice(0, -1))));
+    const HOUSE = /^(maker-|portal-|app-|cowork-)/;
+    const code = a.code || a.all, missing = new Set();
+    for (const m of code.matchAll(/localStorage\.(?:getItem|setItem|removeItem)\(\s*['"`]([^'"`$]+)(\$\{)?/g)) {
+      const k = m[1] + (m[2] ? '*' : '');
+      if (!HOUSE.test(k) && !covered(d.localStorage, m[2] ? m[1] : k)) missing.add('localStorage ' + k);
+    }
+    for (const m of code.matchAll(/indexedDB\.open\(\s*['"]([^'"]+)/g)) if (!covered(d.indexedDB, m[1])) missing.add('IndexedDB ' + m[1]);
+    if (missing.size) return fail('not declared in app-data.json: ' + [...missing].slice(0, 6).join(', ') + (missing.size > 6 ? ` (+${missing.size - 6})` : ''));
+    return ok(`schema ${d.schema}`);
+  }],
   ['notes', 'Agent notes import the house standards', (a) => {
     const here = path.join(a.root, 'CLAUDE.md'), up = path.join(path.dirname(a.root), 'CLAUDE.md');
     const f = existsSync(here) ? here : (path.basename(a.root) === 'site' && existsSync(up) ? up : null);
@@ -323,6 +340,16 @@ function selftest() {
   eq(check('sec', fake(CSP + 'el.innerHTML = `<b>${esc(item.name)}</b>`;')), 'ok', 'escaped ${} into innerHTML passes');
   eq(check('supply', fake('', ['LICENSE'], [{ f: 'ci.yml', t: 'on: push\npermissions:\n  contents: read\njobs:\n  t:\n    steps:\n      - uses: actions/checkout@v4' }])), 'ok', 'locked-down CI passes');
   eq(check('supply', fake('', ['LICENSE'], [{ f: 'ci.yml', t: 'on: push\njobs:\n  t:\n    steps:\n      - uses: actions/checkout@v4' }])), 'FAIL', 'CI without permissions fails');
+  {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'inv-')), inv = (decl, src) => { writeFileSync(path.join(tmp, 'app-data.json'), JSON.stringify(decl)); return check('datainv', { ...fake(src, ['app-data.json']), root: tmp }); };
+    const D = { schema: 1, localStorage: ['mm-*'], indexedDB: ['minis'], drive: [] };
+    eq(inv(D, "localStorage.setItem('mm-view', v); indexedDB.open('minis', 2); localStorage.getItem('maker-font')"), 'ok', 'declared keys, prefixes and house keys pass');
+    eq(inv(D, "localStorage.setItem('other-key', v)"), 'FAIL', 'an undeclared key fails');
+    eq(inv(D, 'localStorage.setItem(`mm-x-${id}`, v)'), 'ok', 'a templated key under a declared prefix passes');
+    eq(inv(D, "indexedDB.open('photos')"), 'FAIL', 'an undeclared database fails');
+    eq(inv({ localStorage: [] }, ''), 'FAIL', 'a missing schema number fails');
+    eq(check('datainv', fake('')), 'FAIL', 'no app-data.json fails');
+  }
   console.log('standards.mjs selftest: ok');
 }
 

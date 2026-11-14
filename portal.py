@@ -1,7 +1,7 @@
 """Portal generator for adervec.github.io/portal/ — manager / launcher / catalog for the published apps.
 
   python portal.py build [--offline]   build the site/ portal (fetches GitHub data unless --offline)
-  python portal.py deploy [--offline]  build + public-exposure audit + commit + push site/
+  python portal.py deploy [--offline] [--beta]  build + public-exposure audit + commit + push site/ (--beta: /portal-beta/ only)
   python portal.py shots               capture app screenshots via headless Chrome/Edge into site/shots/
   python portal.py apps [--quick]      manager table: dirty/unpushed, published age, CI, live status
   python portal.py open <app>          launch a published app in the browser
@@ -32,6 +32,7 @@ SITE = BASE / "site"
 # the adervec.github.io origin, and a root-scoped installed PWA makes Android treat every
 # sub-app under /<App>/ as "already installed" (their install prompts vanish).
 PORTAL_DIR = SITE / "portal"
+BETA = False  # `deploy --beta`: the portal goes to /portal-beta/ only; shared files and the live portal are untouched
 DATA_PATH = SITE / "portal-data.json"
 USER = "adervec"
 GITHUB_DIR = BASE.parent  # ponytail: assumes all app clones sit beside this repo
@@ -44,200 +45,8 @@ BROWSERS = [  # first one found does the screenshots
 
 # Curated per app: slow-changing identity. Volatile data (pushed_at, stars, commits,
 # weekly activity) is fetched at build time. dir = local clone folder (None = not cloned).
-APPS = [
-    dict(slug="GymTracker315", kind="lift", dir="GymTracker", title="GymTracker", emoji="\U0001F3CB️", hue=20,
-         tagline="A whole gym logbook in one HTML file — lifts, cardio, plans, and progress.",
-         badges=["PWA", "single file", "Strava sync", "cloud sync"],
-         download=("single file", f"https://github.com/adervec/GymTracker315/blob/main/gym-tracker.html"),
-         features=[
-             "Adaptive workout plans and a fast set logger",
-             "Picker-driven equipment setup: barbell, dumbbell, kettlebell, landmine…",
-             "Per-exercise reference media and baked-in coaching guides",
-             "Biometrics, wearable recovery metrics, and Strava reconciliation",
-             "Cloud sync via Google Drive, Dropbox, or OneDrive",
-             "Offline-first — everything lives in your browser storage",
-         ]),
-    dict(slug="Tachyread", kind="read", dir="Tachyread", title="Tachyread", emoji="⚡", hue=270,
-         tagline="Speed reading one word at a time — RSVP on an optimal recognition point, up to ~1500 WPM.",
-         badges=["Drive sync", "⚠ flashing text"],
-         features=[
-             "Import TXT, DOCX, PDF, EPUB — or OCR-grab text from images",
-             "~30 themes and animated reader faces",
-             "Listen mode: text-to-speech rendered ahead and pulled to your phone",
-             "Trackyread: a reading log of every book, with notes and a fading-memory check",
-             "Typing and speaking minigames, audiobook recording",
-             "Measured reading stats and an editable table of contents",
-         ]),
-    dict(slug="ChessRetabled", kind="chess", dir="ChessRetabled", title="ChessRetabled", emoji="♞", hue=165,
-         tagline="A cel-shaded chess club in the browser — bots, lessons, puzzles, and 56 games.",
-         badges=["PWA", "offline", "Drive sync"],
-         features=[
-             "12 Stockfish-powered characters, 250 to 2850 Elo",
-             "37 validated tactics puzzles with rated training",
-             "Academy courses and practice-arena endgame drills",
-             "56 games — board, cards, logic — each with a strategy guide",
-             "Level, XP, streaks, and personal ratings",
-             "Full offline play once installed",
-         ]),
-    dict(slug="GuitarPicker", kind="practice", dir="GuitarPicker", title="GuitarPicker", emoji="\U0001F3B8", hue=45,
-         tagline="Zero-build guitar school — note highway, tuner, karaoke, and a synthesized backing band.",
-         badges=["PWA", "Drive sync"],
-         features=[
-             "Streaming note highway with per-note grading",
-             "Live tuner across 59 instruments and their tunings",
-             "45+ public-domain songs, each with a synthesized backing band",
-             "Karaoke with word-by-word lyrics and pitch scoring",
-             "Practice mode, MIDI input, MusicXML import, sight-reading",
-             "Song editor, record-and-transcribe, theory games, courses",
-         ]),
-    dict(slug="BlackMirrorBikeRide", kind="ride", dir="BlackMirrorBikeRide", title="Black Mirror Bike Ride",
-         emoji="\U0001F6B4", hue=130,
-         tagline="A homebrew Zwift — your real trainer over Bluetooth, low-poly worlds, real GPX routes.",
-         badges=["PWA", "Bluetooth", "Drive sync"],
-         features=[
-             "Reads power and heart rate over Web Bluetooth — zero drivers",
-             "A proper physics model behind every ride",
-             "Build your own low-poly 3D worlds",
-             "GPX import plus 34 bundled routes (~660 km)",
-             "Replay, ride history, and ghosts",
-         ]),
-    dict(slug="BodybuildingProgressCoach", kind="checkin", dir="BodybuildingProgressCoach",
-         title="Bodybuilding Progress Coach", emoji="\U0001F5FF", hue=240,
-         tagline="Honest physique and posing tracking from your own photos — scored against the classics.",
-         badges=["PWA", "offline", "AI optional"],
-         features=[
-             "On-device pose analysis — nothing uploaded",
-             "Objective symmetry and proportion geometry first, opinion second",
-             "Per-division posing technique (24 mandatories) and live mirror practice",
-             "Body-composition trends corroborate the photos",
-             "Aligned progress timelapses",
-         ]),
-    dict(slug="HandwritingHelper", kind="write", dir="HandwritingHelper", title="Handwriting Helper",
-         emoji="✍️", hue=210,
-         tagline="Photograph a page of handwriting and get honest, measured scores — then drill.",
-         badges=["PWA", "offline"],
-         features=[
-             "Per-line scores: slant, baseline, size, spacing, pen control, legibility",
-             "Right or left hand, print or cursive, plus mirror-prime mode",
-             "38 drills with printable guide sheets in true size",
-             "Review scan batches as a gallery, with duplicate detection",
-             "Streaks, trends, and full history",
-         ]),
-    dict(slug="MicroMiniger", kind="paint", dir="MicroMiniger", title="MicroMiniger", emoji="⚔️", hue=0,
-         tagline="A miniature-collection manager — paint queue, photo studio, and offline photo-to-3D.",
-         badges=["PWA", "offline"],
-         features=[
-             "Rich per-mini metadata, kitbash-aware, with provenance and value",
-             "Kanban paint queue, paint timer, deadlines",
-             "Multi-angle photos, 360° viewer, spin video and GIF export",
-             "Photo-to-3D mesh and Gaussian-splat viewer, STL/PLY export",
-             "Armies, points, and a battle log",
-             "Field-scoped search, bulk edit, CSV, one-file backup",
-         ]),
-    dict(slug="SpeechImprover", kind="speak", dir="SpeechImprover", title="SpeechImprover", emoji="\U0001F399️", hue=315,
-         tagline="Record yourself and get ten scored attributes — then train the weak ones.",
-         badges=["PWA", "Drive sync"],
-         features=[
-             "962 public-domain passages, 158 exercises, 65 targeted drills",
-             "Ten attributes scored 0–100, from pace to projection",
-             "Free speaking toward a chosen target tone or emotion",
-             "Reading projects — import a document and work through it passage by passage",
-             "Trends, an activity heatmap, A/B compare, AI-coach export",
-         ]),
-    dict(slug="Mise", kind="cook", dir="Mise", title="Mise", emoji="\U0001F373", hue=75,
-         tagline="An interactive cookbook you can run — recipes execute as live, scheduled flow charts.",
-         badges=["PWA", "offline", "voice"],
-         features=[
-             "114 recipes plus techniques, ingredients, and equipment guides",
-             "Execute mode: station swimlanes, a moving playhead, countdowns, alarms",
-             "Voice control — play, pause, done, skip — with steps read aloud",
-             "A cook log of every finished cook, exportable",
-             "Field guides: coffee, tea, alcohol, protein prep — and a box-mix calculator",
-         ]),
-    dict(slug="MarksmanApp", kind="aim", dir="MarksmanApp", title="Marksman", emoji="\U0001F3AF", hue=100,
-         tagline="Foam-dart marksmanship, measured — photograph your target and get real metrics.",
-         badges=["web + desktop", "Drive sync", "CLI"],
-         features=[
-             "Mark up a photo of where your darts landed — precision, accuracy, bias",
-             "Tiered practice standards judge every session",
-             "Progress overall, by blaster category, and by specific blaster",
-             "Prints true-size target faces to shoot at",
-             "Equipment packs: plain JSON defines drills, faces, and vocabulary",
-         ]),
-    dict(slug="Run315", kind="cardio", dir="Run315", title="Run315", emoji="\U0001F3C3", hue=190,
-         tagline="GymTracker for cardio — every Garmin and Strava number you have, analysed properly.",
-         badges=["PWA", "Drive sync", "Garmin + Strava", "demo athlete"],
-         features=[
-             "Garmin and Strava arrive through a cowork folder, or a Garmin export archive",
-             "A fitness / fatigue model fitted to you, race projections, taper planning",
-             "Route builder, new-ground runs, trail completion, and a territory game",
-             "Replay, ghost races, records, year in review — and an SQL console over it all",
-             "No server, no account — press Load demo athlete to look around",
-         ]),
-    dict(slug="learning-pit", kind="study", dir="learning-pit", title="Learning Pit", emoji="\U0001F9E0", hue=55,
-         tagline="Flashcards and learning games with spaced repetition — for readers and pre-readers alike.",
-         badges=["PWA", "offline", "Drive sync", "kid mode"],
-         features=[
-             "23 modules from first words to full decks — plus make your own",
-             "Spaced repetition with sessions, streaks, exam mode, and undo",
-             "Games: match boards, duels, spelling, tracing on a slate",
-             "Kid mode with pictures, stickers, and read-aloud voices",
-             "Static files, no build — fully offline once installed",
-         ]),
-    dict(slug="MusicStudio", kind="compose", dir="MusicStudio", title="Music Studio", emoji="\U0001F3BC", hue=295,
-         tagline="An ElevenLabs album builder in your browser — curate prompts, generate songs, export albums.",
-         badges=["PWA", "BYO API key", "local backup"],
-         features=[
-             "Albums in nested groups with full metadata and per-group themes",
-             "Generate songs, dialog, sound effects and stems — cost estimate first",
-             "Waveforms, trim/fade/gain, reorder, playlists, crossfaded mixdowns",
-             "Export tagged tracks — and publish picked albums to a phone-synced folder",
-             "Ratings, notes, and a taste profile an agent can read and design albums from",
-         ]),
-    dict(slug="long-gallery", kind="art", dir="ArtGallery/site", title="The Long Gallery", emoji="\U0001F5BC️", hue=335,
-         tagline="A museum in a single page — 9,300 works from the Olmec heads to now, each with its story.",
-         badges=["PWA", "offline"],
-         features=[
-             "Six eras, Antiquity to Modern, across movements, regions and themes",
-             "Every work with its story: what it is, its context, and a hidden detail",
-             "HD zoom on every credited plate, plus guided tours through the collection",
-             "A map of where each work hangs; artist pages with portraits and timelines",
-             "Autoplay: a hands-free walk, timed or narrated with subtitles",
-         ]),
-    dict(slug="classical-journey", kind="listen", dir="Classical Music/site", title="The Classical Journey",
-         emoji="🎼", hue=15,
-         tagline="Every piece worth hearing, in order — Gregorian chant to now, with what to listen for.",
-         badges=["PWA", "offline", "links out"],
-         features=[
-             "8,300 works — the classical canon, plus a Journey for every other genre",
-             "Each one: what it is, the world it came from, and what to listen for",
-             "Theory stops, placed where history invented the idea",
-             "Autoplay with spoken notes, a gym mode, and a blind listening quiz",
-             "Piece of the day, a weekly mix, and listening-history import",
-         ]),
-    dict(slug="InsightMaster", kind="focus", dir="InsightMaster", title="InsightMaster", emoji="\U0001F9D8", hue=180,
-         tagline="A meditation practice tracker whose timer teaches — it walks the technique step by step.",
-         badges=["PWA", "offline", "single file"],
-         download=("single file", "https://github.com/adervec/InsightMaster/blob/main/insight-hunter.html"),
-         features=[
-             "A guided timer: countdown ring, bells, and the current step called out in time",
-             "Open-ended sits, a settling-in countdown, vibration for silent sits",
-             "Plans, streaks, reminders, and stats on where the practice has gone",
-             "The content is data — ships with sitting meditation, replace it with your own",
-             "One file, no account; history exports to CSV",
-         ]),
-    dict(slug="CelebrityCrusher", kind="cardio", dir="CelebrityCrusher", title="Celebrity Crusher", emoji="\U0001F3C5",
-         hue=350,
-         tagline="389 celebrity fitness feats, judged against your own Strava and Garmin data.",
-         badges=["PWA", "offline", "Strava + Garmin import"],
-         features=[
-             "Which feats you've already beaten, which you'd clear today, which are a plan",
-             "Fitness / fatigue, estimated VO₂max, and a marathon projection with a second opinion",
-             "Goals: feat + date becomes a week-by-week build, exportable to your calendar",
-             "Pace curve against every timed feat, Eddington numbers, a three-year forecast",
-             "Zero dependencies — the same app runs as a local server with live OAuth sync",
-         ]),
-]
+# The app registry lives in apps.json (also read by standards.mjs and published for the hub).
+APPS = json.loads((BASE / "apps.json").read_text(encoding="utf-8"))
 
 
 def app_url(app):
@@ -530,7 +339,7 @@ function installed(){try{var m=JSON.parse(localStorage.getItem(IKEY)||"{}"),
   return live;}catch(err){return{}}}
 function paintUsage(){var u=usage(),ins=installed(),now=Date.now()/1000,tot=0,tried=0;
   d.querySelectorAll(".usage").forEach(function(el){
-    var x=u[el.dataset.slug],pre=ins[el.dataset.slug]?"installed \\u00b7 ":"";
+    var x=u[el.dataset.slug],pre=ins[el.dataset.slug]?"on home screen (seen "+rel(now-ins[el.dataset.slug]/1000)+" ago) \\u00b7 ":"";
     el.textContent=pre+(x?("opened "+x.n+"\\u00d7 \\u00b7 "+rel(now-x.last)+" ago"):"not opened yet");});
   d.querySelectorAll(".tiles a").forEach(function(el){
     el.classList.toggle("ins",!!ins[el.dataset.slug]);});
@@ -1146,7 +955,7 @@ def write_cowork():
     shutil.copy(BASE / "cowork.js", SITE / "cowork.js")
     # the house font: font.js + the Atkinson Hyperlegible files it points at + its self-test
     shutil.copy(BASE / "cowork-engine-test.html", SITE / "cowork-engine-test.html")  # the engine, against an in-memory folder
-    for f in ("font.js", "font-selftest.html"):
+    for f in ("font.js", "font-selftest.html", "apps.json"):  # apps.json: the registry, for the hub and backup
         shutil.copy(BASE / f, SITE / f)
     shutil.copytree(BASE / "fonts", SITE / "fonts", dirs_exist_ok=True)
     # the house's own translations (font.js labels, machine translated) + the language self-test
@@ -1204,8 +1013,9 @@ cowork.mount(document.getElementById("try"),{{app:"portal-try",
 def write_site(data):
     SITE.mkdir(exist_ok=True)
     PORTAL_DIR.mkdir(exist_ok=True)
-    write_root()  # first: it also migrates legacy root shots/ that the cards look for
-    write_cowork()
+    if not BETA:
+        write_root()  # first: it also migrates legacy root shots/ that the cards look for
+        write_cowork()
     now = time.time()
     stamp = time.strftime("%Y%m%d%H%M")
     cards = "".join(_card(app, data.get(app["slug"], {})) for app in APPS)
@@ -1287,6 +1097,10 @@ This portal installs the same way.</p>
 <span><a href="feed.xml">RSS</a></span>
 <span><a href="https://github.com/{USER}">github.com/{USER}</a></span></footer>
 </main><script>const GEN={now:.0f};const FLEET={json.dumps(fleet)};const CHANGES={json.dumps(recent)};const APPKIND={json.dumps({a['slug']: a['kind'] for a in APPS})};const HUES={json.dumps({a['slug']: a['hue'] for a in APPS})};const TITLES={json.dumps({a['slug']: a['title'] for a in APPS})};{PORTAL_JS}</script></body></html>"""
+    if BETA:
+        page = page.replace("<main", "<p style='margin:0;padding:6px 12px;background:#b45309;color:#fff;font:600 14px system-ui;text-align:center'>"
+                            "BETA: the maker's preview. <a style='color:#fff' href='/portal/'>Live portal</a></p><main", 1)
+        page = page.replace("<head>", "<head><meta name='robots' content='noindex'>", 1)
     (PORTAL_DIR / "index.html").write_text(page, encoding="utf-8")
     write_feed(data)
     write_pwa(stamp)
@@ -1516,7 +1330,7 @@ def cmd_deploy(offline=False):
         "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n"
         "Claude-Session: https://claude.ai/code/session_01G24qcutUGDibaCB8TopeeU")
     git("push", "origin", "main")
-    print(f"deploy: pushed — live at https://{USER}.github.io/portal/ shortly")
+    print(f"deploy: pushed — live at https://{USER}.github.io/{PORTAL_DIR.name}/ shortly")
 
 
 def _git(d, *args):
@@ -1587,6 +1401,9 @@ def main(argv):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # cp1252 consoles vs · — ✓
     cmd = argv[0] if argv else "build"
+    if "--beta" in argv:
+        global PORTAL_DIR, BETA
+        PORTAL_DIR, BETA = SITE / "portal-beta", True
     if cmd == "build":
         cmd_build(offline="--offline" in argv)
     elif cmd == "deploy":

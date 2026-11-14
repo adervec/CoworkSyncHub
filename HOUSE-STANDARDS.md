@@ -147,6 +147,32 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - The standards check's `sec` and `supply` columns cover what source reading can; the rest is
       on you.
 
+23. **Data inventory**: the app declares every place it keeps the reader's data, in an
+    `app-data.json` published beside its `index.html` (`public/` for Vite apps). The hub's backup,
+    restore and "erase" read it, and **the apps have real users: never lose their data**.
+    ```json
+    {
+      "schema": 3,
+      "localStorage": ["mm-*", "minis-settings"],
+      "indexedDB": ["minis"],
+      "drive": ["minis-*.json"],
+      "caches": [],
+      "export": "Settings > Data > Export"
+    }
+    ```
+    - `schema`: a whole number, bumped whenever stored data changes shape. Keep the code that
+      upgrades older data, so a backup from any earlier version still restores.
+    - Exact names, or a prefix ending in `*`. List every key, database and shared-Drive-folder file
+      the app writes, including settings. `caches` lists only Cache Storage holding user data (not
+      the app shell). `export` says where the reader's own export lives.
+    - Keys starting `maker-`, `portal-`, `app-` or `cowork-` belong to the house (font.js, the
+      portal, cowork.js); don't declare them, and don't invent new keys with those prefixes.
+    - The standards check (`datainv`) fails when the code uses a key or database that is not declared.
+    - font.js now records the home-screen install (`portal-installed`) for every app; an app's own
+      copy of that code can go.
+    - The registry of apps is `CoworkSyncHub/apps.json` (published at `adervec.github.io/apps.json`).
+      Add an app there, not in `portal.py`.
+
 ## Working habits
 
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you. Also run `node ../CoworkSyncHub/layout-check.mjs <App>` (the live site, phone and desktop) and fix what it flags.
