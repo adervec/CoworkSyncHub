@@ -27,8 +27,12 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
 
 ## The standards
 
-1. **Drive sync** to the private app folder (`drive.appdata`), and the signed-in Google **profile
-   picture** shown beside the account (`<img src=picture referrerpolicy="no-referrer">`).
+1. **Drive sync** to the private app folder (`drive.appdata`), and while synced the Google **profile
+   picture is always visible in the app's top bar**, on every screen, like YouTube's corner avatar,
+   not only in settings. Use font.js: put `<app-account></app-account>` in the header and call
+   `appFont.setAccount({ name, email, picture })` after sign-in (`setAccount(null)` on sign-out);
+   handle `app-account-click` to open the sync settings. An app's own always-visible header avatar
+   (GymTracker's banner, a header sync chip with the picture) also meets it.
 2. **House font**: Atkinson Hyperlegible by default, reader-changeable (font.js).
 3. **Cowork** (the GymTracker / Tachyread style): named channels, each with fixed request files,
    instructions and a reply format, declared in a `cowork.json` manifest; a schedule per channel

@@ -469,8 +469,67 @@
   var darkQuery = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
   function systemTheme() { return darkQuery && darkQuery.matches ? 'dark' : 'light'; }
 
+  // ---- The signed-in account, always visible (house standard) -----------------------------------
+  // Like YouTube's corner avatar: while this app syncs to Google Drive, the account's picture sits in
+  // the app's top bar on every screen, not only in settings. The app reports the account once it knows
+  // it, and clears it on sign-out:
+  //   appFont.setAccount({ name, email, picture })   // after the Drive sign-in / userinfo
+  //   appFont.setAccount(null)                        // on disconnect
+  // and places <app-account></app-account> in its header. The account is remembered per app, so the
+  // picture is there immediately on the next visit, before the silent reconnect finishes. Clicking it
+  // fires `app-account-click` on document, so the app can open its sync settings.
+  var ACCT = function () { return 'maker-account:' + appKey(); };
+  function getAccount() { try { return JSON.parse(store.get(ACCT()) || 'null'); } catch (e) { return null; } }
+  function setAccount(a) {
+    var clean = a && (a.picture || a.name || a.email) ? { name: a.name || '', email: a.email || '', picture: /^https:\/\//.test(a.picture || '') ? a.picture : '' } : null;
+    store.set(ACCT(), clean ? JSON.stringify(clean) : null);
+    document.dispatchEvent(new CustomEvent('app-account-change', { detail: clean }));
+  }
+  if (window.customElements && !customElements.get('app-account')) {
+    customElements.define('app-account', class extends HTMLElement {
+      connectedCallback() {
+        var self = this;
+        this._draw = function () {
+          var a = getAccount();
+          self.textContent = '';
+          self.style.display = a ? 'inline-flex' : 'none';
+          if (!a) return;
+          var who = a.name || a.email || 'Google account';
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.title = 'Signed in as ' + who + (a.email && a.name ? ' (' + a.email + ')' : '') + ' · syncing to Google Drive';
+          b.setAttribute('aria-label', b.title);
+          b.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;line-height:1';
+          var size = self.getAttribute('size') || '28';
+          if (a.picture) {
+            var img = document.createElement('img');
+            img.src = a.picture; img.alt = ''; img.referrerPolicy = 'no-referrer';
+            img.width = img.height = +size;
+            img.style.cssText = 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;object-fit:cover;display:block;box-shadow:0 0 0 2px rgba(127,127,127,.35)';
+            // a picture that will not load falls back to the initial, never a broken image
+            img.onerror = function () { img.replaceWith(initial(who, size)); };
+            b.appendChild(img);
+          } else b.appendChild(initial(who, size));
+          if (self.hasAttribute('show-name')) { var n = document.createElement('span'); n.textContent = who; b.appendChild(n); }
+          b.addEventListener('click', function () { document.dispatchEvent(new CustomEvent('app-account-click', { detail: a })); });
+          self.appendChild(b);
+        };
+        document.addEventListener('app-account-change', this._draw);
+        this._draw();
+      }
+      disconnectedCallback() { document.removeEventListener('app-account-change', this._draw); }
+    });
+  }
+  function initial(who, size) {
+    var s = document.createElement('span');
+    s.textContent = (who || '?').trim().charAt(0).toUpperCase();
+    s.style.cssText = 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;display:inline-grid;place-items:center;background:#4c6fff;color:#fff;font-weight:700;font-size:' + Math.round(size * 0.5) + 'px';
+    return s;
+  }
+
   window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice,
     zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice,
     diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,
-    whatsNew: whatsNew, checkWhatsNew: checkWhatsNew, setWhatsNewSilenced: setWhatsNewSilenced };
+    whatsNew: whatsNew, checkWhatsNew: checkWhatsNew, setWhatsNewSilenced: setWhatsNewSilenced,
+    getAccount: getAccount, setAccount: setAccount };
 })();

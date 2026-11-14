@@ -80,13 +80,14 @@ const ok = (note = '') => ['ok', note], warn = (note) => ['warn', note], fail = 
 
 const CHECKS = [
   ['drive', 'Drive private-folder sync', (a) => a.has(/appDataFolder|drive\.appdata/) ? ok() : fail('no drive.appdata sync')],
-  ['pfp', 'Google picture when synced', (a) => {
+  ['pfp', 'Google picture always visible (top bar)', (a) => {
     if (!a.has(/oauth2\/v3\/userinfo/)) return fail('never asks Google for the profile');
-    // an <img> (or el('img'), createElement('img')) whose src is a variable named like the picture
-    const drawn = /<img[^>]{0,240}(picture|pfp|\bpic\b|[a-z]Pic\b|gpic|avatar)/i.test(a.all)
-      || /\bsrc\s*[:=]\s*[{(]?\s*[\w.()!?$]*(picture|Picture|\bpic\b|[a-z]Pic\b|avatar|Avatar)/.test(a.all)
-      || /\.src\s*=\s*[\w.()!?]*(picture|pic|Pic|avatar)/.test(a.all);
-    return drawn ? ok() : fail('fetches the profile but never draws the picture');
+    // the shared corner avatar, placed in the page and fed the account
+    const shared = a.has(/<app-account|createElement\(\s*['"]app-account/) && a.has(/setAccount\(/);
+    // or the app's own avatar in an always-visible bar: GymTracker's banner identity, or a header sync chip with the picture
+    const own = a.has(/id=["']app-identity["']|ti-pfp|gsync-pfp-sm/) || a.has(/class=["']gav["']|i\.className\s*=\s*["']gav["']/);
+    if (shared || own) return ok(own && !shared ? 'own header avatar' : '');
+    return fail('the picture is not in an always-visible top bar (use <app-account> + appFont.setAccount)');
   }],
   ['font', 'Atkinson default + font choice', (a) => {
     if (a.has(FONTJS)) return a.has(/var\(--app-font/) ? (a.has(/app-font-picker|appFont\.(set|options)/) ? ok() : fail('no font picker')) : fail('loads font.js but nothing uses --app-font');
@@ -249,12 +250,10 @@ function selftest() {
   eq(check('3p', fake('<script src="https://adervec.github.io/font.js"></script><script src="https://accounts.google.com/gsi/client"></script>')), 'ok', 'own site and Google sign-in pass');
   eq(check('data', fake('<script src="https://adervec.github.io/font.js"></script> Export Import Erase everything')), 'ok', 'export+import+erase+font.js passes');
   eq(check('data', fake('Export Import Erase everything localStorage.clear()')), 'FAIL', 'localStorage.clear() fails');
-  eq(check('pfp', fake('fetch("https://www.googleapis.com/oauth2/v3/userinfo") <img src="${esc(prof.picture)}">')), 'ok', 'a drawn picture passes');
   eq(check('pfp', fake('fetch("https://www.googleapis.com/oauth2/v3/userinfo") _profile = { picture: j.picture }')), 'FAIL', 'an undrawn picture fails');
   eq(check('gated', fake('', ['LICENSE'], [{ f: 'ci.yml', t: 'on:\n  push:\njobs:\n  test:\n    steps:\n      - run: npm test\n  deploy:\n    needs: test\n    steps:\n      - uses: actions/upload-pages-artifact@v3\n      - uses: actions/deploy-pages@v4' }])), 'ok', 'test then deploy passes');
   eq(check('gated', fake('', ['LICENSE'], [{ f: 'deploy.yml', t: 'on:\n  push:\njobs:\n  build:\n    steps:\n      - run: npm run build\n      - uses: actions/upload-pages-artifact@v3\n  deploy:\n    needs: build\n    steps:\n      - uses: actions/deploy-pages@v4' }])), 'FAIL', 'build then deploy without tests fails');
   eq(check('data', { ...fake('<script src="https://adervec.github.io/font.js"></script> Export Import Erase everything'), code: 'Export Import Erase everything' }), 'ok', 'a comment saying never localStorage.clear() is fine');
-  eq(check('pfp', fake('fetch("https://www.googleapis.com/oauth2/v3/userinfo") <img src="${esc(drivePic)}">')), 'ok', 'a picture drawn from a variable passes');
   eq(check('3p', fake('<a href="https://www.openstreetmap.org/x">map</a> fetch("https://api.dropboxapi.com/2/files")')), 'ok', 'links and connected APIs are not page loads');
   eq(check('a11y', fake('/* house font: CoworkSyncHub/font.js, published at adervec.github.io/font.js */')), 'FAIL', 'a comment naming font.js is not loading it');
   eq(check('a11y', fake('<script src="https://adervec.github.io/font.js"></script>')), 'ok', 'a real font.js load passes');
@@ -265,6 +264,8 @@ function selftest() {
   eq(check('updates', fake('<script src="https://adervec.github.io/font.js"></script> window.appUpdateNotice = false; fetch(BASE + "version.json")')), 'ok', 'an own version.json check counts as its own update notice');
   eq(check('a11y', fake('<script data-house="font.js">if (!this.hasAttribute("no-zoom-option")) {}</script><app-font-picker></app-font-picker>')), 'ok', "font.js's own source does not count as hiding the zoom option");
   eq(check('a11y', fake('<script src="https://adervec.github.io/font.js"></script><app-font-picker no-zoom-option></app-font-picker>')), 'warn', 'a picker that hides the zoom option warns');
+  eq(check('pfp', fake('fetch("https://www.googleapis.com/oauth2/v3/userinfo") <img src="${esc(prof.picture)}">')), 'FAIL', 'a picture only in settings no longer passes');
+  eq(check('pfp', fake('fetch("https://www.googleapis.com/oauth2/v3/userinfo") <header><app-account></app-account></header> appFont.setAccount({ picture })')), 'ok', 'the shared corner avatar passes');
   console.log('standards.mjs selftest: ok');
 }
 

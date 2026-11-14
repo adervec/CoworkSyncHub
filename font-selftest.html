@@ -4,7 +4,7 @@
 <style>body { font-family: var(--app-font, serif); }</style>
 <script>localStorage.removeItem('maker-font'); localStorage.removeItem('maker-seen:font-selftest.html'); localStorage.removeItem('maker-whatsnew-off');</script>
 <script src="font.js"></script>
-<app-font-picker></app-font-picker><pre id="log">running…</pre>
+<app-account id="acct"></app-account><app-font-picker></app-font-picker><pre id="log">running…</pre>
 <script>
 (async function () {
   var fails = [], ok = function (name, cond) { if (!cond) fails.push(name); };
@@ -70,6 +70,20 @@
   localStorage.removeItem(key);
   var src = await (await fetch('font.js')).text();
   ok('font.js can be inlined verbatim (no closing script tag inside)', !/<\/script/i.test(src));
+  appFont.setAccount(null);
+  var acct = document.getElementById('acct');
+  ok('no account: the corner avatar is hidden', acct.style.display === 'none' && !acct.querySelector('img'));
+  appFont.setAccount({ name: 'Ada Lovelace', email: 'ada@example.com', picture: 'https://lh3.googleusercontent.com/a/x' });
+  var im = acct.querySelector('img');
+  ok('signed in: the picture shows in the corner, no referrer, with the name on hover', !!im && im.referrerPolicy === 'no-referrer' && /Ada Lovelace/.test(acct.querySelector('button').title));
+  ok('the account is remembered for the next visit', appFont.getAccount().picture === 'https://lh3.googleusercontent.com/a/x');
+  appFont.setAccount({ name: 'Ada', picture: 'javascript:alert(1)' });
+  ok('only an https picture is ever used', !acct.querySelector('img') && acct.textContent.trim() === 'A');
+  var clicked = null; document.addEventListener('app-account-click', function (e) { clicked = e.detail; }, { once: true });
+  acct.querySelector('button').click();
+  ok('clicking the avatar tells the app (to open its sync settings)', clicked && clicked.name === 'Ada');
+  appFont.setAccount(null);
+  ok('sign-out hides it again', acct.style.display === 'none');
   localStorage.removeItem('maker-font');
   document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
 })();
