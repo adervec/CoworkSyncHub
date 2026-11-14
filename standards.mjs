@@ -183,6 +183,13 @@ const CHECKS = [
     const parent = path.dirname(a.root), viaParent = path.basename(a.root) === 'site' && existsSync(path.join(parent, 'deploy.sh')) && /live-check\.mjs/.test(readFileSync(path.join(parent, 'deploy.sh'), 'utf8'));
     return viaWorkflow || viaScript || viaParent ? ok() : fail('deploy does not check the live site or tag the release');
   }],
+  ['aireview', 'AI review channel for graded sessions', (a) => {
+    // apps that grade a whole session by algorithm (the user's list, 2026-11-13); everyone else is not applicable
+    const GRADED = /^(GymTracker|Tachyread|SpeechImprover|GuitarPicker|HandwritingHelper|ChessRetabled|BodybuildingProgressCoach|learning-pit|MarksmanApp|Run315|BlackMirrorBikeRide)$/;
+    if (!GRADED.test(a.app.dir)) return ['-', 'no algorithmically graded sessions'];
+    // a real channel or operation: name:/dir: 'something-review', or a Tachyread-style op id 'cw-...-review':
+    return a.has(/(name|dir)\s*:\s*['"][a-z0-9-]*-review['"]|['"]cw-[a-z0-9-]+-review['"]\s*:/) ? ok() : fail('no AI review channel for its graded sessions');
+  }],
   ['notes', 'Agent notes import the house standards', (a) => {
     const here = path.join(a.root, 'CLAUDE.md'), up = path.join(path.dirname(a.root), 'CLAUDE.md');
     const f = existsSync(here) ? here : (path.basename(a.root) === 'site' && existsSync(up) ? up : null);

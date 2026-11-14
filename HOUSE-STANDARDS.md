@@ -75,7 +75,18 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
 15. **About this app** (font.js `<app-about>`): version, licence, where data lives, storage, source,
     what's new, diagnostics.
 16. **Offline and storage are visible** (font.js): an offline pill, and storage use in About.
-17. **Agent notes**: this file, imported from each repo's `CLAUDE.md`.
+18. **AI review of graded sessions**: wherever the app grades something robust by algorithm at the
+    session level (a workout, a speech sitting, a typing run, a practice run, a scored sheet, a game,
+    a check-in, a study session, a run or ride; never every few seconds of activity), it also offers
+    a cowork channel that grades the same session in a beefier way with AI. The pattern
+    (GymTracker's `workout-review`): a `<thing>-review` channel whose request carries the sessions
+    completed since the last review, each with the raw detail needed to grade it plus the app's own
+    score and its breakdown, and recent history for trend; the instructions spell out the rubric; the
+    reply is `{ requestHash, reviews: [{ sessionId, grade, summary, strengths, fixes, next }] }`. Review
+    shows one row per session; applying stores the AI review BESIDE the app's own score (never
+    replacing it) and shows it on that session; undo removes it. Send it on a schedule and when a
+    session ends.
+19. **Agent notes**: this file, imported from each repo's `CLAUDE.md`.
 
 ## Working habits
 
