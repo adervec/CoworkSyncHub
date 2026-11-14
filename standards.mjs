@@ -56,7 +56,8 @@ function git(dir, ...args) {
 }
 function load(app) {
   const root = path.join(GITHUB, app.dir);
-  const files = git(root, 'ls-files').split('\n').filter(Boolean);
+  // committed files plus new ones not yet committed (a session checks its own work in progress)
+  const files = git(root, 'ls-files', '--cached', '--others', '--exclude-standard').split('\n').filter(Boolean);
   const text = [];
   for (const f of files) {
     if (!SRC_EXT.test(f) || SKIP.test(f) || SOURCE_ONLY[app.dir]?.test(f)) continue;
