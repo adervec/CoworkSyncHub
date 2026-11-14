@@ -203,6 +203,31 @@ const CHECKS = [
     const hard = a.count(/['"]en-(US|GB)['"]/g) + a.count(/['"]January['"]\s*,\s*['"]February['"]|['"]Jan['"]\s*,\s*['"]Feb['"]/g);
     return hard ? warn(`${cov.total} strings, all translated; ${hard} hard-coded locale or month list(s) left`) : ok(`${cov.total} strings`);
   }],
+  ['sec', 'Security: CSP, no eval, safe ids, no secrets', (a) => {
+    // standard 22. One origin for every app, so one injected script reaches all of them.
+    const code = a.code || a.all, bad = [];
+    if (/(^|[^\w.])eval\s*\(|new\s+Function\s*\(|set(Timeout|Interval)\s*\(\s*['"`]/.test(code)) bad.push('eval / new Function / string timer');
+    if (/(token|nonce|secret|salt|state|password|passcode|otp)\w*\s*[:=][^;\n]{0,60}Math\.random|Math\.random[^;\n]{0,40}(token|nonce|secret|salt|password)/i.test(code)) bad.push('Math.random for a secret value (use appFont.randomId / crypto)');
+    const ext = [...a.all.matchAll(/<script\b[^>]*\bsrc\s*=\s*["'](https?:)?\/\/([^/"']+)[^>]*>/gi)].filter((m) => !ALWAYS_OK.test(m[2]) && !/\bintegrity\s*=/.test(m[0])).map((m) => m[2]);
+    if (ext.length) bad.push('CDN script without integrity hash: ' + [...new Set(ext)].join(', '));
+    const secret = a.text.find((x) => /\bAKIA[0-9A-Z]{16}\b|\bgh[pousr]_[A-Za-z0-9]{36}\b|\bsk-(ant-)?[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|\bxox[bp]-[\w-]{10,}/.test(x.t));
+    if (secret) bad.push('looks like a secret key in ' + secret.f);
+    const csp = a.all.match(/http-equiv\s*=\s*["']Content-Security-Policy["'][^>]*content\s*=\s*["']([^"']+)/i);
+    if (!csp) bad.push('no Content-Security-Policy meta tag');
+    else if (/'unsafe-eval'/.test(csp[1])) bad.push("CSP allows 'unsafe-eval'");
+    if (bad.length) return fail(bad.join('; '));
+    const risky = (code.match(/(innerHTML|outerHTML)\s*\+?=\s*[^;\n]*\$\{(?![^}]*\b(esc|escape\w*|escHtml|appFont\.esc)\()|insertAdjacentHTML\([^;\n]*\$\{(?![^}]*\besc)|dangerouslySetInnerHTML/g) || []).length;
+    return risky ? warn(`${risky} spot(s) put \${…} into HTML without esc(): check each shows no outside text, or use appFont.html\`\``) : ok();
+  }],
+  ['supply', 'Supply chain: audited deps, locked-down CI', (a) => {
+    const bad = [], deps = npmDeps(a);
+    if (deps.length && !a.workflows.some((w) => /npm audit|audit-ci|osv-scanner/.test(w.t))) bad.push('CI never runs npm audit');
+    const loose = a.workflows.filter((w) => !/^permissions:/m.test(w.t)).map((w) => w.f);
+    if (loose.length) bad.push('no top-level permissions: in ' + loose.join(', '));
+    if (bad.length) return fail(bad.join('; '));
+    const unpinned = a.workflows.flatMap((w) => [...w.t.matchAll(/uses:\s*([\w.-]+\/[\w.\/-]+)@(?![0-9a-f]{40})/g)].map((m) => m[1])).filter((u) => !u.startsWith('actions/') && !u.startsWith('adervec/'));
+    return unpinned.length ? warn('third-party actions not pinned to a commit: ' + [...new Set(unpinned)].join(', ')) : ok();
+  }],
   ['notes', 'Agent notes import the house standards', (a) => {
     const here = path.join(a.root, 'CLAUDE.md'), up = path.join(path.dirname(a.root), 'CLAUDE.md');
     const f = existsSync(here) ? here : (path.basename(a.root) === 'site' && existsSync(up) ? up : null);
@@ -286,6 +311,18 @@ function selftest() {
   eq(check('a11y', fake('<script src="https://adervec.github.io/font.js"></script><app-font-picker no-zoom-option></app-font-picker>')), 'warn', 'a picker that hides the zoom option warns');
   eq(check('pfp', fake('fetch("https://www.googleapis.com/oauth2/v3/userinfo") <img src="${esc(prof.picture)}">')), 'FAIL', 'a picture only in settings no longer passes');
   eq(check('pfp', fake('fetch("https://www.googleapis.com/oauth2/v3/userinfo") <header><app-account></app-account></header> appFont.setAccount({ picture })')), 'ok', 'the shared corner avatar passes');
+  const CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://adervec.github.io">`;
+  eq(check('sec', fake(CSP + 'el.textContent = name;')), 'ok', 'a CSP and plain textContent pass');
+  eq(check('sec', fake('el.textContent = name;')), 'FAIL', 'no CSP fails');
+  eq(check('sec', fake(CSP + 'const f = new Function("return 1");')), 'FAIL', 'new Function fails');
+  eq(check('sec', fake(CSP + 'const state = Math.random().toString(36);')), 'FAIL', 'a Math.random sign-in state fails');
+  eq(check('sec', fake(CSP + 'const roll = Math.floor(Math.random() * 6);')), 'ok', 'Math.random for gameplay is fine');
+  eq(check('sec', fake(CSP + '<script src="https://cdn.jsdelivr.net/npm/x@1/x.js"></script>')), 'FAIL', 'a CDN script without integrity fails');
+  eq(check('sec', fake(CSP + '<script src="https://cdn.jsdelivr.net/npm/x@1/x.js" integrity="sha384-x" crossorigin></script>')), 'ok', 'a CDN script with integrity passes');
+  eq(check('sec', fake(CSP + 'el.innerHTML = `<b>${item.name}</b>`;')), 'warn', 'unescaped ${} into innerHTML warns');
+  eq(check('sec', fake(CSP + 'el.innerHTML = `<b>${esc(item.name)}</b>`;')), 'ok', 'escaped ${} into innerHTML passes');
+  eq(check('supply', fake('', ['LICENSE'], [{ f: 'ci.yml', t: 'on: push\npermissions:\n  contents: read\njobs:\n  t:\n    steps:\n      - uses: actions/checkout@v4' }])), 'ok', 'locked-down CI passes');
+  eq(check('supply', fake('', ['LICENSE'], [{ f: 'ci.yml', t: 'on: push\njobs:\n  t:\n    steps:\n      - uses: actions/checkout@v4' }])), 'FAIL', 'CI without permissions fails');
   console.log('standards.mjs selftest: ok');
 }
 

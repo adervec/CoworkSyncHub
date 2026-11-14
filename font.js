@@ -403,7 +403,7 @@
           'Font: ' + get() + ' · pinch-zoom ' + (zoomAllowed() ? 'on' : 'off') + ' · what\'s new ' + (whatsNewSilenced() ? 'silenced' : 'on'),
           'Recent errors: ' + (recentErrors.length ? '\n  ' + recentErrors.join('\n  ') : 'none'),
         ].join('\n');
-      });
+      }).then(redact);
   }
   function copyDiagnostics(button) {
     return diagnostics().then(function (text) {
@@ -757,7 +757,51 @@
     return lang();
   });
 
+  // ---- Safety helpers (house standard 22) ------------------------------------------------------------
+  // Every app shares the adervec.github.io origin, so one injected script could read every app's data.
+  // Text from outside (imports, Drive, cowork replies, the URL, a profile name) never becomes markup.
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+  // html`<b>${name}</b>`: every ${…} is escaped; wrap trusted markup in html.raw(…) to keep it
+  function html(strings) {
+    var out = strings[0];
+    for (var i = 1; i < arguments.length; i++) {
+      var v = arguments[i];
+      out += (Array.isArray(v) ? v.map(function (x) { return x && x.__raw != null ? x.__raw : esc(x); }).join('') : v && v.__raw != null ? v.__raw : esc(v)) + strings[i];
+    }
+    return { __raw: out, toString: function () { return out; } };
+  }
+  html.raw = function (s) { return { __raw: String(s), toString: function () { return String(s); } }; };
+  // a link or picture address from data: only http(s), relative, blob: or an image data: URL; else ''
+  function safeUrl(u) {
+    u = String(u == null ? '' : u).trim();
+    if (/^data:image\/(png|jpe?g|gif|webp|avif);/i.test(u) || /^blob:/i.test(u)) return u;
+    try { var p = new URL(u, location.href).protocol; return p === 'https:' || p === 'http:' ? u : ''; } catch (e) { return ''; }
+  }
+  // JSON from a file, Drive or a cowork reply: size-capped, and __proto__ / constructor / prototype keys dropped
+  function parseJSON(text, maxBytes) {
+    text = String(text);
+    if (text.length > (maxBytes || 50e6)) throw new Error('File too large');
+    return JSON.parse(text, function (k, v) { return k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v; });
+  }
+  // an unguessable id (sign-in state, file names, request ids); Math.random is fine only for gameplay
+  function randomId() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    var b = crypto.getRandomValues(new Uint8Array(16));
+    return [].map.call(b, function (x) { return (x + 256).toString(16).slice(1); }).join('');
+  }
+  // diagnostics and crash reports are copied around: never carry a token or an email
+  function redact(s) {
+    return String(s)
+      .replace(/ya29\.[\w.-]+/g, '[token]').replace(/\bBearer\s+[\w.~+/-]+=*/gi, 'Bearer [token]')
+      .replace(/\b(access_token|id_token|refresh_token|code)=[^&\s]+/gi, '$1=[token]')
+      .replace(/\beyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]*/g, '[jwt]')
+      .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]');
+  }
+
   window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice,
+    esc: esc, html: html, safeUrl: safeUrl, parseJSON: parseJSON, randomId: randomId, redact: redact,
     zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice,
     diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,
     whatsNew: whatsNew, checkWhatsNew: checkWhatsNew, setWhatsNewSilenced: setWhatsNewSilenced,

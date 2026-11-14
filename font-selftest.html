@@ -95,6 +95,15 @@
   ok('Show less closes it again', !lt.hasAttribute('data-open') && lt.getBoundingClientRect().height < 100);
   var st = document.getElementById('shorttext');
   ok('text that fits is left alone, no button', !st.hasAttribute('data-clamped') && !(st.nextElementSibling && st.nextElementSibling.className === 'app-clamp-toggle'));
+  var F = appFont;
+  ok('esc and html`` escape outside text', F.esc('<img src=x onerror=alert(1)>') === '&lt;img src=x onerror=alert(1)&gt;' && String(F.html`<b>${'<i>'}</b>${F.html.raw('<br>')}`) === '<b>&lt;i&gt;</b><br>');
+  ok('safeUrl lets only safe addresses through', F.safeUrl('javascript:alert(1)') === '' && F.safeUrl(' JaVaScRiPt:x') === '' && F.safeUrl('data:text/html,x') === '' && F.safeUrl('https://a.b/c') === 'https://a.b/c' && F.safeUrl('data:image/png;base64,AA') !== '');
+  var pj = F.parseJSON('{"a":1,"__proto__":{"polluted":true},"b":{"constructor":{"prototype":{"x":1}}}}');
+  ok('parseJSON drops prototype-polluting keys', pj.a === 1 && !({}).polluted && !Object.prototype.hasOwnProperty.call(pj, '__proto__') && !Object.prototype.hasOwnProperty.call(pj.b, 'constructor'));
+  var bigOk = false; try { F.parseJSON('[1]', 2); } catch (e) { bigOk = /too large/.test(e.message); }
+  ok('parseJSON refuses oversized input', bigOk);
+  ok('randomId is long and unique', F.randomId().length >= 32 && F.randomId() !== F.randomId());
+  ok('diagnostics never carry tokens or emails', !/ya29\.|ada@/.test(F.redact('Bearer ya29.abc_DEF-1 access_token=xyz ada@example.com')) && /\[token\]/.test(F.redact('ya29.zz')));
   lt.remove();
   await new Promise(function (r) { setTimeout(r, 30); });
   ok('removing the block (a framework re-render) takes its button too', !lb.isConnected);
