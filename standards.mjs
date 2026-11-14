@@ -98,7 +98,7 @@ const CHECKS = [
     if (!a.has(/cowork-manifest|cowork\.json/)) return fail('no cowork manifest');
     if (!a.has(/github\.io\/cowork\.js/)) return warn('own cowork, no shared panel');
     // fs-mode apps should describe their channels (label, preview rows, undo); data-mode apps run their own engine
-    const fsMount = a.has(/\.mount\(/), described = a.has(/\bpreview\s*[:(]/) && a.has(/\bchannels\s*:\s*\{/);
+    const fsMount = a.has(/\b(cowork|cw)\.mount\(/), described = a.has(/\bpreview\s*[:(]/) && a.has(/\bchannels\s*:\s*\{/);
     return fsMount && !described ? warn('shared engine with defaults: give each channel a label, preview rows and undo') : ok();
   }],
   ['license', 'Licence, notices, privacy note', (a) => {
@@ -189,7 +189,7 @@ const CHECKS = [
     const GRADED = /^(GymTracker|Tachyread|SpeechImprover|GuitarPicker|HandwritingHelper|ChessRetabled|BodybuildingProgressCoach|learning-pit|MarksmanApp|Run315|BlackMirrorBikeRide)$/;
     if (!GRADED.test(a.app.dir)) return ['-', 'no algorithmically graded sessions'];
     // a real channel or operation: name:/dir: 'something-review', or a Tachyread-style op id 'cw-...-review':
-    return a.has(/\b(name|dir)\s*:\s*['"][a-z0-9-]*-review['"]|['"]cw-[a-z0-9-]+-review['"]\s*:/) ? ok() : fail('no AI review channel for its graded sessions');
+    return a.has(/\b(name|dir|key)\s*:\s*['"][a-z0-9-]*-review['"]|['"]cw-[a-z0-9-]+-review['"]\s*:/) ? ok() : fail('no AI review channel for its graded sessions');
   }],
   ['i18n', 'English + 16 machine-translated languages', (a) => {
     // every string the app writes in English is translated into all 16 languages (i18n.mjs), and dates,
