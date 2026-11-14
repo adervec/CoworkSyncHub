@@ -5,6 +5,8 @@
 <script>localStorage.removeItem('maker-font'); localStorage.removeItem('maker-seen:font-selftest.html'); localStorage.removeItem('maker-whatsnew-off');</script>
 <script src="font.js"></script>
 <app-account id="acct"></app-account><app-font-picker></app-font-picker><pre id="log">running…</pre>
+<div id="longtext" data-clamp="3" style="width:300px">one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twenty-one twenty-two twenty-three twenty-four twenty-five twenty-six twenty-seven twenty-eight twenty-nine thirty thirty-one thirty-two thirty-three thirty-four thirty-five thirty-six thirty-seven thirty-eight thirty-nine forty</div>
+<div id="shorttext" data-clamp="3" style="width:300px">short and sweet</div>
 <script>
 (async function () {
   var fails = [], ok = function (name, cond) { if (!cond) fails.push(name); };
@@ -84,6 +86,15 @@
   ok('clicking the avatar tells the app (to open its sync settings)', clicked && clicked.name === 'Ada');
   appFont.setAccount(null);
   ok('sign-out hides it again', acct.style.display === 'none');
+  await new Promise(function (r) { setTimeout(r, 100); });
+  var lt = document.getElementById('longtext'), lb = lt.nextElementSibling;
+  ok('long text is cut short with a Show all button', lt.getAttribute('data-clamped') === '1' && lt.getBoundingClientRect().height < 100 && lb && lb.className === 'app-clamp-toggle' && /Show all/.test(lb.textContent));
+  lb.click();
+  ok('Show all opens it fully, and the button turns into Show less', lt.hasAttribute('data-open') && lt.getBoundingClientRect().height > 100 && /Show less/.test(lb.textContent));
+  lb.click();
+  ok('Show less closes it again', !lt.hasAttribute('data-open') && lt.getBoundingClientRect().height < 100);
+  var st = document.getElementById('shorttext');
+  ok('text that fits is left alone, no button', !st.hasAttribute('data-clamped') && !(st.nextElementSibling && st.nextElementSibling.className === 'app-clamp-toggle'));
   localStorage.removeItem('maker-font');
   document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
 })();

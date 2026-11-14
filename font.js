@@ -682,6 +682,63 @@
     document.documentElement.appendChild(bar);
   }
 
+  // ---- Long text never buries the page (house standard) ------------------------------------------
+  // Mark any block that can grow long (a transcript, an AI review, notes) with data-clamp:
+  //   <div data-clamp>…</div>          at most 12 lines, or 40% of the screen height on a phone
+  //   <div data-clamp="6">…</div>      at most 6 lines
+  // When the text overflows, it is cut with a fade and gets a "Show all" / "Show less" button, so the
+  // buttons below it stay in reach. Text that fits is left alone. Works for markup added later too.
+  var clampCss = document.createElement('style');
+  clampCss.textContent =
+    '[data-clamp][data-clamped="1"]:not([data-open]){overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}' +
+    '.app-clamp-toggle{display:block;margin:.35em 0 .6em;padding:4px 10px;border-radius:7px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;font-size:.9em;cursor:pointer;opacity:.85}';
+  (document.head || document.documentElement).appendChild(clampCss);
+  function clampLimit(el) {
+    var lh = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.4 || 20;
+    var lines = parseInt(el.getAttribute('data-clamp'), 10);
+    var byLines = (lines > 0 ? lines : 12) * lh;
+    return lines > 0 ? byLines : Math.min(byLines, Math.max(160, innerHeight * 0.4));
+  }
+  function clamp(el) {
+    if (el.__clampBusy) return;
+    el.__clampBusy = true;
+    var open = el.hasAttribute('data-open');
+    el.style.maxHeight = '';
+    var limit = clampLimit(el), tall = el.scrollHeight > limit + 8;
+    var btn = el.__clampBtn;
+    if (!tall) {
+      el.removeAttribute('data-clamped');
+      if (btn) btn.remove();
+    } else {
+      el.setAttribute('data-clamped', '1');
+      if (!open) el.style.maxHeight = limit + 'px';
+      if (!btn) {
+        btn = el.__clampBtn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'app-clamp-toggle';
+        btn.addEventListener('click', function () { el.hasAttribute('data-open') ? el.removeAttribute('data-open') : el.setAttribute('data-open', ''); clamp(el); });
+      }
+      btn.textContent = open ? tr('Show less') : tr('Show all');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (btn.previousElementSibling !== el) el.insertAdjacentElement('afterend', btn);
+    }
+    el.__clampBusy = false;
+  }
+  var clampRO = window.ResizeObserver ? new ResizeObserver(function (es) { es.forEach(function (e) { clamp(e.target); }); }) : null;
+  function watchClamps(root) {
+    if (!root || !root.querySelectorAll) return;
+    var els = [].slice.call(root.querySelectorAll('[data-clamp]'));
+    if (root.matches && root.matches('[data-clamp]')) els.push(root);
+    els.forEach(function (el) { if (el.__clampWatched) return; el.__clampWatched = true; clamp(el); if (clampRO) clampRO.observe(el); });
+  }
+  var startClamps = function () {
+    watchClamps(document);
+    if (window.MutationObserver) new MutationObserver(function (ms) { ms.forEach(function (m) {
+      m.addedNodes.forEach(function (n) { if (n.nodeType === 1) watchClamps(n); });
+      if (m.type === 'characterData' || m.type === 'childList') { var p = m.target.nodeType === 1 ? m.target : m.target.parentElement; var c = p && p.closest && p.closest('[data-clamp]'); if (c) clamp(c); }
+    }); }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  };
+  document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', startClamps) : startClamps();
+
   var appLoc = meta('app-locales');
   var ready = (lang() === 'en' ? Promise.resolve([{}, {}]) : Promise.all([
     loadDict(LOC_BASE + lang() + '.json'),
