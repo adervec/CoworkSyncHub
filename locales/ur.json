@@ -56,5 +56,6 @@
  "online": "آن لائن",
  "syncing to Google Drive": "Google Drive سے ہم آہنگی جاری ہے",
  "the browser may clear it if space runs low": "جگہ کم ہونے پر براؤزر اسے مٹا سکتا ہے",
- "{used} used of {quota} available": "{quota} دستیاب میں سے {used} استعمال شدہ"
+ "{used} used of {quota} available": "{quota} دستیاب میں سے {used} استعمال شدہ",
+ "Send feedback": "رائے بھیجیں"
 }

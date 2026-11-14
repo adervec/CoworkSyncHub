@@ -56,5 +56,6 @@
  "online": "online",
  "syncing to Google Drive": "menyinkronkan ke Google Drive",
  "the browser may clear it if space runs low": "browser dapat menghapusnya jika ruang hampir habis",
- "{used} used of {quota} available": "{used} terpakai dari {quota} tersedia"
+ "{used} used of {quota} available": "{used} terpakai dari {quota} tersedia",
+ "Send feedback": "Kirim masukan"
 }

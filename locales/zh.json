@@ -56,5 +56,6 @@
  "online": "在线",
  "syncing to Google Drive": "正在同步到 Google Drive",
  "the browser may clear it if space runs low": "空间不足时浏览器可能会清除它",
- "{used} used of {quota} available": "已用 {used}，共 {quota} 可用"
+ "{used} used of {quota} available": "已用 {used}，共 {quota} 可用",
+ "Send feedback": "发送反馈"
 }

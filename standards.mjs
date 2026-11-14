@@ -287,6 +287,11 @@ function run(argv) {
   const filters = argv.filter((x) => !x.startsWith('-')).map((x) => x.toLowerCase());
   const apps = portalApps().filter((a) => !filters.length || filters.some((f) => a.slug.toLowerCase().startsWith(f) || a.dir.toLowerCase().startsWith(f)));
   const W = 15, keys = CHECKS.map((c) => c[0]);
+  if (argv.includes('--json')) { // for the status board (portal.py status)
+    const rows = apps.filter((app) => existsSync(path.join(GITHUB, app.dir))).map((app) => { const a = load(app); return { slug: app.slug, cells: Object.fromEntries(CHECKS.map(([k, , fn]) => { let r; try { r = fn(a); } catch (e) { r = ['?', 'check crashed: ' + e.message]; } return [k, r]; })) }; });
+    console.log(JSON.stringify({ checks: CHECKS.map(([k, label]) => [k, label]), apps: rows }));
+    return;
+  }
   console.log('App'.padEnd(W) + keys.map((k) => k.padStart(8)).join(''));
   const notes = [], totals = Object.fromEntries(keys.map((k) => [k, 0]));
   for (const app of apps) {

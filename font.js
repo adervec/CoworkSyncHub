@@ -469,6 +469,18 @@
           });
         });
         row.append(copy, dl);
+        // Send feedback: a new issue on the app's GitHub page, with the (redacted) diagnostics filled in.
+        // ponytail: needs a GitHub account; add a no-account route (a form) when users ask for one.
+        if (/^https:\/\/github\.com\//.test(sourceUrl())) {
+          var fb = document.createElement('button');
+          fb.type = 'button'; fb.textContent = tr('Send feedback');
+          fb.addEventListener('click', function () {
+            diagnostics().then(function (t) {
+              window.open(sourceUrl().replace(/\/$/, '') + '/issues/new?body=' + encodeURIComponent('What happened, or what would you like?\n\n\n---\n' + t.slice(0, 3000)), '_blank', 'noopener');
+            });
+          });
+          row.appendChild(fb);
+        }
         body.appendChild(row);
         d.append(sum, body);
         this.appendChild(d);

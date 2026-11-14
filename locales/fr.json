@@ -56,5 +56,6 @@
  "online": "en ligne",
  "syncing to Google Drive": "synchronisation avec Google Drive",
  "the browser may clear it if space runs low": "le navigateur peut l’effacer si l’espace manque",
- "{used} used of {quota} available": "{used} utilisés sur {quota} disponibles"
+ "{used} used of {quota} available": "{used} utilisés sur {quota} disponibles",
+ "Send feedback": "Envoyer un commentaire"
 }

@@ -56,5 +56,6 @@
  "online": "অনলাইন",
  "syncing to Google Drive": "Google Drive-এ সিঙ্ক হচ্ছে",
  "the browser may clear it if space runs low": "জায়গা কম পড়লে ব্রাউজার এটি মুছে ফেলতে পারে",
- "{used} used of {quota} available": "{quota} উপলব্ধের মধ্যে {used} ব্যবহৃত"
+ "{used} used of {quota} available": "{quota} উপলব্ধের মধ্যে {used} ব্যবহৃত",
+ "Send feedback": "মতামত পাঠান"
 }

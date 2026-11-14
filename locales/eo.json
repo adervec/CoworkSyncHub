@@ -56,5 +56,6 @@
  "online": "konektite",
  "syncing to Google Drive": "sinkronigado kun Google Drive",
  "the browser may clear it if space runs low": "la retumilo povas forigi ĝin se mankas spaco",
- "{used} used of {quota} available": "{used} uzataj el {quota} disponeblaj"
+ "{used} used of {quota} available": "{used} uzataj el {quota} disponeblaj",
+ "Send feedback": "Sendi komenton"
 }

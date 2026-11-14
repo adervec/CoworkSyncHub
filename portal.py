@@ -1,6 +1,7 @@
 """Portal generator for adervec.github.io/portal/ — manager / launcher / catalog for the published apps.
 
   python portal.py build [--offline]   build the site/ portal (fetches GitHub data unless --offline)
+  python portal.py status              write the maker's status board (portal/status.html); deploy publishes it
   python portal.py deploy [--offline] [--beta]  build + public-exposure audit + commit + push site/ (--beta: /portal-beta/ only)
   python portal.py shots               capture app screenshots via headless Chrome/Edge into site/shots/
   python portal.py apps [--quick]      manager table: dirty/unpushed, published age, CI, live status
@@ -1387,6 +1388,39 @@ def cmd_apps(quick=False):
     print("sweep: " + sweep_summary())
 
 
+def cmd_status():
+    """The maker's status board: every app's CI, live site, last push and house-standards columns, as one page."""
+    r = subprocess.run(["node", str(BASE / "standards.mjs"), "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    std = json.loads(r.stdout)
+    cells = {a["slug"]: a["cells"] for a in std["apps"]}
+    data = json.loads(DATA_PATH.read_text(encoding="utf-8")) if DATA_PATH.exists() else {}
+    col = {"ok": "#16a34a", "warn": "#d97706", "FAIL": "#dc2626"}
+    head = "".join(f"<th title='{e(label)}'><span>{e(k)}</span></th>" for k, label in std["checks"])
+    rows, bad = [], 0
+    for app in APPS:
+        ci, live = _ci_state(app["slug"]), _live_state(app_url(app))
+        pushed = fmt_age(iso_ts(data.get(app["slug"], {}).get("pushed_at")))
+        tds = ""
+        for k, _ in std["checks"]:
+            st, note = (cells.get(app["slug"], {}).get(k) or ["-", ""])[:2]
+            bad += st == "FAIL"
+            tds += f"<td title='{e(k + ': ' + st + (' — ' + note if note else ''))}'><i style='background:{col.get(st, '#9ca3af')}'></i></td>"
+        okc = lambda v, good: f"<td class='{'g' if v in good else 'b'}'>{e(v)}</td>"
+        rows.append(f"<tr><th><a href='{e(app_url(app))}'>{e(app['title'])}</a></th>{okc(ci, ('ok', 'running'))}{okc(live, ('200',))}<td>{e(pushed)}</td>{tds}</tr>")
+    page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>Status board</title><script src="/font.js"></script>
+<style>:root{{color-scheme:light dark}}body{{font-family:var(--app-font,system-ui);margin:16px;background:Canvas;color:CanvasText}}
+.wrap{{overflow-x:auto}}table{{border-collapse:collapse;font-size:14px}}td,th{{padding:4px 6px;border-bottom:1px solid color-mix(in srgb,CanvasText 15%,transparent);text-align:center;white-space:nowrap}}
+tbody th{{text-align:left;position:sticky;left:0;background:Canvas}}thead th span{{writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600}}
+td i{{display:inline-block;width:12px;height:12px;border-radius:50%}}.g{{color:#16a34a}}.b{{color:#dc2626;font-weight:700}}p{{max-width:70ch}}</style></head><body>
+<h1>Status board</h1><p>Snapshot from {time.strftime('%Y-%m-%d %H:%M')} ({bad} failing checks). Green = ok, amber = warning, red = fails, grey = not applicable. Hover or tap a dot for the reason. Refresh with <code>python portal.py status</code> then <code>deploy</code>. <a href="./">Portal</a></p>
+<div class="wrap"><table><thead><tr><th>App</th><th><span>CI</span></th><th><span>live</span></th><th><span>last push</span></th>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div><p id="why" aria-live="polite"></p>
+<script>document.querySelector('table').addEventListener('click',function(ev){{var td=ev.target.closest('td[title]');if(td)document.getElementById('why').textContent=td.parentNode.querySelector('th').textContent+' · '+td.title;}});</script></body></html>"""
+    PORTAL_DIR.mkdir(parents=True, exist_ok=True)
+    (PORTAL_DIR / "status.html").write_text(page, encoding="utf-8")
+    print(f"wrote {PORTAL_DIR / 'status.html'}: {bad} failing checks across {len(APPS)} apps")
+
+
 def cmd_open(name):
     n = name.casefold()
     for app in APPS:
@@ -1412,6 +1446,8 @@ def main(argv):
         cmd_shots()
     elif cmd == "apps":
         cmd_apps(quick="--quick" in argv)
+    elif cmd == "status":
+        cmd_status()
     elif cmd == "sweep":
         cmd_sweep()
     elif cmd == "open" and len(argv) > 1:

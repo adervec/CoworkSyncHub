@@ -56,5 +56,6 @@
  "online": "na mreži",
  "syncing to Google Drive": "sinkronizacija s Google Driveom",
  "the browser may clear it if space runs low": "preglednik ga može izbrisati ako ponestane prostora",
- "{used} used of {quota} available": "{used} iskorišteno od {quota} dostupno"
+ "{used} used of {quota} available": "{used} iskorišteno od {quota} dostupno",
+ "Send feedback": "Pošalji povratnu informaciju"
 }
