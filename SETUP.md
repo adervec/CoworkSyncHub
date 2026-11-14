@@ -3,63 +3,46 @@
 This is the long-form companion to `README.md`. It walks through every connection in the
 system and what to do when one misbehaves:
 
-1. [The hub itself](#1-the-hub-itself)
+1. [The briefs folder](#1-the-briefs-folder)
 2. [Cowork connections, app by app](#2-cowork-connections-app-by-app)
 3. [Troubleshooting cowork connections](#3-troubleshooting-cowork-connections)
 4. [Data source connections (Garmin, Strava, Google Drive, Bluetooth, AI keys)](#4-data-source-connections)
 5. [Troubleshooting data sources](#5-troubleshooting-data-sources)
-6. [Fetch-once sources: one Garmin pull for every app](#6-fetch-once-sources)
-7. [The sync log and daily / weekly briefs](#7-the-sync-log-and-briefs)
-8. [Scheduling everything](#8-scheduling)
 
 Vocabulary used throughout: an **app** writes a **request** into a **cowork folder** it owns; an
-**agent** (Claude Code via the hub, Claude Desktop pointed at the folder, or you) writes a
-**reply** next to it; the app imports the reply. The **hub** (`coworkhub.py`) is the agent side,
-centralised. The **panel** is the shared `AI cowork sync` UI every app shows (it is the same
+**agent** (Claude Cowork or Claude Code pointed at the folder, or you) writes a
+**reply** next to it; the app imports the reply. The **hub** (`coworkhub.py`) only displays the briefs the
+agent writes (§1). The **panel** is the shared `AI cowork sync` UI every app shows (it is the same
 component everywhere, loaded from `https://adervec.github.io/cowork.js`). Panel **states** are
-the hub's words: `idle` · `PENDING` · `answered` · `STALE` · `note`.
+`idle` · `PENDING` · `answered` · `STALE` · `note`.
 
 ---
 
-## 1. The hub itself
+## 1. The briefs folder
 
-### 1.1 Install
+The hub no longer dispatches anything. An agent writes one brief a day into a folder, the apps
+keep their own `BRIEF.md` current in their link folders, and `coworkhub.py` shows both.
 
-1. Python 3.10+ on PATH (`python --version`). No pip packages are needed.
-2. The Claude Code CLI on PATH: `claude --version`. If that fails, install it and **open a new
-   terminal** (PATH changes don't reach an already-open shell).
-3. Clone / open `CoworkSyncHub`. Run the self-checks once — both must print `OK`:
-   ```
-   python test_coworkhub.py
-   python test_portal.py
-   ```
-4. First status: `python coworkhub.py status` — prints an empty table and writes `status.html`.
-   Open `status.html` in a browser; it should say "all quiet".
+1. Python 3.9+ on PATH. No pip packages. `python test_coworkhub.py` and
+   `python test_portal.py` must both print `OK`.
+2. `python coworkhub.py` opens `http://127.0.0.1:8791/`. It reads
+   `~/Documents/Cowork/MorningBrief` and `~/Documents/Cowork/Cowork Link Folders` when they exist;
+   otherwise pass them: `python coworkhub.py "D:/briefs" --apps "D:/link folders"`. First run drops
+   `INSTRUCTIONS.md` (the brief format) into the briefs folder.
+3. Give the scheduled agent write access to the briefs folder and have it write `YYYY-MM-DD.md`
+   in that format. The hub needs no scheduling.
+4. In each app, connect its "Morning brief" / cowork folder to its own sub-folder of the apps
+   folder so the app keeps `BRIEF.md` there.
+5. Reload the page to see what landed.
 
-### 1.2 Register a folder
-
-Every cowork folder is registered once:
-
-```
-python coworkhub.py add <name> <kind> "<full path to the folder>"
-```
-
-- `<kind>` is `manifest` for any app that writes a `cowork.json` (all ten apps, the portal,
-  and the hub's own briefs), `gymtracker` or `tachyread` for those two if you prefer their
-  dialect adapter. **If the folder contains a `cowork.json`, the manifest adapter is used no
-  matter what kind you typed.**
-- Use the folder the app's panel shows in its header (`no folder connected` → connect one first).
-- Verify: `python coworkhub.py check "<path>"` prints `PASS (manifest)` and a channel table. Any
-  `warning:` lines list request files that don't exist yet (normal until the app sends once).
-
-### 1.3 Run
-
-- `python coworkhub.py status` — scan everything, table + `status.html`.
-- `python coworkhub.py run` — dispatch Claude on every `PENDING` channel once. `run <app>`,
-  `--channel <name>`, `--dry-run`, `--force` (re-answer even if answered), `--refresh-sources`.
-- `python coworkhub.py watch --interval 300` — `run` in a loop.
-- `python coworkhub.py serve` — the same status page on `http://127.0.0.1:8791/` where the panel
-  buttons actually run channels; panels refresh every 15 s.
+| Symptom | Cause | Fix |
+|---|---|---|
+| Banner: *Today's brief hasn't landed* | the agent has not run, or wrote elsewhere / without a date in the file name | check the task ran; the file must be `YYYY-MM-DD.md` in the briefs folder |
+| One big tile instead of a grid | the brief has no `## ` sections | have the agent follow `INSTRUCTIONS.md` |
+| A tile is a wall of text | depth was written before the first `### ` | move it under `### ` headings |
+| An app row says *stale* | Chrome dropped the app's folder grant after a restart, or the app was not opened | open the app once and re-grant the folder |
+| An app row says *nothing written here yet* | the app was never connected to that folder | connect it from the app's cowork / morning-brief panel |
+| Port in use | another copy is running | `--port 8792` |
 
 ---
 
@@ -75,8 +58,8 @@ folder steps (the File System Access API); Firefox and Safari can't open folders
 > 2. Press **Send requests** (fs-mode apps do this automatically on connect). The panel's
 >    channel rows turn `PENDING`. The folder now contains `cowork.json` plus the channel's
 >    `request.json` / `INSTRUCTIONS.md`.
-> 3. Register the folder with the hub once (`coworkhub.py add …`) and run `coworkhub.py run`
->    (or let `watch` / `serve` do it). The hub writes `<channel>/reply.json`.
+> 3. Point your agent at the folder ("read INSTRUCTIONS.md and answer the request"). It writes
+>    `<channel>/reply.json`.
 > 4. Back in the app press **Check for replies** (or just focus the tab — fs-mode panels
 >    re-check on focus). The row turns `answered` and the reply shows in-app.
 
@@ -99,13 +82,12 @@ folder steps (the File System Access API); Firefox and Safari can't open folders
 | The Long Gallery | **Progress → "A second opinion"** | fs | coach | what you've seen/rated/noted + major works missed | under the panel |
 | The Classical Journey | **Progress → "Ask for a programme"** | fs | coach | what you've heard/loved/noted + landmarks missed | under the panel |
 | The portal (adervec.github.io/portal/) | "ask your coach" under the character sheet | fs | review | your cross-app week | under the panel |
-| The hub's own briefs | `briefs/` next to `coworkhub.py` (see §7) | — | daily, weekly | the sync-log digest | `briefs/<period>/reply.json` + status.html |
 
 **GymTracker specifics.** Its folder is the "AI export" folder (Settings › Cowork › *Pick folder*,
 then *Write the hub once*). It writes `app-export.json` and a sub-folder per channel
 (`garmin-reconciliation/`, …) with `context.json`, `INSTRUCTIONS.md`, `inbox/`, `processed/`.
 Replies go to `<channel>/inbox/output-<date>.json`; the app moves consumed files to `processed/`.
-The hub never moves files.
+The agent never moves files.
 
 **Tachyread specifics.** Tick the actions you want in the tree, then **Send requests** (or
 *Run selected*). One request = one instruction; *heavy* actions send the whole library.
@@ -122,14 +104,11 @@ demo. The cowork panel below it needs neither a key nor a server, so on
 `adervec.github.io/Run315/` it is the coaching path that actually works.
 A "sync machine" can be designated — other devices then only watch.
 
-**Claude Desktop instead of the hub.** Point Claude Desktop (Cowork) at the same folder and ask it
-to "read INSTRUCTIONS.md and answer the request". The app doesn't care who wrote the reply.
-
 ---
 
 ## 3. Troubleshooting cowork connections
 
-Work top-down: **panel → folder → hub → reply → import**.
+Work top-down: **panel → folder → reply → import**.
 
 ### 3.1 The panel
 
@@ -147,44 +126,17 @@ Work top-down: **panel → folder → hub → reply → import**.
 
 1. Open the folder in Explorer. You should see `cowork.json` and `<channel>/request.json`
    (+ `INSTRUCTIONS.md`). If not, the Send didn't happen — go back to the panel.
-2. `python coworkhub.py check "<path>"` — `PASS` means the layout is valid. `FAIL` lines name
-   the broken field (`exactly one of replyPath/replyDir required`, `request must be a non-empty
-   list`…) — that's an app bug; report it with the manifest.
-3. OneDrive / Dropbox / Drive-synced folders work but can create `request (1).json` conflict
-   copies and hold files locked briefly. Prefer a local folder; if you must sync it, give the
-   hub's `timeout_sec` some slack and don't run the hub on two machines at once.
-4. Windows paths: quote them. Forward slashes are fine in `hub-config.json`.
+2. OneDrive / Dropbox / Drive-synced folders work but can create `request (1).json` conflict
+   copies and hold files locked briefly. Prefer a local folder.
 
-### 3.3 The hub
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| `another sweep is running (hub.lock); skipping` | a previous run is still going, or died | wait; if `hub.lock` is older than `timeout_sec`+60 s it's stolen automatically; delete it by hand if a crash left it |
-| `error: claude CLI not found (claude)` | not on PATH for *this* shell/task | `where claude`; set `claude_cmd` in `hub-config.json` to the full path |
-| `error: timeout` | the agent ran past `timeout_sec` (900 s) | raise `timeout_sec`; check `logs/<app>-<channel>-<stamp>.log` for what it was doing |
-| `error: no reply file appeared` | the agent finished but wrote nothing / wrote to the wrong place | read the log; for GymTracker the reply must land in `<channel>/inbox/output-<date>.json`; the prompt tells it exactly where |
-| `error: reply invalid JSON` | reply file exists but isn't JSON | open it; usually prose or a trailing comma — re-run with `--force` |
-| `error: reply for stale request` | the reply's `requestHash` ≠ the request's | the app re-sent while the agent was working; re-run |
-| `error: agent reported: <reason>` | the agent wrote an `error-<date>.json` dead letter | the reason is the fix (missing data, unreadable instructions…) |
-| `unsupported protocol` / `newer protocol version` (note state `-`) | manifest says something the hub doesn't speak | upgrade the hub; `protocolVersion` must be ≤ 1 |
-| `folder missing` | the registered path doesn't exist | `hub-config.json` → fix the `root` |
-| `unknown kind` | typo in `add` | re-add with `manifest` |
-| `scan error: …` | a corrupt file in the folder | the message names it |
-| Channel `PENDING` but `run` says `nothing to dispatch` | the hub already answered this exact request (it remembers the request hash) | change the request (Send again from the app) or `run --force` |
-| `STALE` | pending for over `stale_days` (7) | the hub isn't running, or errors above |
-| The permission prompt inside Claude blocks the run | GymTracker's garmin/strava channels ask the agent to run helper scripts | either configure the scripts as **shared sources** (§6 — recommended) or add `"--allowedTools", "Bash(python:*)"` to `claude_args` |
-
-Always read the per-run log: `logs/<app>-<channel>-<timestamp>.log` holds the exact prompt and
-everything the agent printed. `runs.jsonl` / `sync-log.jsonl` have one line per attempt.
-
-### 3.4 The import
+### 3.3 The import
 
 | Symptom | Fix |
 |---|---|
 | Panel says `answered` but nothing changed in the app | fs-mode apps import once per reply file — if you replaced the reply, its mtime must be newer than the request's; press **Check for replies** |
 | GymTracker shows ⚠ on a channel | the ledger already consumed that file, or the envelope `kind` didn't match (`garmin-output` etc.); see the app's Cowork history |
 | Tachyread "Could not parse that reply" | the reply isn't the JSON shape in `journey-instructions.md` — paste the error to the agent |
-| Reply shows but is generic / ignores the data | the agent didn't read the instructions file — check the log; for shared sources confirm the `DATA SOURCES` paragraph appears in the prompt (§6) |
+| Reply shows but is generic / ignores the data | the agent didn't read the instructions file — tell it to start there |
 
 ---
 
@@ -205,16 +157,14 @@ unofficial — your own data only, at your own risk, and it can break when Garmi
    - PowerShell: `$env:GARMIN_EMAIL="you@example.com"; $env:GARMIN_PASSWORD="…"`
    - cmd: `set GARMIN_EMAIL=…` / `set GARMIN_PASSWORD=…`
    - For scheduled runs set them as **user** environment variables (System → Environment
-     Variables), or put them in the hub's source `env` block (`hub-config.json` is gitignored
-     and machine-local; still, prefer env vars).
+     Variables).
 3. First run by hand: `py tools/garmin-sync.py 14 "C:\path\out\gymtracker-biometrics.json"`.
    If your account uses MFA you'll be prompted for the code — that's why the first run is by
    hand; the library caches the session afterwards.
 4. Check the output: a JSON with `bodyComp` (weightKg, bodyFatPct, muscleMassKg, boneMassKg,
    bodyWaterPct per date) and `sleep`.
-5. Wire it so the hub fetches it **once** for everyone — §6. (You can also still point
-   GymTracker's *Biometrics Auto-Load* at the output folder; keep "biometrics" / "garmin" in
-   the filename so the watcher recognises it.)
+5. Point GymTracker's *Biometrics Auto-Load* at the output folder; keep "biometrics" /
+   "garmin" in the filename so the watcher recognises it.
 
 ### 4.2 Strava (GymTracker activities; description push-back)
 
@@ -227,15 +177,13 @@ Official API, your own application, your own data.
 3. Pull: `py tools/strava-sync.py --days 30 --out "C:\path\out\strava-activities.json"`.
 4. Push descriptions back (optional): generate the push file in GymTracker (Strava panel →
    *Generate Strava push file*), then `py tools/strava-sync.py --push strava-push.json`.
-5. Wire it as a shared source — §6.
-
 Limits: ~100 requests / 15 min and 1 000 / day per application; the pull is one request per
 page of activities, so daily pulls are nowhere near them.
 
 ### 4.3 Google Drive sync (Tachyread, ChessRetabled, GuitarPicker, BMBR, SpeechImprover, Mise, Handwriting Helper, MicroMiniger)
 
 Each app's Drive sync is its own: Settings → *Connect Google Drive* → Google's consent screen →
-the app gets a private app folder. Data goes **Drive ↔ app**, never through the hub.
+the app gets a private app folder. Data goes **Drive ↔ app** only.
 Tachyread / Mise note the origin rule: Drive sync only runs on the published site
 (`adervec.github.io`) or a local dev server, not from a `file://` page.
 
@@ -243,7 +191,7 @@ Tachyread / Mise note the origin rule: Drive sync only runs on the published sit
 
 Chrome/Edge desktop or Android; **Web Bluetooth needs HTTPS** (the published site) or
 `localhost`. Pair from the ride screen; power + heart rate are read live, nothing is stored
-by the hub.
+outside the app.
 
 ### 4.5 AI keys (ChessRetabled, Tachyread, BPC "AI optional")
 
@@ -258,13 +206,11 @@ A pasted Anthropic key is held in memory only and only used when you send a mess
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ModuleNotFoundError: garminconnect` | not installed for the Python the hub uses | `py -m pip install garminconnect` with the **same** interpreter (`where py`, `where python`) |
+| `ModuleNotFoundError: garminconnect` | not installed for the Python that runs the script | `py -m pip install garminconnect` with the **same** interpreter (`where py`, `where python`) |
 | Login fails / `401` / "Unauthorized" | wrong credentials, or Garmin changed the login flow | re-check env vars (no quotes in cmd `set`); `pip install -U garminconnect`; try once interactively |
 | Asks for MFA every run | the session cache isn't persisting (different user / HOME between your shell and the scheduled task) | run once by hand **as the same Windows user** the task uses; or temporarily disable MFA-on-every-login in Garmin |
-| `429 Too Many Requests` | Garmin rate-limited the unofficial endpoints | the hub's TTL is your friend: one pull per `ttl_min` (default 360) regardless of how many apps ask; don't schedule more often than hourly |
+| `429 Too Many Requests` | Garmin rate-limited the unofficial endpoints | don't schedule more often than hourly |
 | Empty `bodyComp` | the scale didn't sync to Garmin Connect, or field names changed | check Garmin Connect web shows the weight; if it does, uncomment the debug line in the script and map the new key |
-| Works by hand, fails from the hub | env vars not visible to the hub's process | put them in `sources.garmin.env` in `hub-config.json`, or set **user** env vars and restart the task |
-| Hub log says `source garmin: FAILED … using stale cache` | the pull failed; the last good file was used | that's the designed fallback — fix the cause at your leisure; `python coworkhub.py sources --fetch garmin --force` to retry now |
 
 ### Strava
 
@@ -273,7 +219,7 @@ A pasted Anthropic key is held in memory only and only used when you send a mess
 | `--auth` opens the browser but the redirect fails | callback domain isn't `localhost`, or port 8723 is busy | fix the Strava app settings; free the port |
 | `401 invalid_grant` / `refresh token invalid` | Strava rotated the token and the file wasn't updated, or you deauthorised the app | `--auth` again |
 | `403 … scope` on push | authorised read-only | `--auth` again and accept write |
-| `429` | rate limit | wait 15 min; raise the source TTL |
+| `429` | rate limit | wait 15 min; pull less often |
 | Activities don't link in GymTracker | start times differ by more than the matching window | reconcile by hand once in the Strava panel; the next pull links by id |
 
 ### Google Drive
@@ -290,127 +236,3 @@ A pasted Anthropic key is held in memory only and only used when you send a mess
 |---|---|
 | No device in the picker | trainer already connected to another app (Zwift, the Garmin app) — disconnect it there; HTTPS required |
 | Power but no HR | the HR strap is a separate device — pair it too |
-
----
-
-## 6. Fetch-once sources
-
-The hub can run each data-source script **once per sweep** and hand the resulting file to every
-channel that needs it, so Garmin (or Strava, or anything) is never hit once per app.
-
-### 6.1 Configure
-
-`hub-config.json` (machine-local, gitignored):
-
-```json
-{
-  "claude_cmd": "claude",
-  "timeout_sec": 900,
-  "apps": [ ... ],
-  "sources": {
-    "garmin": {
-      "cmd": ["py", "C:/Users/you/Documents/GitHub/GymTracker/tools/garmin-sync.py", "14", "{out}"],
-      "ttl_min": 360,
-      "channels": ["gymtracker/garmin-*", "bpc/*"],
-      "env": { "GARMIN_EMAIL": "you@example.com" }
-    },
-    "strava": {
-      "cmd": ["py", "C:/Users/you/Documents/GitHub/GymTracker/tools/strava-sync.py", "--days", "30", "--out", "{out}"],
-      "ttl_min": 120,
-      "channels": ["gymtracker/strava-*"]
-    }
-  }
-}
-```
-
-- `cmd` — the command; `{out}` is replaced by the file the hub wants written
-  (`sources/<name>/<timestamp>.json`). The command must write that file and exit 0.
-- `ttl_min` — how long a pull stays fresh. Within the TTL the hub reuses `latest.json` and
-  logs a *cache hit*; the service is not contacted.
-- `channels` — `app/channel` patterns (wildcards OK) that receive this source. A manifest
-  channel can also ask for it itself: `"sources": ["garmin"]` in its `cowork.json` entry.
-- `env` — extra environment for the command (optional). `cwd`, `timeout_sec` are also accepted.
-
-### 6.2 What happens on a sweep
-
-1. `coworkhub.py run` decides which channels to dispatch.
-2. It collects the sources those channels need and fetches **each one once** (or reuses a
-   fresh cache). Output: `sources/<name>/latest.json` (+ a dated copy; the last 30 are kept).
-3. Every dispatched prompt for a channel that needs a source gets a `DATA SOURCES` paragraph:
-   *"the hub fetched these once for every app this sweep. Read these files; do NOT contact the
-   services or run any sync script yourself"* — with the absolute path and the cache age.
-4. A failed fetch falls back to the last good file (the prompt says `STALE cache`), and if
-   there is none, the prompt says so explicitly, so the agent reports it instead of improvising.
-
-### 6.3 Verify
-
-```
-python coworkhub.py sources                  # table: TTL, age of latest.json, size
-python coworkhub.py sources --fetch garmin   # pull now (respects TTL)
-python coworkhub.py sources --fetch --force  # pull everything, ignore TTL
-python coworkhub.py run --refresh-sources    # one sweep with fresh pulls
-python coworkhub.py log                      # "sources: garmin: fetched 1× · cache hits 4 · errors 0"
-```
-
-Open a dispatch log under `logs/` and confirm the `DATA SOURCES` paragraph is there.
-
----
-
-## 7. The sync log and briefs
-
-### 7.1 The log
-
-`sync-log.jsonl` (next to `coworkhub.py`, gitignored) gets **one JSON line per event**, always
-with `ts` and `kind`:
-
-| kind | fields |
-|---|---|
-| `sweep` | `channels`, `pending`, `apps` |
-| `source` | `source`, `result` = `ok` / `cache` / `error`, `duration_sec`, `file` or `detail` / `age_sec` |
-| `dispatch` | `app`, `channel`, `result` (`ok` or `error: …`), `duration_sec`, `log` (file in `logs/`) |
-| `brief` | `period`, `events` |
-
-Nothing to configure — it's always on. It's plain JSONL, so anything can harvest it:
-`python coworkhub.py log --days 7` (text), `--md` (markdown), `--json` (the digest object),
-`Get-Content sync-log.jsonl -Tail 50`, a spreadsheet, or an agent.
-
-### 7.2 Briefs — a cowork channel the hub answers itself
-
-```
-python coworkhub.py brief daily     # or weekly
-```
-
-writes `briefs/cowork.json`, `briefs/daily/request.json` (the digest + the raw events of the
-period, with a `requestHash`) and `briefs/daily/INSTRUCTIONS.md` (what the brief should contain:
-health verdict, what ran per app, failures with the most likely fix, what needs a human; under
-250 words). On first use it **registers `briefs/` as an app** named `briefs`. From then on it is
-an ordinary channel: `coworkhub.py run briefs` (or `watch`) dispatches an agent, and the brief
-lands in `briefs/daily/reply.json`. `brief daily --print` shows the latest one;
-`status.html` shows it in a *Latest daily brief* card; `serve` exposes `/log` and `/api/log`.
-
-Claude Desktop works too: point it at `briefs/` and ask for the daily brief.
-
----
-
-## 8. Scheduling
-
-Windows Task Scheduler (run as your user so env vars and Garmin's session cache are yours):
-
-```
-schtasks /Create /SC MINUTE /MO 15 /TN "CoworkSyncHub run" ^
-  /TR "python C:\path\CoworkSyncHub\coworkhub.py run"
-
-schtasks /Create /SC DAILY /ST 07:00 /TN "CoworkSyncHub daily brief" ^
-  /TR "cmd /c python C:\path\CoworkSyncHub\coworkhub.py brief daily && python C:\path\CoworkSyncHub\coworkhub.py run briefs --channel daily"
-
-schtasks /Create /SC WEEKLY /D MON /ST 07:30 /TN "CoworkSyncHub weekly brief" ^
-  /TR "cmd /c python C:\path\CoworkSyncHub\coworkhub.py brief weekly && python C:\path\CoworkSyncHub\coworkhub.py run briefs --channel weekly"
-```
-
-Or simply keep `python coworkhub.py watch --interval 300` running in a terminal; briefs still
-need the `brief` command on a schedule (it only *writes the request*; the next sweep answers it).
-
-Checklist when a scheduled run "does nothing": same Windows user as the interactive run ·
-`claude` resolvable from that task (use the full path in `claude_cmd`) · env vars are **user**
-variables, not session ones · `hub.lock` not left behind · look at `sync-log.jsonl` first, then
-`logs/`.

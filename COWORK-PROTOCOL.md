@@ -3,8 +3,7 @@
 The folder handshake between an **app** (request side) and an **AI agent**
 (reply side). The app writes machine-readable requests plus human/agent
 instructions into a folder it owns; an agent answers by writing reply files
-into the same folder; the app imports them. CoworkSyncHub is the centralized
-agent side. Scope: local disk, single user, polling — not a network protocol.
+into the same folder; the app imports them. Scope: local disk, single user, polling — not a network protocol.
 
 ## Terminology
 
@@ -15,9 +14,12 @@ agent side. Scope: local disk, single user, polling — not a network protocol.
 - **reply** — the JSON file the agent writes.
 - **envelope** — the versioned JSON wrapper (below).
 - **dialect** — a grandfathered pre-manifest protocol (see table at the end).
-- **hub** — CoworkSyncHub's dispatcher (`coworkhub.py`).
-- **agent** — whatever answers: Claude Code headless via the hub, Claude
-  Desktop/Cowork pointed at the folder, or a human pasting JSON.
+- **agent** — whatever answers: Claude Cowork or Claude Code pointed at the
+  folder, or a human pasting JSON.
+- **hub** — historical: CoworkSyncHub used to dispatch a headless agent per
+  pending request and verify the reply. It is now a passive viewer of the
+  briefs the agent writes (see README), so where this document says "the hub"
+  checks or records something, read "a careful agent should".
 
 ## Canonical layout
 
@@ -128,13 +130,3 @@ is information, not garbage collection.
 
 Dialect apps that also emit a `cowork.json` are treated as manifest apps
 (manifest wins). New apps MUST ship a manifest; new dialects are not accepted.
-
-## Conformance
-
-```
-python coworkhub.py check <folder>
-```
-
-Validates the manifest (or recognizes a known dialect), checks the declared
-files, verifies any present reply envelopes, and prints the channel table the
-hub would see. Wiring a new app = write `cowork.json`, run `check`, `add`.

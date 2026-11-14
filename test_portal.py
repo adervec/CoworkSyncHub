@@ -74,6 +74,8 @@ assert 'id="whatsnew"' in page and 'id="wnshow"' in page and 'id="wndismiss"' in
 assert "freshOnly" in page and "class='when' data-ts=" in page
 # the shared cowork UI ships with the site, with its docs page and a browser self-test
 assert "cowork-panel" in (tmp / "cowork.js").read_text(encoding="utf-8")
+assert "app-font-picker" in (tmp / "font.js").read_text(encoding="utf-8")
+assert len(list((tmp / "fonts").glob("*.woff2"))) >= 6 and (tmp / "fonts" / "fraunces.css").exists() and (tmp / "fonts" / "OFL.txt").exists()
 assert "cowork.mount(" in (tmp / "cowork" / "index.html").read_text(encoding="utf-8")
 assert "stateOf" in (tmp / "cowork-selftest.html").read_text(encoding="utf-8")
 # character sheet + habits wiring

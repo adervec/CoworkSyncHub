@@ -1,94 +1,46 @@
 # CoworkSyncHub
 
-One dispatcher for all the "AI cowork" folders my apps write. The apps drop a
-JSON request + instructions into a folder and wait for an agent to write a JSON
-reply back; this hub is that agent side, centralized: it scans every registered
-folder, spawns Claude Code headless on each pending request, verifies the reply
-landed, and writes a `status.html` dashboard.
+Three things that tie my apps together:
 
-Protocols spoken (see `COWORK-PROTOCOL.md` for the house standard):
+- **`coworkhub.py`** — a passive morning dashboard: an agent's daily brief on top, each app's own brief below.
+- **`cowork.js`** + `COWORK-PROTOCOL.md` — the shared folder hand-off every app speaks.
+- **`portal.py`** — the generator for the app portal at <https://adervec.github.io/portal/>.
 
-- **cowork-manifest v1** — any folder with a `cowork.json` at its root. This is
-  the standard: a new app = drop a `cowork.json`, zero hub code. The manifest
-  wins over a dialect adapter when both apply.
-- **gymtracker-cowork v1** (dialect) — GymTracker's AI export folder: 4 channels
-  (`garmin-reconciliation`, `strava-reconciliation`, `plan-of-the-day`,
-  `analysis`), reply goes to `<channel>/inbox/output-<ISO-date>.json`.
-- **tachyread-journey v1** (dialect) — Tachyread's journey folder: reply goes to
-  `journey-cowork-response.json`.
+## The morning dashboard (`coworkhub.py`)
 
-The hub **never** moves files between `inbox/` and `processed/` — the apps own
-that. Agents echo the request envelope's `requestHash` in replies (the hub
-rejects replies to stale requests) and may write `error-<date>.json` /
-`<reply-stem>-error.json` with a reason when they can't complete a task.
-
-## Setup
-
-Needs Python 3.10+ and the `claude` CLI on PATH. No dependencies.
+A passive page over two folders. It dispatches nothing and writes nothing into an app folder.
 
 ```
-python coworkhub.py add gymtracker gymtracker "C:\path\to\GymTracker AI export"
-python coworkhub.py add tachyread  tachyread  "C:\path\to\Tachyread journey folder"
+python coworkhub.py [briefs] [--apps DIR] [--port 8791] [--no-open]
 ```
 
-## Commands
+- **briefs folder** - one markdown file a day (`YYYY-MM-DD.md`), written by an agent on a
+  schedule (Claude Cowork here). Every `## ` section becomes a tile; what sits before the
+  tile's first `### ` is always visible and each `### ` is a collapsed drill-down. A tile
+  titled *Needs you* is pinned first, a table makes a tile full width (the across-days
+  *Outlook*), and a visible red or orange circle emoji colours the tile's edge. The exact
+  contract is `INSTRUCTIONS.md`, dropped into the folder on first run.
+- **apps folder** - one sub-folder per app, each holding the `BRIEF.md` that app keeps
+  current by itself. Shown under the tiles as one line per app (its own "At a glance"),
+  expandable to the app's full brief section by section, with its age; anything older than
+  36 hours is marked stale, and a folder an app has never written to says so.
 
-```
-python coworkhub.py status                 # colored table + status.html dashboard
-                                           # (per-app cards, run history, live filter, dark mode)
-python coworkhub.py run [app] [--channel C] [--dry-run] [--force]
-python coworkhub.py watch [--interval 300] # run on a loop, Ctrl-C to stop
-python coworkhub.py check <folder>         # validate a folder against COWORK-PROTOCOL.md
-python coworkhub.py serve [--port 8791]    # localhost web UI: view + run channels
-python coworkhub.py sources [--fetch [NAME]] [--force]   # shared data sources (Garmin, Strava…)
-python coworkhub.py log [--days 7] [--md|--json]          # sync-activity digest
-python coworkhub.py brief daily|weekly [--print]          # a brief request the hub answers itself
-```
+Earlier days are a list of links at the bottom. Reload to re-read; loopback only, since
+briefs are private. Defaults are `~/Documents/Cowork/MorningBrief` and
+`~/Documents/Cowork/Cowork Link Folders` when they exist, otherwise `briefs/` beside the
+script and no app strip.
 
-**Step-by-step setup and troubleshooting for every connection — apps, hub, Garmin, Strava,
-Drive, Bluetooth, the sync log and briefs — is in [SETUP.md](SETUP.md).**
+The split is deliberate: the agent writes what only it can (weather, traffic, calendar,
+news, the cross-source reading and a recommendation), the apps speak for themselves, and
+nothing is said twice. To really drill down, open the app.
 
-### Shared data sources — fetch once, share with every app
+Needs Python 3.9+, no dependencies. `python test_coworkhub.py` prints `OK`.
 
-A `"sources"` block in `hub-config.json` names a command per source (`{out}` = the file the hub
-wants), a TTL, and which `app/channel` patterns receive it (a manifest channel can also say
-`"sources": ["garmin"]`). On every sweep the hub fetches each needed source **once**, caches it
-under `sources/<name>/latest.json`, and appends a `DATA SOURCES` paragraph to every prompt that
-needs it: read this file, do not contact the service. A failed pull falls back to the last good
-file and is logged. `run --refresh-sources` ignores the TTLs.
+This used to be a dispatcher that scanned registered folders and spawned headless Claude on
+each pending request (`run` / `watch` / `serve` / shared sources / sync log). The agent does
+that walk itself now; the old hub is in git history if it is ever wanted.
 
-### Sync log + briefs
-
-`sync-log.jsonl` gets one line per sweep / source fetch / dispatch (always on, nothing to
-configure). `coworkhub.py log` prints the digest (`--md`, `--json`). `coworkhub.py brief daily`
-writes `briefs/daily/request.json` from that digest and registers `briefs/` as an ordinary
-manifest app, so the next sweep — or a scheduled one — has an agent write the brief to
-`briefs/daily/reply.json`; `status.html` shows the latest brief.
-
-A request is dispatched at most once, even if the run failed — `--force` is the
-retry button. Per-run Claude output lands in `logs/`; every dispatch also
-appends one line to `runs.jsonl` (append-only history). Sweeps are serialized
-by `hub.lock` (stale locks are stolen after `timeout_sec` + 60 s). A pending
-request older than `stale_days` (default 7) shows as STALE on the dashboard.
-
-## Config (`hub-config.json`, machine-local, gitignored)
-
-```json
-{
-  "claude_cmd": "claude",
-  "claude_args": ["--permission-mode", "acceptEdits", "--max-turns", "40"],
-  "timeout_sec": 900,
-  "apps": [
-    {"name": "gymtracker", "kind": "gymtracker", "root": "C:/.../GymTracker AI export"},
-    {"name": "tachyread",  "kind": "tachyread",  "root": "C:/.../Tachyread journey"}
-  ]
-}
-```
-
-Note: GymTracker's garmin/strava channels tell the agent to run helper scripts
-from the GymTracker repo, which `acceptEdits` won't permit. For those, extend
-`claude_args` with `"--allowedTools", "Bash(python:*)"` (or, if you accept the
-risk, `"--dangerously-skip-permissions"`).
+Setup and troubleshooting for the apps' cowork panels and data sources: [SETUP.md](SETUP.md).
 
 ## The shared cowork UI (`cowork.js`)
 
@@ -97,12 +49,11 @@ One implementation of the AI cowork sync panel, published at
 behaves the same no matter what the app around it looks like (shadow DOM; theme only
 through `--cowork-*` custom properties). Two modes: `fs` drives a real folder through the
 File System Access API (`cowork.mount(host, {app, manifest, files, apply})` is the whole
-adoption for a new app); `mode="data"` is for apps that already drive their own folder and
-for the hub — feed it `{app, channels, actions}` and listen for `cowork-action`. The state
+adoption for a new app); `mode="data"` is for apps that already drive their own folder — feed it `{app, channels, actions}` and listen for `cowork-action`. The state
 words are the hub's own (idle / PENDING / answered / STALE). Docs + live demo:
 <https://adervec.github.io/cowork>; browser self-test: `/cowork-selftest.html`.
 
-All sixteen apps wear it: GymTracker, Tachyread and SpeechImprover in data mode around their own
+Sixteen apps wear it: GymTracker, Tachyread and SpeechImprover in data mode around their own
 folder logic; ChessRetabled, GuitarPicker, Mise, Handwriting Helper, MicroMiniger, Black Mirror
 Bike Ride, Bodybuilding Progress Coach, Marksman, Run315, Learning Pit, Music Studio, The Long
 Gallery and The Classical Journey in fs mode with a single `coach` channel — the data they
@@ -110,17 +61,12 @@ already have (a brief, a report, a cook log, scores, a paint queue, rides, body-
 numbers, shot groups, training load, review schedules, album prompts, what you've looked at,
 what you've listened to; never photos) becomes `coach/request.json`, and the agent's
 `coach/reply.json` shows in-app. The portal itself has a
-`review` channel. Every one of those folders is hub-ready: `coworkhub.py add`.
+`review` channel.
 
 Two of the newcomers needed care. Music Studio already had a folder hand-off where an agent edits
 `album.json` and the app live-reloads it; the panel writes only `cowork.json` and `coach/`, so the
 two can never race. Learning Pit's kid mode returns before the panel renders, and its beacon is
 suppressed under `?selftest` so a 400-assertion run doesn't invent a fortnight of studying.
-
-`python coworkhub.py serve` serves `status.html` on localhost with the same panel per
-registered app, and its buttons POST `/api/run` so channels can be run from the browser.
-Opened as a plain file, the panels still show state; the buttons explain how to get control.
-Served, the panels re-read the folders every 15 s and `/sweep` opens the latest stable sweep report.
 
 ## App portal (`portal.py`)
 
@@ -165,8 +111,7 @@ ago"), a dot on each updated tile, an accent border on those cards, and a **show
 button that filters the grid down to just them. The stamp only advances when the banner
 is dismissed, so a refresh doesn't wipe the markers away before they've been read.
 
-**Stable sweep** (`python portal.py sweep`, also run by every `deploy`; the hub's `status`
-prints the cached summary): an advisory legal / ToS / privacy / PG-content pass over every
+**Stable sweep** (`python portal.py sweep`, also run by every `deploy`): an advisory legal / ToS / privacy / PG-content pass over every
 app repo — missing LICENSE, trademarks in app names, health wording without a disclaimer,
 bundled audio without credits, trackers, CORS proxies, third-party API hosts, brand
 mentions, your own email or local paths in sources, credential shapes, and a word list for
@@ -192,8 +137,8 @@ tiles. All of it stays in the browser.
 **Ask your coach**: the portal is a cowork app too. Below the sheet, the shared panel (fs mode)
 drives a folder with one `review` channel — `review/request.json` carries the levels, sources,
 habits with rhythm, streak, journal and launch counts; an agent's `review/reply.json`
-(`{requestHash, reply}`) shows right there, so CoworkSyncHub can review your whole week across
-every app. Register the folder with `coworkhub.py add portal manifest <path>`.
+(`{requestHash, reply}`) shows right there, so an agent can review your whole week across
+every app.
 
 The portal page (live at <https://adervec.github.io/portal/>) shows each app's featureset,
 recent changes, launch/install/download actions, a cross-app "recently shipped" log
@@ -203,12 +148,3 @@ shortcuts, `/` to focus), sorting, a theme toggle, and per-browser usage counts
 (localStorage only — no analytics). The portal is itself an installable PWA
 (manifest + service worker). `site/` is its own git repo pushed to
 `adervec.github.io` — rebuild, commit, push to publish. Self-check: `python test_portal.py`.
-
-## Test
-
-```
-python test_coworkhub.py   # prints OK; uses a stub claude, no API calls
-```
-
-To run `watch` unattended, a scheduled task works too:
-`schtasks /Create /SC MINUTE /MO 15 /TN CoworkSyncHub /TR "python C:\...\coworkhub.py run"`
