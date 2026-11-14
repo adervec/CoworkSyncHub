@@ -469,6 +469,16 @@
           });
         });
         row.append(copy, dl);
+        // Cold backup: everything this browser holds for the apps, as one file (the hub's Backup page does
+        // the same with more choice; this button is the only way in for an iPhone home-screen app).
+        var bk = document.createElement('button');
+        bk.type = 'button'; bk.textContent = tr('Back up my data');
+        bk.addEventListener('click', function () {
+          bk.disabled = true;
+          backupDownload().then(function () { bk.textContent = tr('Back up my data'); }, function () { bk.textContent = tr('Backup failed'); })
+            .then(function () { bk.disabled = false; });
+        });
+        row.appendChild(bk);
         // Send feedback: a new issue on the app's GitHub page, with the (redacted) diagnostics filled in.
         // ponytail: needs a GitHub account; add a no-account route (a form) when users ask for one.
         if (/^https:\/\/github\.com\//.test(sourceUrl())) {
@@ -825,9 +835,122 @@
       .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]');
   }
 
+  // ---- Cold backup (hub roadmap chunk 2a) ------------------------------------------------------------
+  // Every app shares the origin, so one page can read all of their settings and databases into one
+  // file the reader keeps wherever they like. This half only READS: nothing here writes app data.
+  // TODO(chunk 2b): restore. One app at a time, a fresh backup first, tested by restoring into a clean
+  // browser and comparing every record; open problem: Drive sync pulling over, or pushing, restored data.
+  // ponytail: the whole snapshot is held in memory and saved as one JSON file (binary as base64);
+  // stream to a zip if someone's recordings outgrow the tab.
+  var SECRET_KEY = /token|secret|credential|password/i;
+  var SECRET_VAL = /ya29\.[\w.-]{20,}|eyJ[\w-]{10,}\.[\w-]{10,}\.|"(access|refresh|id)_token"\s*:/;
+  function b64(buf) {
+    var u = new Uint8Array(buf), s = '';
+    for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  // -> a promise of a JSON-safe copy: binary, dates, maps, sets and the like become { $t: … }
+  function enc(v) {
+    var P = function (x) { return Promise.resolve(x); };
+    if (v === undefined) return P({ $t: 'undef' });
+    if (typeof v === 'bigint') return P({ $t: 'bigint', v: String(v) });
+    if (typeof v === 'number' && !isFinite(v)) return P({ $t: 'num', v: String(v) });
+    if (typeof v === 'string') return P(SECRET_VAL.test(v) && v.length < 5000 ? '[token]' : v);
+    if (v === null || typeof v !== 'object') return P(v);
+    if (v instanceof Date) return P({ $t: 'date', v: v.getTime() });
+    if (v instanceof Blob) return v.arrayBuffer().then(function (b) {
+      return { $t: 'blob', type: v.type, name: v.name, lastModified: v.lastModified, b64: b64(b) };
+    });
+    if (v instanceof ArrayBuffer) return P({ $t: 'buf', b64: b64(v) });
+    if (ArrayBuffer.isView(v)) return P({ $t: 'view', ctor: v.constructor.name, b64: b64(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength)) });
+    if (v instanceof Map) return enc(Array.from(v)).then(function (a) { return { $t: 'map', v: a }; });
+    if (v instanceof Set) return enc(Array.from(v)).then(function (a) { return { $t: 'set', v: a }; });
+    if (Array.isArray(v)) return Promise.all(Array.from(v, enc));
+    var proto = Object.getPrototypeOf(v);
+    // a folder handle, a crypto key…: cannot be written to a file; say what it was
+    if (proto && proto !== Object.prototype) return P({ $t: 'other', is: Object.prototype.toString.call(v).slice(8, -1) });
+    var keys = Object.keys(v);
+    return Promise.all(keys.map(function (k) { return enc(v[k]); })).then(function (vals) {
+      var o = {};
+      keys.forEach(function (k, i) { o[k] = vals[i]; });
+      return '$t' in o ? { $t: 'obj', v: o } : o;
+    });
+  }
+  // one database -> { version, stores: { name: { keyPath, autoIncrement, indexes, keys, values } } }, or null if it is gone
+  function idbDump(name) {
+    return new Promise(function (res, rej) {
+      var rq = indexedDB.open(name);
+      rq.onupgradeneeded = function () { rq.transaction.abort(); }; // it was not there: never create it
+      rq.onerror = function (ev) { ev.preventDefault(); res(null); };
+      rq.onsuccess = function () {
+        var db = rq.result, names = Array.from(db.objectStoreNames), out = { version: db.version, stores: {} }, raw = {};
+        db.onversionchange = function () { db.close(); }; // never block an app's own upgrade
+        if (!names.length) { db.close(); return res(out); }
+        var tx = db.transaction(names, 'readonly');
+        names.forEach(function (n) {
+          var st = tx.objectStore(n);
+          out.stores[n] = { keyPath: st.keyPath, autoIncrement: st.autoIncrement,
+            indexes: Array.from(st.indexNames).map(function (i) { var x = st.index(i); return { name: x.name, keyPath: x.keyPath, unique: x.unique, multiEntry: x.multiEntry }; }) };
+          var k = st.getAllKeys(), v = st.getAll();
+          v.onsuccess = function () { raw[n] = [k.result, v.result]; };
+        });
+        tx.oncomplete = function () {
+          db.close();
+          Promise.all(names.map(function (n) {
+            return enc(raw[n]).then(function (e) { out.stores[n].keys = e[0]; out.stores[n].values = e[1]; });
+          })).then(function () { res(out); }, rej);
+        };
+        tx.onerror = tx.onabort = function () { db.close(); rej(tx.error || new Error('Could not read ' + name)); };
+      };
+    });
+  }
+  // want(kind, name) -> false leaves that key or database out; by default everything is taken.
+  // A database that cannot be read is recorded as { error } so the gap is never silent.
+  function backupSnapshot(want) {
+    want = want || function () { return true; };
+    var out = { format: 'adervec-backup', schema: 1, made: new Date().toISOString(), origin: location.origin, from: location.pathname,
+      localStorage: {}, skipped: [], indexedDB: {} };
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i), v = localStorage.getItem(k);
+        if (!want('localStorage', k)) continue;
+        if (SECRET_KEY.test(k) || SECRET_VAL.test(v)) out.skipped.push(k); else out.localStorage[k] = v; // sign-in tokens stay out
+      }
+    } catch (e) { out.note = 'Settings could not be read: ' + (e.message || e); }
+    if (!window.indexedDB || !indexedDB.databases) { out.note = 'This browser cannot list its databases, so only settings are included.'; return Promise.resolve(out); }
+    return indexedDB.databases().then(function (dbs) {
+      return Promise.all(dbs.filter(function (d) { return d.name && want('indexedDB', d.name); }).map(function (d) {
+        return idbDump(d.name).catch(function (e) { return { error: String((e && e.message) || e) }; })
+          .then(function (dump) { if (dump) out.indexedDB[d.name] = dump; });
+      }));
+    }).then(function () { return out; });
+  }
+  // the file: one JSON text, written a database at a time so no single string has to hold it all
+  function backupBlob(snap) {
+    var idb = snap.indexedDB || {}, head = Object.assign({}, snap);
+    delete head.indexedDB;
+    var parts = [JSON.stringify(head).slice(0, -1), ',"indexedDB":{'];
+    Object.keys(idb).forEach(function (n, i) { parts.push((i ? ',' : '') + JSON.stringify(n) + ':' + JSON.stringify(idb[n])); });
+    parts.push('}}');
+    return new Blob(parts, { type: 'application/json' });
+  }
+  // extra: more top-level fields for the file (the hub adds the Google Drive copy)
+  function backupDownload(want, extra) {
+    return backupSnapshot(want).then(function (snap) {
+      Object.assign(snap, extra || {});
+      var u = URL.createObjectURL(backupBlob(snap)), x = document.createElement('a');
+      x.href = u; x.download = 'adervec-backup-' + snap.made.slice(0, 10) + '.json';
+      document.body.appendChild(x); x.click(); x.remove();
+      setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
+      try { localStorage.setItem('portal-last-backup', String(Date.now())); } catch (e) { /* private mode */ }
+      return snap;
+    });
+  }
+
   window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice,
     esc: esc, html: html, safeUrl: safeUrl, parseJSON: parseJSON, randomId: randomId, redact: redact,
     zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice,
+    backup: { snapshot: backupSnapshot, blob: backupBlob, download: backupDownload },
     diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,
     whatsNew: whatsNew, checkWhatsNew: checkWhatsNew, setWhatsNewSilenced: setWhatsNewSilenced,
     getAccount: getAccount, setAccount: setAccount,

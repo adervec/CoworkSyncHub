@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data: blob: https:; object-src 'none'; base-uri 'none'">
+<meta name="app-name" content="Backup">
+<title>Backup</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<script>window.appFontBase = '/fonts/';</script>
+<script src="font.js"></script>
+<style>
+:root { color-scheme: light dark }
+body { font-family: var(--app-font, system-ui); margin: 0 auto; padding: 16px; max-width: 760px; background: Canvas; color: CanvasText; line-height: 1.5 }
+h1 { margin: 0 0 4px } h2 { margin: 28px 0 8px; font-size: 1.15rem }
+p { margin: 8px 0 } .dim { opacity: .75; font-size: .92rem }
+button, .filebtn { font: inherit; padding: 10px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, CanvasText 30%, transparent); background: Canvas; color: CanvasText; cursor: pointer; min-height: 44px }
+button.main { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600 }
+.filebtn { display: inline-flex; align-items: center }
+button:disabled { opacity: .5; cursor: default }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 }
+.group { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 12px; margin: 8px 0; padding: 4px 12px }
+.group > summary { display: flex; gap: 10px; align-items: center; padding: 8px 0; cursor: pointer; list-style: none }
+.group > summary::-webkit-details-marker { display: none }
+.group > summary b { flex: 1; min-width: 0; overflow-wrap: anywhere }
+.group input[type=checkbox] { width: 22px; height: 22px; flex: none }
+.item { border-top: 1px solid color-mix(in srgb, CanvasText 10%, transparent); padding: 6px 0; font-size: .92rem }
+.item summary { cursor: pointer; overflow-wrap: anywhere }
+.kind { font-size: .75rem; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, CanvasText 12%, transparent); margin-right: 6px; white-space: nowrap }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-height: 320px; overflow: auto; background: color-mix(in srgb, CanvasText 6%, transparent); padding: 8px; border-radius: 8px; margin: 6px 0 }
+.warn { color: #b45309; font-weight: 600 } .bad { color: #dc2626; font-weight: 600 }
+#beta { margin: -16px -16px 12px; padding: 6px 12px; background: #b45309; color: #fff; font-weight: 600; text-align: center }
+</style></head><body>
+<p id="beta" hidden>BETA: the maker's preview</p>
+<p class="dim"><a href="./">&larr; all apps</a></p>
+<h1>Backup</h1>
+<p>Save a copy of everything these apps keep for you into one file, to store wherever you like: a USB stick, another cloud, an email to yourself. Your data never leaves this device unless you move the file.</p>
+<p id="last" class="dim"></p>
+
+<h2>On this device</h2>
+<p class="dim">Each browser, and on an iPhone each home-screen app, keeps its own data. This page sees what <i>this</i> browser holds. For an app on your iPhone home screen, use <b>Back up my data</b> in that app's About panel.</p>
+<div id="local"><p>Reading…</p></div>
+
+<h2>Your Google Drive copy</h2>
+<p class="dim">Apps you signed in to also keep a synced copy in a private folder of your Google Drive. Adding it puts the data from your other devices into the same file.</p>
+<div class="row"><button id="driveBtn" type="button">Add my Google Drive copy</button><span id="driveMsg" class="dim" aria-live="polite"></span></div>
+<div id="drive"></div>
+
+<div class="row"><button id="dl" class="main" type="button" disabled>Download backup</button><span id="dlMsg" aria-live="polite"></span></div>
+<p class="dim">The file is not encrypted and can hold personal data (training logs, recordings, notes): keep it somewhere private. Sign-in tokens are left out.</p>
+
+<h2>Check a backup file</h2>
+<p class="dim">Open a file you saved earlier to see what is inside. Nothing is changed.</p>
+<div class="row"><label class="filebtn">Choose a file…<input id="file" type="file" accept=".json,application/json" hidden></label><span id="fileMsg" aria-live="polite"></span></div>
+<div id="check"></div>
+
+<h2>Restore</h2>
+<p class="dim">Putting a backup back into the apps is not built yet. Keep your files: they hold everything needed, and will restore once that arrives.</p>
+
+<script>
+(function () {
+  'use strict';
+  // Public OAuth client id shared by the apps (an identifier, not a secret); read-only use here.
+  var CLIENT_ID = '547617739897-br6dj2facmsc34qnkjb5u4dbfhju39pu.apps.googleusercontent.com';
+  var HOUSE = /^(maker-|portal-|app-|cowork-)/;
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, text, cls) { var x = document.createElement(tag); if (text != null) x.textContent = text; if (cls) x.className = cls; return x; };
+  var norm = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); };
+  var size = function (n) { return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB'; };
+  var ago = function (ms) { var d = Math.floor((Date.now() - ms) / 864e5); return d < 1 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago'; };
+  var apps = [], driveFiles = null, localSnap = null;
+  if (/portal-beta/.test(location.pathname)) $('beta').hidden = false;
+
+  function paintLast() {
+    var t = 0; try { t = +localStorage.getItem('portal-last-backup'); } catch (e) { /* private mode */ }
+    $('last').textContent = t ? 'Last backup from this browser: ' + ago(t) + '.' : 'No backup has been made from this browser yet.';
+  }
+
+  // ---- which app owns a key, database or Drive file --------------------------------------------------
+  // An app's app-data.json (house standard 23) says so exactly; until it has one, guess from the name.
+  function matches(list, name) {
+    return (list || []).some(function (p) { // exact, or one * standing for anything: 'mm-*', 'minis-*.json'
+      var i = p.indexOf('*'), a = p.slice(0, i), z = p.slice(i + 1);
+      return i < 0 ? p === name : name.length >= a.length + z.length && name.indexOf(a) === 0 && name.slice(name.length - z.length) === z;
+    });
+  }
+  function owner(kind, name) {
+    for (var i = 0; i < apps.length; i++) if (apps[i].inv && matches(apps[i].inv[kind], name)) return apps[i].title;
+    if (kind === 'localStorage' && HOUSE.test(name)) return 'Shared settings (font, language, hub)';
+    var n = norm(name), best = null;
+    apps.forEach(function (a) { // ponytail: name guess; exact once the app publishes app-data.json
+      [a.slug, a.title, a.dir].forEach(function (w) { w = norm(w || ''); if (w.length > 3 && n.indexOf(w) >= 0 && (!best || w.length > best.w)) best = { w: w.length, t: a.title }; });
+    });
+    return best ? best.t : 'Other data';
+  }
+  function loadApps() {
+    return fetch('/apps.json').then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }).then(function (list) {
+      apps = list;
+      return Promise.all(apps.map(function (a) {
+        return fetch('/' + encodeURIComponent(a.slug) + '/app-data.json').then(function (r) { return r.ok ? r.text() : null; })
+          .then(function (t) { if (t) a.inv = appFont.parseJSON(t, 1e6); }).catch(function () { /* no inventory yet */ });
+      }));
+    });
+  }
+
+  // ---- showing a snapshot (this device, or a file) ---------------------------------------------------
+  var short = function (k, v) { return k === 'b64' && typeof v === 'string' ? '[' + size(Math.round(v.length * 0.75)) + ' of binary]' : v; };
+  function pretty(v) {
+    if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return v.slice(0, 20000); } }
+    var s = JSON.stringify(v, short, 1) || String(v);
+    return s.length > 20000 ? s.slice(0, 20000) + '\n… (' + size(s.length) + ' in all)' : s;
+  }
+  function items(snap) {
+    var out = [];
+    Object.keys(snap.localStorage || {}).forEach(function (k) {
+      var v = snap.localStorage[k];
+      out.push({ kind: 'localStorage', label: 'setting', name: k, bytes: v.length, count: 1, view: function () { return pretty(v); } });
+    });
+    Object.keys(snap.indexedDB || {}).forEach(function (n) {
+      var db = snap.indexedDB[n], stores = db.stores || {}, count = 0;
+      Object.keys(stores).forEach(function (s) { count += (stores[s].values || []).length; });
+      out.push({ kind: 'indexedDB', label: 'database', name: n, bytes: JSON.stringify(db).length, count: count, error: db.error,
+        view: function () {
+          return Object.keys(stores).map(function (s) {
+            var v = stores[s].values || [];
+            return s + ': ' + v.length + ' record' + (v.length === 1 ? '' : 's') + (v.length ? '\n' + pretty(v.slice(0, 20)) + (v.length > 20 ? '\n… and ' + (v.length - 20) + ' more' : '') : '');
+          }).join('\n\n') || '(empty)';
+        } });
+    });
+    (snap.drive || []).forEach(function (f) {
+      var body = f.text != null ? f.text : (f.b64 || '');
+      out.push({ kind: 'drive', label: 'Drive file', name: f.name, bytes: f.text != null ? body.length : Math.round(body.length * 0.75), count: 1,
+        view: function () { return (f.modifiedTime ? 'changed ' + f.modifiedTime + '\n' : '') + (f.text != null ? pretty(f.text) : '[' + size(Math.round(body.length * 0.75)) + ' of binary]'); } });
+    });
+    out.forEach(function (it) { it.owner = owner(it.kind, it.name); });
+    return out;
+  }
+  // -> { picked(): the ticked owners } ; pick=false renders read-only (checking a file)
+  function render(box, list, pick, empty) {
+    box.textContent = '';
+    var groups = {}, boxes = {};
+    list.forEach(function (it) { (groups[it.owner] = groups[it.owner] || []).push(it); });
+    var names = Object.keys(groups).sort(function (a, b) { return a.localeCompare(b); });
+    if (!names.length) box.appendChild(el('p', empty, 'dim'));
+    names.forEach(function (g) {
+      var d = el('details', null, 'group'), sum = el('summary'), bytes = 0, count = 0, errs = 0;
+      groups[g].forEach(function (it) { bytes += it.bytes; count += it.count; errs += it.error ? 1 : 0; });
+      if (pick) {
+        var c = el('input'); c.type = 'checkbox'; c.checked = true; c.setAttribute('aria-label', 'Include ' + g);
+        c.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        sum.appendChild(c); boxes[g] = c;
+      }
+      sum.appendChild(el('b', g));
+      sum.appendChild(el('span', count + ' item' + (count === 1 ? '' : 's') + ' · ' + size(bytes), 'dim'));
+      if (errs) sum.appendChild(el('span', 'could not read ' + errs, 'bad'));
+      d.appendChild(sum);
+      groups[g].forEach(function (it) {
+        var row = el('details', null, 'item'), s = el('summary');
+        s.appendChild(el('span', it.label, 'kind'));
+        s.appendChild(document.createTextNode(it.name + ' · ' + (it.kind === 'indexedDB' ? it.count + ' records · ' : '') + size(it.bytes)));
+        if (it.error) s.appendChild(el('span', ' could not be read: ' + it.error, 'bad'));
+        row.appendChild(s);
+        row.addEventListener('toggle', function () { if (row.open && !row.querySelector('pre')) row.appendChild(el('pre', it.view())); });
+        d.appendChild(row);
+      });
+      box.appendChild(d);
+    });
+    return { picked: function () { var p = {}; names.forEach(function (g) { p[g] = !boxes[g] || boxes[g].checked; }); return p; } };
+  }
+  function notes(box, snap) {
+    if (snap.note) box.appendChild(el('p', snap.note, 'warn'));
+    if (snap.skipped && snap.skipped.length) box.appendChild(el('p', 'Left out (sign-in tokens): ' + snap.skipped.join(', '), 'dim'));
+  }
+
+  // ---- this device -----------------------------------------------------------------------------------
+  var localPick = { picked: function () { return {}; } }, drivePick = null;
+  function readLocal() {
+    return appFont.backup.snapshot().then(function (snap) {
+      localSnap = snap;
+      localPick = render($('local'), items(snap), true, 'Nothing is stored in this browser yet.');
+      notes($('local'), snap);
+      $('dl').disabled = false;
+    }).catch(function (e) { $('local').textContent = ''; $('local').appendChild(el('p', 'Could not read this browser\'s data: ' + (e.message || e), 'bad')); });
+  }
+
+  // ---- Google Drive (read-only; the token stays in memory) -------------------------------------------
+  function loadGis() {
+    return new Promise(function (res, rej) {
+      if (window.google && google.accounts && google.accounts.oauth2) return res();
+      var s = el('script'); s.src = 'https://accounts.google.com/gsi/client'; s.onload = function () { res(); };
+      s.onerror = function () { rej(new Error('Could not load Google sign-in.')); };
+      document.head.appendChild(s);
+    });
+  }
+  function token() {
+    return new Promise(function (res, rej) {
+      google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.appdata',
+        callback: function (r) { r && r.access_token ? res(r.access_token) : rej(new Error((r && r.error) || 'Sign-in failed.')); },
+        error_callback: function (e) { rej(new Error((e && (e.message || e.type)) || 'Sign-in was dismissed.')); } }).requestAccessToken({ prompt: '' });
+    });
+  }
+  function readDrive() {
+    var auth, files = [];
+    var api = function (path) {
+      return fetch('https://www.googleapis.com/drive/v3/files' + path, { headers: { Authorization: 'Bearer ' + auth } })
+        .then(function (r) { if (!r.ok) throw new Error('Google Drive answered ' + r.status + '.'); return r; });
+    };
+    var page = function (pt) {
+      return api('?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,modifiedTime,mimeType)' + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))
+        .then(function (r) { return r.json(); }).then(function (j) { files = files.concat(j.files || []); return j.nextPageToken ? page(j.nextPageToken) : null; });
+    };
+    return loadGis().then(token).then(function (t) { auth = t; return page(); }).then(function () {
+      var out = [], i = 0;
+      var next = function () { // one at a time: gentle on Drive's rate limit
+        if (i >= files.length) return out;
+        var f = files[i++];
+        $('driveMsg').textContent = 'Fetching ' + i + ' of ' + files.length + '…';
+        return api('/' + encodeURIComponent(f.id) + '?alt=media').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+          var rec = { name: f.name, modifiedTime: f.modifiedTime, mimeType: f.mimeType };
+          try { rec.text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+          catch (e) { var u = new Uint8Array(buf), s = ''; for (var k = 0; k < u.length; k += 0x8000) s += String.fromCharCode.apply(null, u.subarray(k, k + 0x8000)); rec.b64 = btoa(s); }
+          out.push(rec);
+          return next();
+        });
+      };
+      return next();
+    });
+  }
+  $('driveBtn').addEventListener('click', function () {
+    var b = $('driveBtn'); b.disabled = true; $('driveMsg').className = 'dim'; $('driveMsg').textContent = 'Signing in…';
+    readDrive().then(function (list) {
+      driveFiles = list;
+      $('driveMsg').textContent = list.length + ' file' + (list.length === 1 ? '' : 's') + ' added.';
+      drivePick = render($('drive'), items({ drive: list }), true, 'Your Drive folder for these apps is empty.');
+    }).catch(function (e) { $('driveMsg').className = 'bad'; $('driveMsg').textContent = e.message || String(e); b.disabled = false; });
+  });
+
+  // ---- download --------------------------------------------------------------------------------------
+  $('dl').addEventListener('click', function () {
+    var b = $('dl'), keep = localPick.picked(), keepDrive = drivePick ? drivePick.picked() : {};
+    b.disabled = true; $('dlMsg').className = ''; $('dlMsg').textContent = 'Reading…';
+    var extra = driveFiles ? { drive: driveFiles.filter(function (f) { return keepDrive[owner('drive', f.name)]; }) } : {};
+    // a fresh read, so the file is as of now, not as of when the page opened
+    appFont.backup.download(function (kind, name) { return keep[owner(kind, name)] !== false; }, extra).then(function (snap) {
+      var failed = Object.keys(snap.indexedDB).filter(function (n) { return snap.indexedDB[n].error; });
+      $('dlMsg').className = failed.length ? 'bad' : '';
+      $('dlMsg').textContent = failed.length ? 'Saved, but these could not be read: ' + failed.join(', ') : 'Saved to your downloads.';
+      paintLast();
+    }).catch(function (e) { $('dlMsg').className = 'bad'; $('dlMsg').textContent = 'Backup failed: ' + (e.message || e); })
+      .then(function () { b.disabled = false; });
+  });
+
+  // ---- check a file ----------------------------------------------------------------------------------
+  $('file').addEventListener('change', function () {
+    var f = this.files[0], box = $('check'), msg = $('fileMsg');
+    if (!f) return;
+    box.textContent = ''; msg.className = ''; msg.textContent = 'Reading…';
+    f.text().then(function (text) {
+      var snap = appFont.parseJSON(text, 2e9);
+      if (!snap || snap.format !== 'adervec-backup' || typeof snap.localStorage !== 'object') throw new Error('This is not a backup file from these apps.');
+      if (snap.schema > 1) throw new Error('This file was made by a newer version of the backup. Reload this page and try again.');
+      var list = items(snap);
+      msg.textContent = 'Readable. Made ' + new Date(snap.made).toLocaleString() + ' · ' + list.length + ' item' + (list.length === 1 ? '' : 's') + ' · ' + size(f.size);
+      render(box, list, false, 'The file is valid but holds no data.');
+      notes(box, snap);
+    }).catch(function (e) { msg.className = 'bad'; msg.textContent = /JSON|token|Unexpected/.test(e.message) ? 'This file is damaged or is not a backup: it cannot be read.' : e.message; });
+    this.value = '';
+  });
+
+  paintLast();
+  window.backupReady = loadApps().then(readLocal); // for the tests
+})();
+</script>
+</body></html>

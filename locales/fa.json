@@ -57,5 +57,7 @@
  "syncing to Google Drive": "در حال همگام‌سازی با Google Drive",
  "the browser may clear it if space runs low": "اگر فضا کم شود مرورگر ممکن است آن را پاک کند",
  "{used} used of {quota} available": "{used} استفاده‌شده از {quota} در دسترس",
- "Send feedback": "ارسال بازخورد"
+ "Send feedback": "ارسال بازخورد",
+ "Back up my data": "پشتیبان‌گیری از داده‌های من",
+ "Backup failed": "پشتیبان‌گیری ناموفق بود"
 }

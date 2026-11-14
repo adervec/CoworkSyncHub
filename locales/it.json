@@ -57,5 +57,7 @@
  "syncing to Google Drive": "sincronizzazione con Google Drive",
  "the browser may clear it if space runs low": "il browser potrebbe cancellarlo se lo spazio scarseggia",
  "{used} used of {quota} available": "{used} usati su {quota} disponibili",
- "Send feedback": "Invia feedback"
+ "Send feedback": "Invia feedback",
+ "Back up my data": "Esegui il backup dei miei dati",
+ "Backup failed": "Backup non riuscito"
 }

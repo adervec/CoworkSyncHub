@@ -330,6 +330,7 @@ tick();setInterval(tick,30000);
 // usage counts, and the registry each installed app writes about itself (both
 // same-origin localStorage, this browser only — nothing leaves the device)
 var KEY="portal-usage",IKEY="portal-installed",VKEY="portal-visit";
+try{var lastBk=+localStorage.getItem("portal-last-backup");if(lastBk)d.getElementById("bk").textContent="Backup (last "+rel((Date.now()-lastBk)/1000)+" ago)"}catch(err){}
 var freshOnly=false,fresh={};  // apps that shipped since the visit you last acknowledged
 function usage(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch(err){return{}}}
 // Each app restamps its entry every installed launch. Nothing can tell us about an
@@ -1095,6 +1096,7 @@ their own window and the ones marked <i>offline</i> keep working without a conne
 This portal installs the same way.</p>
 <footer class="page"><span>generated {e(time.strftime('%Y-%m-%d %H:%M'))}</span>
 <span>usage counts live only in this browser</span><span id="you"></span>
+<span><a href="backup.html" id="bk">Back up your data</a></span>
 <span><a href="feed.xml">RSS</a></span>
 <span><a href="https://github.com/{USER}">github.com/{USER}</a></span></footer>
 </main><script>const GEN={now:.0f};const FLEET={json.dumps(fleet)};const CHANGES={json.dumps(recent)};const APPKIND={json.dumps({a['slug']: a['kind'] for a in APPS})};const HUES={json.dumps({a['slug']: a['hue'] for a in APPS})};const TITLES={json.dumps({a['slug']: a['title'] for a in APPS})};{PORTAL_JS}</script></body></html>"""
@@ -1103,6 +1105,8 @@ This portal installs the same way.</p>
                             "BETA: the maker's preview. <a style='color:#fff' href='/portal/'>Live portal</a></p><main", 1)
         page = page.replace("<head>", "<head><meta name='robots' content='noindex'>", 1)
     (PORTAL_DIR / "index.html").write_text(page, encoding="utf-8")
+    for f in ("backup.html", "font.js"):  # the Backup page, with its own font.js so the beta can run ahead of the live one
+        shutil.copy(BASE / f, PORTAL_DIR / f)
     write_feed(data)
     write_pwa(stamp)
     return PORTAL_DIR / "index.html"

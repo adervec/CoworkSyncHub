@@ -57,5 +57,7 @@
  "syncing to Google Drive": "Google Drive سے ہم آہنگی جاری ہے",
  "the browser may clear it if space runs low": "جگہ کم ہونے پر براؤزر اسے مٹا سکتا ہے",
  "{used} used of {quota} available": "{quota} دستیاب میں سے {used} استعمال شدہ",
- "Send feedback": "رائے بھیجیں"
+ "Send feedback": "رائے بھیجیں",
+ "Back up my data": "میرے ڈیٹا کا بیک اپ لیں",
+ "Backup failed": "بیک اپ ناکام ہو گیا"
 }

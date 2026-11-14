@@ -57,5 +57,7 @@
  "syncing to Google Drive": "Google Drive से सिंक हो रहा है",
  "the browser may clear it if space runs low": "जगह कम होने पर ब्राउज़र इसे हटा सकता है",
  "{used} used of {quota} available": "{quota} उपलब्ध में से {used} इस्तेमाल हुआ",
- "Send feedback": "प्रतिक्रिया भेजें"
+ "Send feedback": "प्रतिक्रिया भेजें",
+ "Back up my data": "मेरे डेटा का बैकअप लें",
+ "Backup failed": "बैकअप विफल रहा"
 }

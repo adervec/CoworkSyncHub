@@ -168,6 +168,11 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - Keys starting `maker-`, `portal-`, `app-` or `cowork-` belong to the house (font.js, the
       portal, cowork.js); don't declare them, and don't invent new keys with those prefixes.
     - The standards check (`datainv`) fails when the code uses a key or database that is not declared.
+    - The backup is live: the hub's Backup page (`/portal/backup.html`) and the "Back up my data"
+      button in every About panel (`appFont.backup`, in font.js) save everything on the origin, plus
+      the Drive folder, to one file. Until an app has its `app-data.json` its data is matched by
+      name, or lands under "Other data". Check with `node ../CoworkSyncHub/backup-check.mjs`.
+      Restore is not built yet (hub roadmap chunk 2b): do not promise it in an app's own text.
     - font.js now records the home-screen install (`portal-installed`) for every app; an app's own
       copy of that code can go.
     - The registry of apps is `CoworkSyncHub/apps.json` (published at `adervec.github.io/apps.json`).

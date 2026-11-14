@@ -57,5 +57,7 @@
  "syncing to Google Drive": "синхронізація з Google Drive",
  "the browser may clear it if space runs low": "браузер може видалити це, якщо забракне місця",
  "{used} used of {quota} available": "використано {used} з {quota} доступних",
- "Send feedback": "Надіслати відгук"
+ "Send feedback": "Надіслати відгук",
+ "Back up my data": "Створити резервну копію моїх даних",
+ "Backup failed": "Не вдалося створити резервну копію"
 }

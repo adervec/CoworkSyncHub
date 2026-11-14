@@ -57,5 +57,7 @@
  "syncing to Google Drive": "جارٍ المزامنة مع Google Drive",
  "the browser may clear it if space runs low": "قد يحذفه المتصفح إذا قلّت المساحة",
  "{used} used of {quota} available": "{used} مستخدمة من {quota} متاحة",
- "Send feedback": "إرسال ملاحظات"
+ "Send feedback": "إرسال ملاحظات",
+ "Back up my data": "نسخ بياناتي احتياطيًا",
+ "Backup failed": "فشل النسخ الاحتياطي"
 }

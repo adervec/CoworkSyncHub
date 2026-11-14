@@ -57,5 +57,7 @@
  "syncing to Google Drive": "sinkronizacija s Google Driveom",
  "the browser may clear it if space runs low": "preglednik ga može izbrisati ako ponestane prostora",
  "{used} used of {quota} available": "{used} iskorišteno od {quota} dostupno",
- "Send feedback": "Pošalji povratnu informaciju"
+ "Send feedback": "Pošalji povratnu informaciju",
+ "Back up my data": "Sigurnosno kopiraj moje podatke",
+ "Backup failed": "Sigurnosno kopiranje nije uspjelo"
 }

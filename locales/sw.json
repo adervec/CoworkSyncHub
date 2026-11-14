@@ -57,5 +57,7 @@
  "syncing to Google Drive": "inasawazisha na Google Drive",
  "the browser may clear it if space runs low": "kivinjari kinaweza kuifuta nafasi ikipungua",
  "{used} used of {quota} available": "{used} imetumika kati ya {quota} inayopatikana",
- "Send feedback": "Tuma maoni"
+ "Send feedback": "Tuma maoni",
+ "Back up my data": "Hifadhi nakala ya data yangu",
+ "Backup failed": "Kuhifadhi nakala kumeshindikana"
 }
