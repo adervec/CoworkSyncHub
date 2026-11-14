@@ -152,4 +152,5 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you. Also run `node ../CoworkSyncHub/layout-check.mjs <App>` (the live site, phone and desktop) and fix what it flags.
 - Run the app's own tests and `standards.mjs` before pushing; never push red.
 - Commit and push your own work when it passes; do not leave a pile of uncommitted files.
+- Temporary files (test logs, commit-message drafts, server notes) go in your repo's git-ignored folder or the system temp folder, never loose in the shared GitHub folder.
 - Keep the shared files (font.js, cowork.js, standards.mjs) in CoworkSyncHub; an app never edits a copy.
