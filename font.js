@@ -734,6 +734,11 @@
     watchClamps(document);
     if (window.MutationObserver) new MutationObserver(function (ms) { ms.forEach(function (m) {
       m.addedNodes.forEach(function (n) { if (n.nodeType === 1) watchClamps(n); });
+      m.removedNodes.forEach(function (n) { // a framework removed the block: take its button too
+        if (n.nodeType !== 1 || !n.querySelectorAll) return;
+        var gone = [].slice.call(n.querySelectorAll('[data-clamp]')); if (n.matches('[data-clamp]')) gone.push(n);
+        gone.forEach(function (el) { if (el.__clampBtn && !el.isConnected) { el.__clampBtn.remove(); el.__clampBtn = null; el.__clampWatched = false; } });
+      });
       if (m.type === 'characterData' || m.type === 'childList') { var p = m.target.nodeType === 1 ? m.target : m.target.parentElement; var c = p && p.closest && p.closest('[data-clamp]'); if (c) clamp(c); }
     }); }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
   };

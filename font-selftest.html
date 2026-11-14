@@ -95,6 +95,9 @@
   ok('Show less closes it again', !lt.hasAttribute('data-open') && lt.getBoundingClientRect().height < 100);
   var st = document.getElementById('shorttext');
   ok('text that fits is left alone, no button', !st.hasAttribute('data-clamped') && !(st.nextElementSibling && st.nextElementSibling.className === 'app-clamp-toggle'));
+  lt.remove();
+  await new Promise(function (r) { setTimeout(r, 30); });
+  ok('removing the block (a framework re-render) takes its button too', !lb.isConnected);
   localStorage.removeItem('maker-font');
   document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
 })();
