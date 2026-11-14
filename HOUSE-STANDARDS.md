@@ -109,6 +109,16 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - Scope: the app's interface (menus, buttons, messages, help). Catalogue content (a gallery's
       stories, a book's text) is not covered yet.
 
+21. **Looks right on a phone and on a desktop, and long text never buries the buttons.**
+    - No sideways scrolling at 390 px wide; nothing cramped or stretched edge to edge at 1280 px.
+    - Any block that can grow long (a transcript, an AI review, notes, a log, pasted text) gets
+      `data-clamp` (font.js: about 12 lines or 40% of a phone screen) or `data-clamp="6"`. It is cut
+      with a fade and a "Show all" / "Show less" button. Text that fits is left alone. Long lists
+      may scroll; walls of prose may not push the actions off screen.
+    - Check the screens you changed with `node ../CoworkSyncHub/layout-check.mjs --url <local url>`,
+      with enough seeded data to make the text long, at both sizes. It flags sideways scroll (and
+      the culprit) and unclamped text walls.
+
 ## Working habits
 
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you.
