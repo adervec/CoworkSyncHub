@@ -48,7 +48,7 @@ export function extractText(text, { house = false } = {}) {
   for (const m of text.matchAll(/i18n-keys:([^\n]*)/g)) m[1].split('|').map((k) => k.trim()).filter(Boolean).forEach((k) => strings.add(k));
   if (!house) {
     // static HTML: data-t (attribute value, or the element's own text) and data-t-attr
-    for (const m of text.matchAll(/<([a-zA-Z][\w-]*)\b([^>]*?)\sdata-t(?:=("[^"]*"|'[^']*'))?([^>]*)>([^<]*)</g)) {
+    for (const m of text.matchAll(/<([a-zA-Z][\w-]*)\b([^>]*?)\sdata-t(?:=("[^"]*"|'[^']*'))?(?=[\s/>])([^>]*)>([^<]*)</g)) { // exactly data-t, not data-tid / data-t-attr
       const key = m[3] ? m[3].slice(1, -1) : m[5].trim();
       if (key) strings.add(key.replace(/\s+/g, ' '));
     }
