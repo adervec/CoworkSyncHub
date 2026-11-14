@@ -85,7 +85,7 @@ const CHECKS = [
     // the shared corner avatar, placed in the page and fed the account
     const shared = a.has(/<app-account|createElement\(\s*['"]app-account/) && a.has(/setAccount\(/);
     // or the app's own avatar in an always-visible bar: GymTracker's banner identity, or a header sync chip with the picture
-    const own = a.has(/id=["']app-identity["']|ti-pfp|gsync-pfp-sm/) || a.has(/class=["']gav["']|i\.className\s*=\s*["']gav["']/);
+    const own = a.has(/id=["']app-identity["']|ti-pfp|gsync-pfp-sm|class="gpic"/) || a.has(/class=["']gav["']|i\.className\s*=\s*["']gav["']/);
     if (shared || own) return ok(own && !shared ? 'own header avatar' : '');
     return fail('the picture is not in an always-visible top bar (use <app-account> + appFont.setAccount)');
   }],

@@ -493,6 +493,11 @@
           var a = getAccount();
           self.textContent = '';
           self.style.display = a ? 'inline-flex' : 'none';
+          // <app-account corner>: for an app with no shared top bar, pin it top-right on every page
+          if (self.hasAttribute('corner')) {
+            self.style.position = 'fixed'; self.style.top = 'calc(10px + env(safe-area-inset-top, 0px))';
+            self.style.right = 'calc(12px + env(safe-area-inset-right, 0px))'; self.style.zIndex = '2147482990';
+          }
           if (!a) return;
           var who = a.name || a.email || 'Google account';
           var b = document.createElement('button');
