@@ -27,9 +27,9 @@
   var BASE = window.appFontBase || new URL('fonts/', (document.currentScript && document.currentScript.src) || location.href).href;
   var options = [
     { id: 'atkinson', label: 'Atkinson Hyperlegible', stack: '"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
-    { id: 'system', label: 'System', stack: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
-    { id: 'serif', label: 'Serif', stack: 'Georgia, "Times New Roman", serif' },
-    { id: 'mono', label: 'Monospace', stack: 'ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace' },
+    { id: 'system', label: 'System', i18n: true, stack: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
+    { id: 'serif', label: 'Serif', i18n: true, stack: 'Georgia, "Times New Roman", serif' },
+    { id: 'mono', label: 'Monospace', i18n: true, stack: 'ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace' },
   ];
   var byId = function (id) { return options.filter(function (o) { return o.id === id; })[0] || options[0]; };
 
@@ -102,13 +102,14 @@
     customElements.define('app-font-picker', class extends HTMLElement {
       connectedCallback() {
         if (this.firstChild) return;
+        if (!houseReady && lang() !== 'en') { var me = this; ready.then(function () { if (!me.firstChild) me.connectedCallback(); }); return; }
         var label = document.createElement('label');
         var select = document.createElement('select');
-        options.forEach(function (o) { var el = document.createElement('option'); el.value = o.id; el.textContent = o.label; select.appendChild(el); });
+        options.forEach(function (o) { var el = document.createElement('option'); el.value = o.id; el.textContent = o.i18n ? tr(o.label) : o.label; select.appendChild(el); });
         select.value = get();
         select.addEventListener('change', function () { set(select.value); });
         document.addEventListener('app-font-change', function () { select.value = get(); });
-        label.append((this.getAttribute('label') || 'Font') + ' ', select);
+        label.append((this.getAttribute('label') || tr('Font')) + ' ', select);
         this.appendChild(label);
         // The house zoom option sits with the font choice: both are "how the page reads".
         if (!this.hasAttribute('no-zoom-option')) {
@@ -118,8 +119,26 @@
           zc.type = 'checkbox'; zc.checked = zoomAllowed();
           zc.addEventListener('change', function () { setZoomAllowed(zc.checked); });
           document.addEventListener('app-zoom-change', function () { zc.checked = zoomAllowed(); });
-          zl.append(zc, ' Allow pinch-zoom');
+          zl.append(zc, ' ' + tr('Allow pinch-zoom'));
           this.appendChild(zl);
+        }
+        // Language and regional settings, shared by every app (house standard). A change reloads the page.
+        if (!this.hasAttribute('no-region')) {
+          var row = function (labelText, opts, current, onPick) {
+            var l = document.createElement('label'), s = document.createElement('select');
+            l.style.cssText = 'display:block;margin-top:.35em';
+            opts.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; s.appendChild(op); });
+            s.value = current;
+            s.addEventListener('change', function () { onPick(s.value); });
+            l.append(labelText + ' ', s);
+            return l;
+          };
+          var auto = tr('Automatic');
+          this.appendChild(row(tr('Language'), LANGS.map(function (L) { return [L.id, L.name + (L.id === 'en' ? '' : ' · ' + tr('machine translated'))]; }), lang(), function (v) { setRegional(LKEY, v); }));
+          this.appendChild(row(tr('Units'), [['auto', auto + ' (' + (units() === 'imperial' ? tr('imperial') : tr('metric')) + ')'], ['metric', tr('Metric (km, kg)')], ['imperial', tr('Imperial (mi, lb)')]], store.get(UKEY) || 'auto', function (v) { setRegional(UKEY, v); }));
+          var dayName = function (d) { return new Intl.DateTimeFormat(locale(), { weekday: 'long' }).format(new Date(2026, 0, 4 + d)); };
+          this.appendChild(row(tr('First day of the week'), [['auto', auto + ' (' + dayName(weekStart()) + ')'], ['mon', dayName(1)], ['sun', dayName(0)], ['sat', dayName(6)]], store.get(WKEY) || 'auto', function (v) { setRegional(WKEY, v); }));
+          this.appendChild(row(tr('Clock'), [['auto', auto + ' (' + (clock() === '12' ? tr('12-hour') : tr('24-hour')) + ')'], ['24', tr('24-hour')], ['12', tr('12-hour')]], store.get(CKEY) || 'auto', function (v) { setRegional(CKEY, v); }));
         }
         // Every app has this picker in its settings, so the running build is shown under it.
         // Opt out with <app-font-picker no-build>, and place <app-build-info> yourself.
@@ -155,8 +174,8 @@
   function buildLabel() {
     var meta = document.querySelector('meta[name="app-version"]');
     var when = new Date(document.lastModified);
-    var built = isNaN(when) ? '' : when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-    return (meta && meta.content ? 'Version ' + meta.content + (built ? ' · ' : '') : 'Build ') + built;
+    var built = isNaN(when) ? '' : fmt.dateTime(when);
+    return meta && meta.content ? tr('Version {version}', { version: meta.content }) + (built ? ' · ' + built : '') : tr('Build {date}', { date: built });
   }
   if (window.customElements && !customElements.get('app-build-info')) {
     customElements.define('app-build-info', class extends HTMLElement {
@@ -175,14 +194,14 @@
       'display:flex;gap:12px;align-items:center;max-width:calc(100vw - 24px);padding:10px 14px;border-radius:10px;' +
       'background:#1d2430;color:#f2ece1;font:14px/1.3 var(--app-font,system-ui,sans-serif);box-shadow:0 6px 24px rgba(0,0,0,.45)';
     var text = document.createElement('span');
-    text.textContent = 'A new version is ready.';
+    text.textContent = tr('A new version is ready.');
     var btn = function (label, fn) {
       var b = document.createElement('button');
       b.type = 'button'; b.textContent = label; b.addEventListener('click', fn);
       b.style.cssText = 'font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:7px;padding:4px 10px;cursor:pointer';
       return b;
     };
-    bar.append(text, btn('Reload', function () { location.reload(); }), btn('Later', function () { bar.remove(); }));
+    bar.append(text, btn(tr('Reload'), function () { location.reload(); }), btn(tr('Later'), function () { bar.remove(); }));
     document.documentElement.appendChild(bar); // on <html>, so an app re-rendering <body> cannot wipe it
   }
   try {
@@ -218,7 +237,7 @@
       'display:flex;flex-wrap:wrap;gap:10px;align-items:center;max-width:calc(100vw - 24px);padding:10px 14px;border-radius:10px;' +
       'background:#5c1d24;color:#fff;font:14px/1.3 var(--app-font,system-ui,sans-serif);box-shadow:0 6px 24px rgba(0,0,0,.45)';
     var text = document.createElement('span');
-    text.textContent = 'Something went wrong. Your saved data is safe.';
+    text.textContent = tr('Something went wrong. Your saved data is safe.');
     var btn = function (label, fn) {
       var b = document.createElement('button');
       b.type = 'button'; b.textContent = label; b.addEventListener('click', fn);
@@ -228,12 +247,12 @@
     var more = document.createElement('pre');
     more.style.cssText = 'display:none;flex-basis:100%;margin:0;max-height:30vh;overflow:auto;white-space:pre-wrap;font:12px/1.35 ui-monospace,Consolas,monospace;opacity:.9';
     more.textContent = String(detail || '').slice(0, 4000);
-    var copy = btn('Copy diagnostics', function () { copyDiagnostics(copy); });
+    var copy = btn(tr('Copy diagnostics'), function () { copyDiagnostics(copy); });
     bar.append(text,
-      btn('Reload', function () { location.reload(); }),
-      btn('Details', function () { more.style.display = more.style.display === 'none' ? 'block' : 'none'; }),
+      btn(tr('Reload'), function () { location.reload(); }),
+      btn(tr('Details'), function () { more.style.display = more.style.display === 'none' ? 'block' : 'none'; }),
       copy,
-      btn('Dismiss', function () { bar.remove(); }),
+      btn(tr('Dismiss'), function () { bar.remove(); }),
       more);
     document.documentElement.appendChild(bar); // on <html>, so an app re-rendering <body> cannot wipe it
   }
@@ -266,7 +285,8 @@
   var appName = function () { return meta('app-name') || (document.title || location.pathname).replace(/\s+[—–|-]\s+.*$/, ''); };
   var appKey = function () { return location.pathname.split('/')[1] || 'root'; };
   var sourceUrl = function () { return meta('app-source') || (location.host === 'adervec.github.io' && appKey() !== 'root' ? 'https://github.com/adervec/' + appKey() : ''); };
-  var DATA_NOTE = 'Your data stays in this browser on this device. If you connect Google Drive, a copy is kept in a private app folder that only this app can read, not in your Drive files.';
+  // i18n-keys: System | Serif | Monospace | Your data stays in this browser on this device. If you connect Google Drive, a copy is kept in a private app folder that only this app can read, not in your Drive files.
+  var DATA_NOTE ='Your data stays in this browser on this device. If you connect Google Drive, a copy is kept in a private app folder that only this app can read, not in your Drive files.';
   var store = {
     get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set: function (k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
@@ -292,7 +312,7 @@
     entries.forEach(function (e) {
       var h = document.createElement('div');
       h.style.cssText = 'font-weight:700;margin:.5em 0 .2em';
-      h.textContent = [e.version && 'Version ' + e.version, e.date].filter(Boolean).join(' · ') || 'Update';
+      h.textContent = [e.version && tr('Version {version}', { version: e.version }), e.date && fmt.date(e.date + 'T00:00:00')].filter(Boolean).join(' · ') || tr('Update');
       var ul = document.createElement('ul');
       ul.style.cssText = 'margin:0;padding-left:1.2em';
       e.items.forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
@@ -304,13 +324,13 @@
     if (document.getElementById('app-whatsnew')) return;
     var card = document.createElement('div');
     card.id = 'app-whatsnew';
-    card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', "What's new");
+    card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', tr("What's new"));
     card.style.cssText = 'position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147482999;' +
       'width:min(440px,calc(100vw - 24px));max-height:60vh;overflow:auto;padding:14px 16px;border-radius:12px;' +
       'background:#1d2430;color:#f2ece1;font:14px/1.4 var(--app-font,system-ui,sans-serif);box-shadow:0 8px 28px rgba(0,0,0,.5)';
     var title = document.createElement('div');
     title.style.cssText = 'font-size:1.1em;font-weight:700';
-    title.textContent = "What's new in " + appName();
+    title.textContent = tr("What's new in {app}", { app: appName() });
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:12px';
     var btn = function (label, fn) {
@@ -319,7 +339,7 @@
       b.style.cssText = 'font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:7px;padding:4px 10px;cursor:pointer';
       return b;
     };
-    row.append(btn("Don't show these", function () { setWhatsNewSilenced(true); card.remove(); }), btn('OK', function () { card.remove(); }));
+    row.append(btn(tr("Don't show these"), function () { setWhatsNewSilenced(true); card.remove(); }), btn(tr('OK'), function () { card.remove(); }));
     card.append(title, listEl(entries), row);
     document.documentElement.appendChild(card);
   }
@@ -343,7 +363,7 @@
     if (el) return;
     el = document.createElement('div');
     el.id = id; el.setAttribute('role', 'status');
-    el.textContent = 'Offline — changes are saved on this device';
+    el.textContent = tr('Offline — changes are saved on this device');
     el.style.cssText = 'position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:2147482998;padding:4px 10px;border-radius:999px;' +
       'background:#3a3f4b;color:#fff;font:12px/1.3 var(--app-font,system-ui,sans-serif);opacity:.92;pointer-events:none';
     document.documentElement.appendChild(el); // on <html>, so an app re-rendering <body> cannot wipe it
@@ -359,10 +379,10 @@
       .then(function (r) { return { usage: r[0].usage || 0, quota: r[0].quota || 0, persisted: !!r[1] }; })
       .catch(function () { return null; });
   }
-  var mb = function (n) { return n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : (n / 1e6).toFixed(n < 1e7 ? 1 : 0) + ' MB'; };
+  var mb = function (n) { return n >= 1e9 ? fmt.unit(n / 1e9, 'gigabyte', 1) : fmt.unit(n / 1e6, 'megabyte', n < 1e7 ? 1 : 0); };
   var storageText = function (s) {
-    return s ? mb(s.usage) + ' used of ' + mb(s.quota) + ' available' + (s.persisted ? ' · kept by the browser' : ' · the browser may clear it if space runs low')
-      : 'Not reported by this browser';
+    return s ? tr('{used} used of {quota} available', { used: mb(s.usage), quota: mb(s.quota) }) + ' · ' + (s.persisted ? tr('kept by the browser') : tr('the browser may clear it if space runs low'))
+      : tr('Not reported by this browser');
   };
 
   // Diagnostics: one paste that tells an agent what it needs. No personal data: no account, no
@@ -387,7 +407,7 @@
   }
   function copyDiagnostics(button) {
     return diagnostics().then(function (text) {
-      var done = function (ok) { if (button) { var t = button.textContent; button.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(function () { button.textContent = t; }, 1500); } return text; };
+      var done = function (ok) { if (button) { var t = button.textContent; button.textContent = ok ? tr('Copied') : tr('Copy failed'); setTimeout(function () { button.textContent = t; }, 1500); } return text; };
       return navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(text).then(function () { return done(true); }, function () { return done(false); }) : done(false);
     });
   }
@@ -398,9 +418,10 @@
     customElements.define('app-about', class extends HTMLElement {
       connectedCallback() {
         if (this.firstChild) return;
+        if (!houseReady && lang() !== 'en') { var me = this; ready.then(function () { if (!me.firstChild) me.connectedCallback(); }); return; }
         var d = document.createElement('details');
         var sum = document.createElement('summary');
-        sum.textContent = 'About ' + appName();
+        sum.textContent = tr('About {app}', { app: appName() });
         sum.style.cursor = 'pointer';
         var body = document.createElement('div');
         body.style.cssText = 'margin-top:.5em;display:grid;gap:.45em;font-size:.95em';
@@ -413,15 +434,16 @@
         if (src) { a = document.createElement('a'); a.href = src; a.target = '_blank'; a.rel = 'noopener'; a.textContent = src.replace(/^https:\/\//, ''); }
         var stor = document.createElement('span'); stor.textContent = '…';
         var net = document.createElement('span');
-        var setNet = function () { net.textContent = navigator.onLine ? 'online' : 'offline'; };
+        var setNet = function () { net.textContent = navigator.onLine ? tr('online') : tr('offline'); };
         setNet(); window.addEventListener('online', setNet); window.addEventListener('offline', setNet);
         body.append(
-          line('Version', buildLabel()),
-          line('Licence', meta('app-license') || 'MIT'),
-          line('Your data', meta('app-data-note') || DATA_NOTE),
-          line('Storage', stor),
-          line('Connection', net));
-        if (a) body.appendChild(line('Source', a));
+          line(tr('Version'), buildLabel()),
+          line(tr('Language'), langInfo(lang()).name + (lang() === 'en' ? '' : ' · ' + tr('machine translated from English, unchecked'))),
+          line(tr('Licence'), meta('app-license') || 'MIT'),
+          line(tr('Your data'), meta('app-data-note') ? t(meta('app-data-note')) : tr(DATA_NOTE)),
+          line(tr('Storage'), stor),
+          line(tr('Connection'), net));
+        if (a) body.appendChild(line(tr('Source'), a));
         var wn = document.createElement('div');
         body.appendChild(wn);
         if (meta('app-whatsnew')) {
@@ -430,16 +452,16 @@
           wc.type = 'checkbox'; wc.checked = !whatsNewSilenced();
           wc.addEventListener('change', function () { setWhatsNewSilenced(!wc.checked); });
           document.addEventListener('app-whatsnew-change', function () { wc.checked = !whatsNewSilenced(); });
-          wl.append(wc, " Show what's new after updates");
+          wl.append(wc, ' ' + tr("Show what's new after updates"));
           body.appendChild(wl);
         }
         var row = document.createElement('div');
         row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px';
         var copy = document.createElement('button');
-        copy.type = 'button'; copy.textContent = 'Copy diagnostics';
+        copy.type = 'button'; copy.textContent = tr('Copy diagnostics');
         copy.addEventListener('click', function () { copyDiagnostics(copy); });
         var dl = document.createElement('button');
-        dl.type = 'button'; dl.textContent = 'Download diagnostics';
+        dl.type = 'button'; dl.textContent = tr('Download diagnostics');
         dl.addEventListener('click', function () {
           diagnostics().then(function (t) {
             var u = URL.createObjectURL(new Blob([t], { type: 'text/plain' })), x = document.createElement('a');
@@ -456,7 +478,7 @@
           whatsNew().then(function (list) {
             wn.textContent = '';
             if (!list.length) return;
-            var h = document.createElement('b'); h.textContent = "What's new";
+            var h = document.createElement('b'); h.textContent = tr("What's new");
             wn.append(h, listEl(list.slice(0, 5)));
           });
         });
@@ -499,10 +521,10 @@
             self.style.right = 'calc(12px + env(safe-area-inset-right, 0px))'; self.style.zIndex = '2147482990';
           }
           if (!a) return;
-          var who = a.name || a.email || 'Google account';
+          var who = a.name || a.email || tr('Google account');
           var b = document.createElement('button');
           b.type = 'button';
-          b.title = 'Signed in as ' + who + (a.email && a.name ? ' (' + a.email + ')' : '') + ' · syncing to Google Drive';
+          b.title = tr('Signed in as {who}', { who: who + (a.email && a.name ? ' (' + a.email + ')' : '') }) + ' · ' + tr('syncing to Google Drive');
           b.setAttribute('aria-label', b.title);
           b.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;line-height:1';
           var size = self.getAttribute('size') || '28';
@@ -532,9 +554,156 @@
     return s;
   }
 
+  // ---- Languages, regional settings and translation (house standard) ----------------------------
+  // Every app is written in English; the other languages are MACHINE translated (by agent sessions,
+  // with CoworkSyncHub/i18n.mjs) and say so. An app writes English straight into its code:
+  //   t('Saved {n} minis', { n })            the English text IS the key; untranslated text stays English
+  //   t.n('{n} mini', '{n} minis', count)    plurals follow each language's own rules
+  //   <span data-t>Settings</span>            static HTML (data-t-attr="title,placeholder" for attributes)
+  // and declares where its translations live: <meta name="app-locales" content="locales/">.
+  // Dates, numbers, distances and weights go through appFont.fmt (Intl), never toFixed or
+  // hand-written month names. Language, units, first day of the week and the clock are shared
+  // across every app on this origin, like the font, and picked under the font picker.
+  var LANGS = [
+    { id: 'en', name: 'English' }, { id: 'fr', name: 'Français' }, { id: 'es', name: 'Español' },
+    { id: 'pt', name: 'Português' }, { id: 'it', name: 'Italiano' }, { id: 'hr', name: 'Hrvatski' },
+    { id: 'de', name: 'Deutsch' }, { id: 'zh', name: '中文（简体）', bcp: 'zh-CN' }, { id: 'uk', name: 'Українська' },
+    { id: 'eo', name: 'Esperanto' }, { id: 'sw', name: 'Kiswahili' }, { id: 'hi', name: 'हिन्दी' },
+    { id: 'bn', name: 'বাংলা' }, { id: 'id', name: 'Bahasa Indonesia' }, { id: 'ur', name: 'اردو', rtl: true },
+    { id: 'fa', name: 'فارسی', rtl: true }, { id: 'ar', name: 'العربية', rtl: true },
+  ];
+  var LKEY = 'maker-lang', UKEY = 'maker-units', WKEY = 'maker-week', CKEY = 'maker-clock', MTKEY = 'maker-mt-ack:';
+  var langInfo = function (id) { return LANGS.filter(function (l) { return l.id === id; })[0] || LANGS[0]; };
+  function deviceLang() {
+    var ls = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
+    for (var i = 0; i < ls.length; i++) { var b = String(ls[i]).toLowerCase().split('-')[0]; if (LANGS.some(function (l) { return l.id === b; })) return b; }
+    return 'en';
+  }
+  function lang() { var v = store.get(LKEY); return LANGS.some(function (l) { return l.id === v; }) ? v : deviceLang(); }
+  // Formatting locale: the device's own region when it speaks the chosen language (en-GB vs en-US),
+  // otherwise the language's default.
+  function locale() {
+    var info = langInfo(lang()), dev = navigator.language || 'en';
+    return dev.toLowerCase().split('-')[0] === info.id ? dev : (info.bcp || info.id);
+  }
+  function region() { try { return new Intl.Locale(navigator.language || 'en').maximize().region || ''; } catch (e) { return ''; } }
+  function units() { var v = store.get(UKEY); return v === 'metric' || v === 'imperial' ? v : (/^(US|LR|MM)$/.test(region()) ? 'imperial' : 'metric'); }
+  function weekStart() { // 0 = Sunday, 1 = Monday, 6 = Saturday
+    var v = store.get(WKEY);
+    if (v === 'sun') return 0; if (v === 'mon') return 1; if (v === 'sat') return 6;
+    try { var L = new Intl.Locale(navigator.language || 'en'), w = L.getWeekInfo ? L.getWeekInfo() : L.weekInfo; if (w && w.firstDay) return w.firstDay % 7; } catch (e) { /* older browser */ }
+    return 1;
+  }
+  function clock() { var v = store.get(CKEY); if (v === '12' || v === '24') return v; try { return /h1[12]/.test(new Intl.DateTimeFormat(navigator.language || 'en', { hour: 'numeric' }).resolvedOptions().hourCycle) ? '12' : '24'; } catch (e) { return '24'; } }
+  // a regional change reloads the page, so every screen of every app redraws in it
+  function setRegional(key, value) { store.set(key, value == null || value === 'auto' ? null : value); location.reload(); }
+
+  var dict = {}, houseDict = {}, houseReady = false;
+  var LOC_BASE = window.appLocaleBase || BASE.replace(/fonts\/$/, 'locales/'); // the house's own translations
+  function loadDict(url) { return fetch(url, { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }); }
+  function interp(s, p) { return p ? String(s).replace(/\{(\w+)\}/g, function (m, k) { return Object.prototype.hasOwnProperty.call(p, k) ? String(p[k]) : m; }) : String(s); }
+  function lookup(d, key, params) { var v = d[key]; return interp(typeof v === 'string' && v ? v : key, params); }
+  function plural(d, one, other, n, params) {
+    var p = Object.assign({ n: fmtNumber(n) }, params || {}), v = d[one + '|' + other];
+    if (v && typeof v === 'object') { var cat; try { cat = new Intl.PluralRules(locale()).select(n); } catch (e) { cat = 'other'; } var s = v[cat] || v.other; if (s) return interp(s, p); }
+    return interp(n === 1 ? one : other, p);
+  }
+  function t(key, params) { return lookup(dict, key, params); }
+  t.n = function (one, other, n, params) { return plural(dict, one, other, n, params); };
+  function tr(key, params) { return lookup(houseDict, key, params); } // this script's own words
+  tr.n = function (one, other, n, params) { return plural(houseDict, one, other, n, params); };
+
+  // static HTML: [data-t] (text) and [data-t-attr="title,placeholder"] (attributes); the English is kept as the key
+  function applyDom(root) {
+    if (!root || !root.querySelectorAll) return;
+    var els = [].slice.call(root.querySelectorAll('[data-t],[data-t-attr]'));
+    if (root.matches && root.matches('[data-t],[data-t-attr]')) els.push(root);
+    els.forEach(function (el) {
+      if (el.hasAttribute('data-t')) { if (el.__tKey == null) el.__tKey = el.getAttribute('data-t') || el.textContent.trim(); el.textContent = t(el.__tKey); }
+      var attrs = el.getAttribute('data-t-attr');
+      if (attrs) { el.__tAttr = el.__tAttr || {}; attrs.split(',').forEach(function (a) { a = a.trim(); if (!a) return; if (el.__tAttr[a] == null) el.__tAttr[a] = el.getAttribute(a) || ''; el.setAttribute(a, t(el.__tAttr[a])); }); }
+    });
+  }
+
+  // formatting: always the shared locale, units, week start and clock
+  function fmtNumber(n, o) { o = o || {}; try { return new Intl.NumberFormat(locale(), { maximumFractionDigits: o.max != null ? o.max : 2, minimumFractionDigits: o.min || 0 }).format(n); } catch (e) { return String(n); } }
+  var asDate = function (d) { return d instanceof Date ? d : new Date(d); };
+  var fmt = {
+    number: fmtNumber,
+    percent: function (x, max) { return new Intl.NumberFormat(locale(), { style: 'percent', maximumFractionDigits: max == null ? 0 : max }).format(x); },
+    date: function (d, style) { return new Intl.DateTimeFormat(locale(), { dateStyle: style || 'medium' }).format(asDate(d)); },
+    time: function (d) { return new Intl.DateTimeFormat(locale(), { timeStyle: 'short', hour12: clock() === '12' }).format(asDate(d)); },
+    dateTime: function (d, style) { return new Intl.DateTimeFormat(locale(), { dateStyle: style || 'medium', timeStyle: 'short', hour12: clock() === '12' }).format(asDate(d)); },
+    custom: function (d, opts) { return new Intl.DateTimeFormat(locale(), Object.assign({ hour12: clock() === '12' }, opts)).format(asDate(d)); },
+    relative: function (d) {
+      var s = (asDate(d).getTime() - Date.now()) / 1000, a = Math.abs(s), rtf = new Intl.RelativeTimeFormat(locale(), { numeric: 'auto' });
+      if (a < 60) return rtf.format(Math.round(s), 'second'); if (a < 3600) return rtf.format(Math.round(s / 60), 'minute');
+      if (a < 86400) return rtf.format(Math.round(s / 3600), 'hour'); if (a < 7 * 86400) return rtf.format(Math.round(s / 86400), 'day');
+      if (a < 30 * 86400) return rtf.format(Math.round(s / (7 * 86400)), 'week'); if (a < 365 * 86400) return rtf.format(Math.round(s / (30 * 86400)), 'month');
+      return rtf.format(Math.round(s / (365 * 86400)), 'year');
+    },
+    unit: function (value, unit, max) { return new Intl.NumberFormat(locale(), { style: 'unit', unit: unit, unitDisplay: 'short', maximumFractionDigits: max == null ? 1 : max }).format(value); },
+    // distance in metres -> km / m, or mi / ft
+    distance: function (m, max) {
+      if (units() === 'imperial') { var mi = m / 1609.344; return mi >= 0.1 ? fmt.unit(mi, 'mile', max == null ? 2 : max) : fmt.unit(m * 3.28084, 'foot', 0); }
+      return m >= 1000 ? fmt.unit(m / 1000, 'kilometer', max == null ? 2 : max) : fmt.unit(m, 'meter', 0);
+    },
+    // weight in kilograms -> kg, or lb
+    weight: function (kg, max) { return units() === 'imperial' ? fmt.unit(kg * 2.2046226, 'pound', max == null ? 1 : max) : fmt.unit(kg, 'kilogram', max == null ? 1 : max); },
+    list: function (arr) { try { return new Intl.ListFormat(locale(), { type: 'conjunction' }).format(arr); } catch (e) { return arr.join(', '); } },
+    // weekday names starting from the shared first day of the week
+    weekdays: function (width) { var f = new Intl.DateTimeFormat(locale(), { weekday: width || 'short' }), out = []; for (var i = 0; i < 7; i++) out.push(f.format(new Date(2026, 0, 4 + ((weekStart() + i) % 7)))); return out; },
+    months: function (width) { var f = new Intl.DateTimeFormat(locale(), { month: width || 'long' }), out = []; for (var i = 0; i < 12; i++) out.push(f.format(new Date(2026, i, 1))); return out; },
+  };
+
+  // the page speaks the chosen language: lang, and right-to-left for Arabic, Farsi and Urdu
+  document.documentElement.lang = locale();
+  document.documentElement.dir = langInfo(lang()).rtl ? 'rtl' : 'ltr';
+
+  // Machine-translation disclaimer: once per language (shared by every app), and always in About.
+  function mtNotice() {
+    var L = lang();
+    if (L === 'en' || store.get(MTKEY + L) === '1' || document.getElementById('app-mt-notice')) return;
+    var bar = document.createElement('div');
+    bar.id = 'app-mt-notice'; bar.setAttribute('role', 'note');
+    bar.style.cssText = 'position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:2147482997;' +
+      'display:flex;flex-wrap:wrap;gap:10px;align-items:center;width:min(560px,calc(100vw - 24px));padding:10px 14px;border-radius:10px;' +
+      'background:#3b3a1d;color:#fff;font:14px/1.4 var(--app-font,system-ui,sans-serif);box-shadow:0 6px 24px rgba(0,0,0,.45)';
+    var text = document.createElement('span');
+    text.style.flex = '1 1 260px';
+    text.textContent = tr('This app was written in English. The {language} text is machine translated and has not been checked by a person, so it may be wrong.', { language: langInfo(L).name });
+    var en = document.createElement('small');
+    en.style.cssText = 'display:block;opacity:.75;margin-top:4px';
+    en.setAttribute('lang', 'en'); en.dir = 'ltr';
+    en.textContent = 'Machine translated from English, unchecked.';
+    text.appendChild(en);
+    var btn = function (label, fn) { var b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.addEventListener('click', fn); b.style.cssText = 'font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:7px;padding:4px 10px;cursor:pointer'; return b; };
+    bar.append(text, btn(tr('Switch to English'), function () { setRegional(LKEY, 'en'); }), btn(tr('OK'), function () { store.set(MTKEY + L, '1'); bar.remove(); }));
+    document.documentElement.appendChild(bar);
+  }
+
+  var appLoc = meta('app-locales');
+  var ready = (lang() === 'en' ? Promise.resolve([{}, {}]) : Promise.all([
+    loadDict(LOC_BASE + lang() + '.json'),
+    appLoc ? loadDict(new URL(appLoc.replace(/\/?$/, '/') + lang() + '.json', location.href).href) : Promise.resolve({}),
+  ])).then(function (r) {
+    houseDict = r[0] || {}; dict = r[1] || {}; houseReady = true;
+    var go = function () { applyDom(document); mtNotice(); document.dispatchEvent(new CustomEvent('app-language-ready', { detail: lang() })); };
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', go) : go();
+    // later-rendered static markup with data-t gets translated as it appears
+    if (lang() !== 'en' && window.MutationObserver) new MutationObserver(function (ms) { ms.forEach(function (m) { m.addedNodes.forEach(function (n) { if (n.nodeType === 1) applyDom(n); }); }); }).observe(document.documentElement, { childList: true, subtree: true });
+    return lang();
+  });
+
   window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice,
     zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice,
     diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,
     whatsNew: whatsNew, checkWhatsNew: checkWhatsNew, setWhatsNewSilenced: setWhatsNewSilenced,
-    getAccount: getAccount, setAccount: setAccount };
+    getAccount: getAccount, setAccount: setAccount,
+    // languages and regional settings
+    languages: LANGS, lang: lang, locale: locale, units: units, weekStart: weekStart, clock: clock,
+    setLanguage: function (id) { setRegional(LKEY, id); }, setUnits: function (v) { setRegional(UKEY, v); },
+    setWeekStart: function (v) { setRegional(WKEY, v); }, setClock: function (v) { setRegional(CKEY, v); },
+    t: t, fmt: fmt, ready: ready, applyDom: applyDom, machineTranslated: function () { return lang() !== 'en'; } };
+  window.t = window.t || t; // the short name apps write their English with
 })();

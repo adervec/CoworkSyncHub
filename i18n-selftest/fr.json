@@ -1,0 +1,6 @@
+{
+ "Saved {n} minis": "{n} figurines enregistrées",
+ "Search": "Rechercher",
+ "Settings": "Réglages",
+ "{n} mini|{n} minis": { "one": "{n} figurine", "many": "{n} figurines", "other": "{n} figurines" }
+}

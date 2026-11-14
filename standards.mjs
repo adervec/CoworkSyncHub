@@ -14,6 +14,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { coverage as i18nCoverage } from './i18n.mjs';
 
 const HUB = path.dirname(fileURLToPath(import.meta.url));
 const GITHUB = path.dirname(HUB);
@@ -189,6 +190,17 @@ const CHECKS = [
     if (!GRADED.test(a.app.dir)) return ['-', 'no algorithmically graded sessions'];
     // a real channel or operation: name:/dir: 'something-review', or a Tachyread-style op id 'cw-...-review':
     return a.has(/\b(name|dir)\s*:\s*['"][a-z0-9-]*-review['"]|['"]cw-[a-z0-9-]+-review['"]\s*:/) ? ok() : fail('no AI review channel for its graded sessions');
+  }],
+  ['i18n', 'English + 16 machine-translated languages', (a) => {
+    // every string the app writes in English is translated into all 16 languages (i18n.mjs), and dates,
+    // numbers and units go through appFont.fmt, never a hard-coded locale or hand-typed month names
+    if (!a.has(/name=["']app-locales["']/)) return fail('no <meta name="app-locales"> (not translated yet)');
+    const cov = i18nCoverage(a.root);
+    const missing = Object.entries(cov.missing).filter(([, n]) => n);
+    if (!cov.total) return fail('declares locales but marks no strings with t() / data-t');
+    if (missing.length) return fail(`${cov.total} strings; missing: ` + missing.map(([l, n]) => `${l} ${n}`).join(', ') + ' (node ../CoworkSyncHub/i18n.mjs todo .)');
+    const hard = a.count(/['"]en-(US|GB)['"]/g) + a.count(/['"]January['"]\s*,\s*['"]February['"]|['"]Jan['"]\s*,\s*['"]Feb['"]/g);
+    return hard ? warn(`${cov.total} strings, all translated; ${hard} hard-coded locale or month list(s) left`) : ok(`${cov.total} strings`);
   }],
   ['notes', 'Agent notes import the house standards', (a) => {
     const here = path.join(a.root, 'CLAUDE.md'), up = path.join(path.dirname(a.root), 'CLAUDE.md');

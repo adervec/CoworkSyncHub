@@ -1149,6 +1149,10 @@ def write_cowork():
     for f in ("font.js", "font-selftest.html"):
         shutil.copy(BASE / f, SITE / f)
     shutil.copytree(BASE / "fonts", SITE / "fonts", dirs_exist_ok=True)
+    # the house's own translations (font.js labels, machine translated) + the language self-test
+    shutil.copytree(BASE / "locales", SITE / "locales", dirs_exist_ok=True, ignore=shutil.ignore_patterns("_todo"))
+    shutil.copy(BASE / "i18n-selftest.html", SITE / "i18n-selftest.html")
+    shutil.copytree(BASE / "i18n-selftest", SITE / "i18n-selftest", dirs_exist_ok=True)
     (SITE / "cowork").mkdir(exist_ok=True)
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">

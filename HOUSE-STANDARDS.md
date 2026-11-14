@@ -88,6 +88,27 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     session ends.
 19. **Agent notes**: this file, imported from each repo's `CLAUDE.md`.
 
+20. **Languages**: every app is written and built in English and also offers French, Spanish,
+    Portuguese, Italian, Croatian, German, Mandarin (Simplified), Ukrainian, Esperanto, Swahili, Hindi,
+    Bengali, Indonesian, Urdu, Farsi and Arabic. The other 16 are MACHINE translated (by an agent
+    session, no translation API) and the app says so: font.js shows a disclaimer the first time a
+    language is chosen, and About marks it "machine translated from English, unchecked".
+    - Write English straight into the code: `t('Saved {n} minis', { n })`, plurals with
+      `t.n('{n} mini', '{n} minis', count)`, static HTML with `data-t` / `data-t-attr`. Labels a
+      scan cannot see go in a `// i18n-keys: A | B` comment. Never build sentences by concatenation.
+    - Declare `<meta name="app-locales" content="locales/">`; translations live in `locales/<lang>.json`.
+    - The loop, whenever English changes: `node ../CoworkSyncHub/i18n.mjs extract .`, then `todo .`,
+      translate every value in `locales/_todo/*.json` (keep `{placeholders}`, fill every plural
+      category), `merge .`, `check .`. The standards check fails until all 16 are complete.
+    - Language names appear in their own script ("Français", "العربية"), **never with country flags**.
+    - Arabic, Farsi and Urdu set `dir="rtl"`; layouts must survive it (use logical CSS: `margin-inline-start`).
+    - Dates, times, numbers, distances and weights go through `appFont.fmt` (Intl), using the
+      shared language, units (metric/imperial), first day of the week and clock, all picked once
+      under the font picker for every app. No hard-coded `'en-US'`, no hand-typed month or weekday
+      names, no `toFixed` for anything the reader sees. App-specific unit settings defer to the shared one.
+    - Scope: the app's interface (menus, buttons, messages, help). Catalogue content (a gallery's
+      stories, a book's text) is not covered yet.
+
 ## Working habits
 
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you.

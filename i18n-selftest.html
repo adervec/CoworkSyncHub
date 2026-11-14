@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><title>font.js languages self-test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="app-locales" content="i18n-selftest/">
+<script>
+  // the language under test comes from ?lang=; the test page reloads itself for each one
+  var L = new URLSearchParams(location.search).get('lang') || 'fr';
+  localStorage.setItem('maker-lang', L); localStorage.removeItem('maker-mt-ack:' + L);
+  localStorage.setItem('maker-units', 'metric'); localStorage.setItem('maker-week', 'mon'); localStorage.setItem('maker-clock', '24');
+</script>
+<script src="font.js"></script>
+<body><h1 data-t>Settings</h1><input id="q" data-t-attr="placeholder" placeholder="Search"><app-font-picker></app-font-picker><pre id="log">running…</pre>
+<script>
+(async function () {
+  var fails = [], log = [], ok = function (name, c) { (c ? log : fails).push(name); };
+  await appFont.ready;
+  await new Promise(function (r) { setTimeout(r, 300); });
+  var L = appFont.lang();
+  if (L === 'fr') {
+    ok('the chosen language is in force', L === 'fr' && document.documentElement.lang.indexOf('fr') === 0 && document.documentElement.dir === 'ltr');
+    ok("the app's text translates (t)", t('Saved {n} minis', { n: 3 }) === '3 figurines enregistrées');
+    ok('untranslated text stays English', t('Nothing translated here') === 'Nothing translated here');
+    ok('plurals follow French rules', t.n('{n} mini', '{n} minis', 1) === '1 figurine' && t.n('{n} mini', '{n} minis', 2) === '2 figurines');
+    ok('static HTML translates (data-t, data-t-attr)', document.querySelector('h1').textContent === 'Réglages' && document.getElementById('q').placeholder === 'Rechercher');
+    ok("the house's own labels translate", /Langue/.test(document.querySelector('app-font-picker').textContent) && /Unités/.test(document.querySelector('app-font-picker').textContent));
+    ok('languages are listed by their own names, no flags', /Français/.test(document.querySelector('app-font-picker').textContent) && !/[\u{1F1E6}-\u{1F1FF}]/u.test(document.querySelector('app-font-picker').textContent));
+    ok('dates follow the language', /novembre/.test(appFont.fmt.date(new Date(2026, 10, 13), 'long')));
+    ok('numbers use the regional separator', appFont.fmt.number(1234.5) === '1 234,5' || appFont.fmt.number(1234.5) === '1 234,5');
+    ok('units: metric distances and weights', /km/.test(appFont.fmt.distance(5000)) && /kg/.test(appFont.fmt.weight(80)));
+    ok('the week starts on the chosen day', appFont.weekStart() === 1 && /^lun/.test(appFont.fmt.weekdays()[0]));
+    var mt = document.getElementById('app-mt-notice');
+    ok('the machine-translation disclaimer shows, in the language and in English', mt && /traduit automatiquement/.test(mt.textContent) && /Machine translated from English/.test(mt.textContent));
+  } else if (L === 'ar') {
+    ok('Arabic turns the page right-to-left', document.documentElement.dir === 'rtl' && document.documentElement.lang.indexOf('ar') === 0);
+    ok('Arabic has its six plural forms', t.n('{n} mini', '{n} minis', 3) === '3 مجسمات' && t.n('{n} mini', '{n} minis', 11) === '11 مجسمًا');
+  }
+  document.getElementById('log').textContent = (fails.length ? 'FAIL ' + fails.length + '\n' + fails.join('\n') : 'SELFTEST PASS ' + log.length + ' checks (' + L + ')') + '\n\npassed:\n' + log.join('\n');
+  localStorage.removeItem('maker-lang'); localStorage.removeItem('maker-units'); localStorage.removeItem('maker-week'); localStorage.removeItem('maker-clock');
+})();
+</script>
