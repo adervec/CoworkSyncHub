@@ -184,10 +184,15 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - The registry of apps is `CoworkSyncHub/apps.json` (published at `adervec.github.io/apps.json`).
       Add an app there, not in `portal.py`.
 
-24. **One theme list.** Every app offers exactly the same colour themes, under the same names:
-    System (the default, follows the device), Light, Dark, Midnight, Slate, Ocean, Forest, Ember,
-    Gold, Synthwave, Terminal, Paper, Pastel, Mono, High contrast. The list and the palettes live in
-    font.js and nowhere else; an app does not add, drop or rename a theme.
+24. **A shared base theme list.** Every app offers at least these colour themes, under these
+    names: System (the default, follows the device), Light, Dark, Midnight, Slate, Ocean, Forest,
+    Ember, Gold, Synthwave, Terminal, Paper, Pastel, Mono, High contrast. The base list and its
+    palettes live in font.js and nowhere else; an app does not drop, rename or recolour one.
+    - **Extras are welcome.** An app may keep themes of its own beyond the base list (GuitarPicker's
+      Sakura, SpeechImprover's Dracula). Register them at start-up with
+      `appFont.addThemes([{ id, label, dark, colors }])`, giving all eleven colours, so they sit in
+      the same picker after the base list and use the same `--t-*` variables. Keep an extra only if
+      it is not just a base theme under another name; translate its label yourself.
     - **Offer it:** put `<app-theme-picker></app-theme-picker>` in the settings, or build your own
       control from `appFont.themes` (`[{ id, label, dark, colors }]`), `appFont.theme()` (the
       choice, or `'system'`) and `appFont.setTheme(id)`. Show names through `t()`.
@@ -199,12 +204,13 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
       `app-theme-change` event.
     - **Per app:** the choice is stored per app, so each app can wear a different theme. Do not
       share one key across apps.
-    - **Moving over:** map a reader's saved old theme to the nearest house theme once (ember ->
-      ember, parchment or sepia -> paper, graphite -> slate, vaporwave -> synthwave, and so on),
-      then delete the old theme code. Never leave a reader on a theme that no longer exists.
+    - **Moving over:** a reader's saved theme keeps working. An old theme that duplicates a base
+      one maps to it once (parchment or sepia -> paper, graphite -> slate, vaporwave -> synthwave);
+      one with no base twin stays as an extra. Never leave a reader on a theme that no longer exists.
     - **Not themes:** skins for a thing inside the app (chess boards and pieces, guitar skins, bike
       paint, per-album artwork palettes) are the app's own and stay.
-    - The standards check's `themes` column fails until the app offers the list and uses the palette.
+    - The standards check's `themes` column fails until the app offers the base list and uses the
+      palette. Extras never fail it.
     - See them all, and a minimal adoption, at `https://adervec.github.io/portal/themes.html`.
 
 25. **Session ledger.** When a session finishes (a workout, a run, a reading or typing session, a

@@ -121,7 +121,7 @@
     if ((lum(c.bg) < 0.2) !== t.dark) weak.push(t.id + ' dark flag');
   });
   ok('every theme is readable: ' + weak.join(', '), !weak.length);
-  ok('the list is 14 themes with unique ids', F.themes.length === 14 && new Set(F.themes.map(function (t) { return t.id; })).size === 14);
+  ok('the base list is 14 themes with unique ids', F.themes.length === 14 && F.baseThemes === 14 && new Set(F.themes.map(function (t) { return t.id; })).size === 14);
   var rootStyle = document.documentElement.style;
   ok('no choice means System, following the device', F.theme() === 'system' && F.themeNow().id === F.systemTheme() && rootStyle.getPropertyValue('--t-bg') === F.themeNow().colors.bg);
   var tp = document.createElement('app-theme-picker'); document.body.appendChild(tp);
@@ -131,6 +131,12 @@
   tsel.value = 'ember'; tsel.dispatchEvent(new Event('change'));
   ok('picking a theme sets the palette and says so', F.theme() === 'ember' && heard === 'ember' && rootStyle.getPropertyValue('--t-accent') === '#ff7a3d' && rootStyle.getPropertyValue('--t-scheme') === 'dark' && document.documentElement.dataset.houseTheme === 'ember');
   ok('the choice is kept per app', localStorage.getItem('maker-theme:font-selftest.html') === 'ember' && Object.keys(localStorage).filter(function (k) { return /^maker-theme/.test(k); }).length === 1);
+  var sakura = { id: 'sakura', label: 'Sakura', dark: false, colors: {} };
+  ['bg', 'surface', 'surface2', 'line', 'text', 'dim', 'accent', 'on-accent', 'good', 'warn', 'bad'].forEach(function (k, i) { sakura.colors[k] = i === 0 ? '#fff0f5' : '#33202a'; });
+  ok('an app can add its own themes after the base list', F.addThemes([sakura, { id: 'ember', colors: sakura.colors }, { id: 'broken', colors: { bg: 'red' } }]) === 1 && F.themes.length === 15 && F.baseThemes === 14 && F.themes[14].id === 'sakura' && F.themes[6].colors.accent === '#ff7a3d');
+  ok('the picker lists the extra too', tsel.options.length === 16 && tsel.options[15].textContent === 'Sakura');
+  F.setTheme('sakura');
+  ok('an extra theme can be chosen and sets the palette', F.theme() === 'sakura' && rootStyle.getPropertyValue('--t-bg') === '#fff0f5' && rootStyle.getPropertyValue('--t-scheme') === 'light');
   F.setTheme('nonsense');
   ok('an unknown theme falls back to System', F.theme() === 'system' && tsel.value === 'system' && !localStorage.getItem('maker-theme:font-selftest.html'));
   tp.remove();
