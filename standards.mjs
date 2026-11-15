@@ -175,7 +175,8 @@ const CHECKS = [
     const web = a.text.filter((x) => !/\.py$/.test(x.f)).map((x) => x.t).join('\n');
     const hasThemes = /data-theme|\bsetTheme\(|\bapplyTheme\(|themechip|theme-quick|(light|dark)[^\n]{0,30}\btheme\b|\btheme\b[^\n]{0,30}(light|dark)/i.test(web);
     if (!hasThemes) return ['-', 'single theme'];
-    return a.has(/prefers-color-scheme|systemTheme\(\)/) ? ok() : fail('default theme ignores the device light/dark setting');
+    // font.js's house theme list starts on System, which follows the device (standard 24)
+    return a.has(/prefers-color-scheme|systemTheme\(\)|app-theme-picker|appFont\.themes\b/) ? ok() : fail('default theme ignores the device light/dark setting');
   }],
   ['themes', 'One theme list (font.js themes)', (a) => {
     // Not applicable: MusicStudio's themes are per-album artwork palettes, not the app's own look.
@@ -253,7 +254,7 @@ const CHECKS = [
       const k = m[1] + (m[2] ? '*' : '');
       if (!HOUSE.test(k) && !covered(d.localStorage, m[2] ? m[1] : k)) missing.add('localStorage ' + k);
     }
-    for (const m of code.matchAll(/indexedDB\.open\(\s*['"]([^'"]+)/g)) if (!covered(d.indexedDB, m[1])) missing.add('IndexedDB ' + m[1]);
+    for (const m of code.matchAll(/indexedDB\.open\(\s*['"]([^'"]+)/g)) if (!HOUSE.test(m[1]) && !covered(d.indexedDB, m[1])) missing.add('IndexedDB ' + m[1]);
     if (missing.size) return fail('not declared in app-data.json: ' + [...missing].slice(0, 6).join(', ') + (missing.size > 6 ? ` (+${missing.size - 6})` : ''));
     return ok(`schema ${d.schema}`);
   }],
@@ -370,6 +371,7 @@ function selftest() {
     eq(inv(D, "localStorage.setItem('other-key', v)"), 'FAIL', 'an undeclared key fails');
     eq(inv(D, 'localStorage.setItem(`mm-x-${id}`, v)'), 'ok', 'a templated key under a declared prefix passes');
     eq(inv(D, "indexedDB.open('photos')"), 'FAIL', 'an undeclared database fails');
+    eq(inv(D, "indexedDB.open('cowork-ui', 1)"), 'ok', "cowork.js's own folder-handle database is the house's to declare");
     eq(inv({ localStorage: [] }, ''), 'FAIL', 'a missing schema number fails');
     eq(check('datainv', fake('')), 'FAIL', 'no app-data.json fails');
   }
