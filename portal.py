@@ -153,6 +153,13 @@ a{color:var(--acc)}
 h1{font:700 30px/1.15 var(--mono);letter-spacing:-.5px;margin:6px 0 10px}
 .head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 #bk{margin-left:auto}
+@media (max-width:430px){.head{gap:8px}.bk{padding:0 10px}}
+#suggest{font:14px var(--mono);margin:14px 0 8px}
+#setupopts label{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font:13px var(--mono)}
+#setupopts small{display:block;color:var(--mut);font-size:11px}
+#setupopts input[type=checkbox]{width:20px;height:20px}
+#setupopts input[type=number]{width:4.2em;font:inherit;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px}
+footer.page .nfmb{padding:0;min-height:0;font:inherit}
 body:not(.showhid) .nfm{display:none!important}
 .showhid .nfm{opacity:.55}
 .nfmb{font:11px var(--mono);color:var(--mut);background:none;border:0;cursor:pointer;text-decoration:underline;padding:8px 0;min-height:32px}
@@ -469,9 +476,81 @@ function activity(){var ev=[];try{ev=JSON.parse(localStorage.getItem(AKEY)||"[]"
   // rows from the reader's other devices, fetched by hub.js when signed in
   try{var rem=JSON.parse(localStorage.getItem("portal-activity-remote")||"[]");if(Array.isArray(rem))ev=ev.concat(rem)}catch(err){}
   ev=ev.filter(function(x){return Array.isArray(x)&&x.length>=3&&APPKIND[x[1]]&&!HID[x[1]]});
+  // the same session logged by two apps (a run in GymTracker and in Run315) counts once: same kind,
+  // different app, within 45 minutes; the larger one is kept. ponytail: time only, no route matching.
+  var sec=function(x){return +x[0]>2e10?x[0]/1000:+x[0]},once=[];
+  ev.sort(function(p,q){return sec(p)-sec(q)});
+  ev.forEach(function(x){var t=sec(x);
+    for(var i=once.length-1;i>=0&&t-sec(once[i])<2700;i--){var y=once[i];
+      if(y[2]===x[2]&&y[1]!==x[1]){if((+x[3]||1)>(+y[3]||1))once[i]=x;return;}}
+    once.push(x);});
+  ev=once;
   var real=ev.length>0,u=usage();
   if(!real)Object.keys(u).forEach(function(s){if(APPKIND[s]&&!HID[s])ev.push([u[s].last,s,APPKIND[s],.25*Math.min(u[s].n,8)])});
   return{events:ev,real:real};}
+// this week (chunk 5): a weekly target for each attribute the reader chose. Any app that trains the
+// attribute counts, the week is the unit (no daily demands), and a met target means done.
+var STATDESC={STR:"strength",END:"endurance",DEX:"hand skill",INT:"knowledge",PSI:"focus",CHR:"expression",VIT:"health upkeep"};
+var DEFH={STR:2,END:2},setupAuto=false;
+function feeds(slug,s){var m=KIND[APPKIND[slug]]||{};return m[s]||0}
+function hrs(v){var m=Math.round(v*60);return m<60?m+" min":(Math.round(v*10)/10)+" h"}
+function trainers(s){return Object.keys(APPKIND).filter(function(k){return !HID[k]&&feeds(k,s)>=.6})}
+function thisWeek(a){
+  var sec=d.getElementById("today"),setup=d.getElementById("setup");
+  if(!window.hubPrefs||!ACT){sec.hidden=true;setup.hidden=true;return;}
+  var p=hubPrefs.get(),goals=p.goals,gs=STATS.filter(function(s){return goals[s]>0});
+  if(!gs.length){sec.hidden=true;window.__weeks=0;if(!p.onboarded&&setup.hidden){openSetup();setupAuto=true;}return;}
+  if(setupAuto){setup.hidden=true;setupAuto=false;}
+  sec.hidden=false;
+  var ws=window.appFont?appFont.weekStart():1,t=new Date();t.setHours(0,0,0,0);
+  var start=t.getTime()-((t.getDay()-ws+7)%7)*864e5,W=6048e5,wk=[],use={};  // wk[n][STAT] = hours, n weeks back
+  for(var n=0;n<12;n++)wk.push({});
+  if(a.real)a.events.forEach(function(x){var ts=+x[0]>2e10?+x[0]:x[0]*1000,n=Math.max(0,Math.ceil((start-ts)/W));
+    if(n>11)return;var m=KIND[x[2]]||KIND[APPKIND[x[1]]]||{},amt=(+x[3]||1)/6;  // an amount of 1 is about ten minutes
+    Object.keys(m).forEach(function(s){wk[n][s]=(wk[n][s]||0)+amt*m[s];
+      if(m[s]>=.6&&n<8){(use[s]=use[s]||{})[x[1]]=(use[s][x[1]]||0)+1}});});
+  var box=d.getElementById("goals"),behind=null;box.innerHTML="";
+  gs.forEach(function(s){var have=wk[0][s]||0,want=goals[s],done=have>=want;
+    var nm=d.createElement("span");nm.className="nm";nm.textContent=s;
+    var bar=d.createElement("span");bar.className="bar";var i=d.createElement("i");i.style.width=Math.round(100*Math.min(1,have/want))+"%";bar.appendChild(i);
+    var l=d.createElement("span");l.className="lv";l.textContent=done?"done ✓":hrs(have)+" of "+hrs(want);
+    box.appendChild(nm);box.appendChild(bar);box.appendChild(l);
+    if(!done&&(!behind||have/want<behind.r))behind={s:s,r:have/want,left:want-have};});
+  var sg=d.getElementById("suggest");sg.textContent="";
+  if(!behind)sg.textContent="All of this week's targets are met. Rest, or do whatever you like.";
+  else{var u=use[behind.s]||{},c=trainers(behind.s).sort(function(p,q){return (u[q]||0)-(u[p]||0)||feeds(q,behind.s)-feeds(p,behind.s)});
+    sg.appendChild(d.createTextNode("Next up: "+behind.s+" ("+STATDESC[behind.s]+"), "+hrs(behind.left)+" to go this week. "));
+    var tl=c.length&&d.querySelector('.tiles a[data-slug="'+c[0]+'"]');
+    if(tl){var b=d.createElement("a");b.href=tl.dataset.url;b.textContent=(u[c[0]]?"Your usual: ":"Try ")+TITLES[c[0]];
+      b.addEventListener("click",function(ev){ev.preventDefault();launch(c[0],b.href)});sg.appendChild(b);}}
+  var met=function(n){return gs.every(function(s){return (wk[n][s]||0)>=goals[s]})},wot=0;
+  for(var n=1;n<12&&met(n);n++)wot++;
+  if(met(0))wot++;
+  window.__weeks=wot;
+  d.getElementById("weeksline").textContent=wot?wot+" week"+(wot>1?"s":"")+" on target":"no full week on target yet";}
+function openSetup(){var box=d.getElementById("setupopts"),g=hubPrefs.get().goals;box.innerHTML="";
+  STATS.forEach(function(s){var l=d.createElement("label"),c=d.createElement("input"),h=d.createElement("input"),tx=d.createElement("span");
+    c.type="checkbox";c.checked=g[s]>0;c.dataset.stat=s;
+    h.type="number";h.min=.5;h.max=40;h.step=.5;h.value=g[s]||DEFH[s]||1;h.dataset.hours=s;h.setAttribute("aria-label",s+": hours a week");
+    var b=d.createElement("b");b.textContent=s;var sm=d.createElement("small");
+    sm.textContent=trainers(s).map(function(k){return TITLES[k]}).join(", ")||"no app on your hub trains this yet";
+    tx.appendChild(b);tx.appendChild(d.createTextNode(" "+STATDESC[s]));tx.appendChild(sm);
+    l.appendChild(c);l.appendChild(tx);l.appendChild(h);l.appendChild(d.createTextNode("h a week"));box.appendChild(l);});
+  d.getElementById("setup").hidden=false;}
+d.getElementById("setupsave").addEventListener("click",function(){var g={},any=false;
+  d.querySelectorAll("#setupopts [data-stat]").forEach(function(c){
+    var h=d.querySelector('#setupopts [data-hours="'+c.dataset.stat+'"]');
+    g[c.dataset.stat]=c.checked?Math.max(.5,Math.min(40,+h.value||1)):0;any=any||c.checked;});
+  setupAuto=false;d.getElementById("setup").hidden=true;
+  hubPrefs.setGoals(g);hubPrefs.sync(false).catch(function(){});
+  // apps that train none of the chosen attributes: offer to take them off the hub (their data stays)
+  var idle=Object.keys(APPKIND).filter(function(k){return !HID[k]&&!STATS.some(function(s){return g[s]>0&&feeds(k,s)>0})}),off=d.getElementById("hideoffer");
+  off.hidden=!any||!idle.length;
+  if(!off.hidden)d.getElementById("hidenames").textContent=idle.length+" app"+(idle.length>1?"s":"")+" on your hub train"+(idle.length>1?"":"s")+" none of these: "+idle.map(function(k){return TITLES[k]}).join(", ")+". ";
+  d.getElementById("hideidle").onclick=function(){idle.forEach(function(k){hubPrefs.hide(k,true)});off.hidden=true;hubPrefs.sync(false).catch(function(){});};});
+d.getElementById("hidekeep").addEventListener("click",function(){d.getElementById("hideoffer").hidden=true});
+d.getElementById("setupskip").addEventListener("click",function(){setupAuto=false;d.getElementById("setup").hidden=true;hubPrefs.setGoals({});});
+d.querySelectorAll(".editgoals").forEach(function(b){b.addEventListener("click",function(){if(!window.hubPrefs)return;setupAuto=false;openSetup();d.getElementById("setup").scrollIntoView({block:"nearest"});});});
 function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},rate21={};
   STATS.forEach(function(s){score[s]=0;by[s]={}});
   a.events.forEach(function(x){var ts=+x[0]>2e10?x[0]/1000:+x[0],age=(now-ts)/86400;if(!(age>=0))return;
@@ -479,6 +558,7 @@ function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},ra
     Object.keys(m).forEach(function(s){score[s]+=w*m[s];by[s][x[1]]=(by[s][x[1]]||0)+w*m[s]});
     if(age<7)rate7[x[1]]=(rate7[x[1]]||0)+(+x[3]||1)/7;
     else if(age<28)rate21[x[1]]=(rate21[x[1]]||0)+(+x[3]||1)/21;});
+  thisWeek(a);
   var host=d.getElementById("sheet");
   if(!ACT||!a.events.length){host.hidden=true;d.getElementById("ask").hidden=true;return;}
   host.hidden=false;
@@ -547,7 +627,7 @@ function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},ra
   Object.keys(days).forEach(function(k){if(k<56){var wd=(new Date(t0-k*DAY).getDay()+6)%7;by7[wd]=(by7[wd]||0)+days[k].tot}});
   var best=Object.keys(by7).sort(function(p,q){return by7[q]-by7[p]})[0],
       names=["Mondays","Tuesdays","Wednesdays","Thursdays","Fridays","Saturdays","Sundays"];
-  d.getElementById("actsum").innerHTML="your activity \u00b7 "+(streak?"<b>🔥 "+streak+"-day streak</b> \u00b7 ":"")
+  d.getElementById("actsum").innerHTML="your activity \u00b7 "+(window.__weeks?"<b>"+window.__weeks+" week"+(window.__weeks>1?"s":"")+" on target</b> \u00b7 ":"")
     +"<b>"+Math.round(wk)+"</b> this week"+(best!==undefined?" \u00b7 busiest on <b>"+names[best]+"</b>":"");
   var jl=d.getElementById("journal"),rows=[];
   for(var k=0;k<14;k++){if(!days[k])continue;var dt=new Date(t0-k*DAY);
@@ -1108,6 +1188,19 @@ def write_site(data):
 <button id="install" class="install" type="button" hidden>Install</button>
 <button id="theme" class="toggle" type="button" aria-label="theme">◐</button></div>
 <h1>Free, local-first web apps</h1>
+<section class="you" id="setup" hidden>
+<h2 class="eyebrow">// what do you want to work on?</h2>
+<p class="caption">Pick two to four. Each gets a weekly target, and any app that trains it counts toward it: typing, handwriting and guitar all fill the same DEX bar. Nothing is asked of you daily.</p>
+<div id="setupopts"></div>
+<p><button id="setupsave" class="bk" type="button">Save</button> <button id="setupskip" class="nfmb" type="button">not now</button></p>
+</section>
+<section class="you" id="today" hidden>
+<h2 class="eyebrow">// this week</h2>
+<div class="cs" id="goals"></div>
+<p id="suggest"></p>
+<p id="hideoffer" class="caption" hidden><span id="hidenames"></span><button id="hideidle" class="nfmb" type="button">hide them</button> · <button id="hidekeep" class="nfmb" type="button">keep them</button></p>
+<p class="caption"><span id="weeksline"></span> · <button class="nfmb editgoals" type="button">change what I'm working on</button></p>
+</section>
 <nav class="tiles" aria-label="Apps">{tiles}</nav>
 <p class="hint">tap a tile for details · <b>hold</b> to launch — a ✓ marks an app you've installed,
 and holding opens that copy · keys <kbd>1</kbd>–<kbd>0</kbd> launch too</p>
@@ -1148,6 +1241,7 @@ their own window and the ones marked <i>offline</i> keep working without a conne
 This portal installs the same way.</p>
 <footer class="page"><span>generated {e(time.strftime('%Y-%m-%d %H:%M'))}</span>
 <span>usage counts live only in this browser</span><span id="you"></span>
+<span><button class="nfmb editgoals" type="button">weekly targets</button></span>
 <span><a href="settings.html">Settings &amp; privacy</a></span>
 <span><a href="feed.xml">RSS</a></span>
 <span><a href="https://github.com/{USER}">github.com/{USER}</a></span></footer>

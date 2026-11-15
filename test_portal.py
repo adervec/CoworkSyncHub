@@ -82,7 +82,7 @@ assert "stateOf" in (tmp / "cowork-selftest.html").read_text(encoding="utf-8")
 assert 'id="sheet"' in page and "const APPKIND=" in page and '"portal-activity"' in page and "var KIND=" in page
 assert all(f'"{a["slug"]}": "{a["kind"]}"' in page for a in portal.APPS)
 assert 'id="radar"' in page and "portal-levels" in page and 'id="lvlups"' in page
-assert 'id="heat"' in page and 'id="journal"' in page and "const HUES=" in page and "-day streak" in page
+assert 'id="heat"' in page and 'id="journal"' in page and "const HUES=" in page and "on target" in page and "-day streak" not in page
 # the portal is a cowork app too: review channel via the shared panel; digit keys launch tiles
 assert 'id="ask"' in page and '"review/request.json"' in page and 'src="../cowork.js"' in page
 assert "aim:{DEX:1" in page and '"MusicStudio": "compose"' in page  # new-app kinds feed the sheet

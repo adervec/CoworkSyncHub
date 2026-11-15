@@ -69,6 +69,18 @@ ok('Sign in shows in the top bar, no account yet', await shown(p1, '#signin') &&
 ok('character sheet shows by default', await shown(p1, '#sheet'));
 ok('no sideways scroll on a phone', await p1.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1);
 
+// ---- first visit: what do you want to work on? ----
+ok('the first visit asks what to work on', await shown(p1, '#setup') && !(await shown(p1, '#today')));
+await p1.check('#setupopts [data-stat=STR]'); await p1.check('#setupopts [data-stat=DEX]');
+await p1.click('#setupsave');
+const goalsText = () => p1.textContent('#goals');
+ok('the choices become weekly targets', !(await shown(p1, '#setup')) && await shown(p1, '#today') && (await p1.$$('#goals .nm')).length === 2 && /STR.*of 2 h/.test(await goalsText()) && /DEX.*of 1 h/.test(await goalsText()));
+ok('launch counts alone are not progress', /0 min of 2 h/.test(await goalsText()) && /no full week/.test(await p1.textContent('#weeksline')));
+ok('it offers to hide apps that train none of them', await shown(p1, '#hideoffer') && /Run315/.test(await p1.textContent('#hidenames')) && !/GymTracker,/.test(await p1.textContent('#hidenames')));
+await p1.click('#hidekeep');
+await p1.reload();
+ok('the targets survive a reload and the question is not asked again', await shown(p1, '#today') && !(await shown(p1, '#setup')));
+
 await p1.click('#gymtracker315 .nfmb');
 ok('"Not for me" removes the card and the tile', !(await slugs(p1)).includes('GymTracker315') && !(await shown(p1, '.tiles a[data-slug=GymTracker315]')));
 ok('the count and the hidden line follow', (await p1.textContent('#count')).startsWith(all.length - 1 + ' of ' + (all.length - 1)) && /1 app hidden/.test(await p1.textContent('#hidn')));
@@ -92,9 +104,17 @@ ok('the hub remembers its theme', (await themeNow()) === t2);
 await p1.evaluate(() => appFont.setTheme('system'));
 
 // ---- device 1 has done some sessions (the apps call appFont.logSession) ----
-await p1.evaluate(() => { for (let i = 0; i < 3; i++) appFont.logSession({ app: 'Run315', kind: 'cardio', minutes: 30, id: 'run' + i, at: Date.now() - i * 864e5 }); });
+await p1.evaluate(() => {
+  const now = Date.now();
+  for (let i = 0; i < 3; i++) appFont.logSession({ app: 'Run315', kind: 'cardio', minutes: 30, id: 'run' + i, at: now - i * 864e5 });
+  appFont.logSession({ app: 'GymTracker315', kind: 'cardio', minutes: 30, id: 'same-run', at: now }); // the same run, logged by a second app
+  appFont.logSession({ app: 'GuitarPicker', kind: 'practice', minutes: 60, id: 'gp1', at: now });
+});
 await p1.reload();
-ok('logged sessions show on the hub', /3 activities reported/.test(await p1.textContent('#sheetnote')) && /Run315/.test(await p1.textContent('#stats')));
+ok('logged sessions show on the hub, a run logged by two apps once', /4 activities reported/.test(await p1.textContent('#sheetnote')) && /Run315/.test(await p1.textContent('#stats')));
+ok('an hour of guitar meets the DEX target', /DEX.*done/.test(await goalsText()) && /STR.*0 min of 2 h/.test(await goalsText()));
+ok('the suggestion is the attribute behind, with an app for it', /Next up: STR/.test(await p1.textContent('#suggest')) && /2 h to go/.test(await p1.textContent('#suggest')) && /GymTracker|Bodybuilding/.test(await p1.textContent('#suggest a')));
+ok('no day streak is shown', !/streak/.test(await p1.textContent('#actsum')));
 
 // ---- device 1 signs in, then hides two apps ----
 await p1.click('#signin');
@@ -105,7 +125,7 @@ await synced(() => hidden() === 'GymTracker315,Tachyread');
 ok('hidden apps reach the Drive file', hidden() === 'GymTracker315,Tachyread');
 const ledgers = () => Object.keys(drive).filter(k => k.startsWith('hub-ledger-'));
 await synced(() => ledgers().length === 1);
-ok('this device\'s sessions go to its own Drive file', ledgers().length === 1 && JSON.parse(drive[ledgers()[0]]).length === 3 && /Run315/.test(drive[ledgers()[0]]));
+ok('this device\'s sessions go to its own Drive file', ledgers().length === 1 && JSON.parse(drive[ledgers()[0]]).length === 5 && /Run315/.test(drive[ledgers()[0]]));
 ok('the token is not kept in storage', await p1.evaluate(t => !JSON.stringify(Object.entries(localStorage)).includes(t), TOKEN));
 
 // ---- device 2: a desktop, fresh browser ----
@@ -116,7 +136,8 @@ await p2.click('#signin');
 await p2.waitForFunction(() => document.querySelectorAll('.grid .app.nfm').length === 2, null, { timeout: 5000 }).catch(() => {});
 ok('signing in brings the hidden apps to the second device', !(await slugs(p2)).includes('GymTracker315') && !(await slugs(p2)).includes('Tachyread'));
 await p2.waitForFunction(() => /Run315/.test(localStorage.getItem('portal-activity-remote') || ''), null, { timeout: 5000 }).catch(() => {});
-ok('the second device sees the first one\'s sessions', /3 activities reported/.test(await p2.textContent('#sheetnote')) && /Run315/.test(await p2.textContent('#stats')));
+ok('the second device sees the first one\'s sessions', /4 activities reported/.test(await p2.textContent('#sheetnote')) && /Run315/.test(await p2.textContent('#stats')));
+ok('and its weekly targets, without being asked again', await shown(p2, '#today') && !(await shown(p2, '#setup')) && /DEX.*done/.test(await p2.textContent('#goals')));
 ok('a device with no sessions writes no file', ledgers().length === 1);
 // both devices now change something without seeing the other: the merge keeps both
 await p2.click('#chessretabled .nfmb');
