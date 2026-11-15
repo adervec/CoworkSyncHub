@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{used} iskorišteno od {quota} dostupno",
  "Send feedback": "Pošalji povratnu informaciju",
  "Back up my data": "Sigurnosno kopiraj moje podatke",
- "Backup failed": "Sigurnosno kopiranje nije uspjelo"
+ "Backup failed": "Sigurnosno kopiranje nije uspjelo",
+ "Theme": "Tema",
+ "Light": "Svijetla",
+ "Dark": "Tamna",
+ "Midnight": "Ponoć",
+ "Slate": "Škriljevac",
+ "Ocean": "Ocean",
+ "Forest": "Šuma",
+ "Ember": "Žeravica",
+ "Gold": "Zlato",
+ "Synthwave": "Synthwave",
+ "Terminal": "Terminal",
+ "Paper": "Papir",
+ "Pastel": "Pastel",
+ "Mono": "Jednobojna",
+ "High contrast": "Visoki kontrast"
 }

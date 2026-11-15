@@ -1147,7 +1147,7 @@ This portal installs the same way.</p>
                             "BETA: the maker's preview. <a style='color:#fff' href='/portal/'>Live portal</a></p><main", 1)
         page = page.replace("<head>", "<head><meta name='robots' content='noindex'>", 1)
     (PORTAL_DIR / "index.html").write_text(page, encoding="utf-8")
-    for f in ("backup.html", "settings.html", "hub.js", "font.js"):  # the Backup page, with its own font.js so the beta can run ahead of the live one
+    for f in ("backup.html", "settings.html", "themes.html", "hub.js", "font.js"):  # the Backup page, with its own font.js so the beta can run ahead of the live one
         shutil.copy(BASE / f, PORTAL_DIR / f)
     write_feed(data)
     write_pwa(stamp)

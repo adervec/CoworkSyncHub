@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{used} استفاده‌شده از {quota} در دسترس",
  "Send feedback": "ارسال بازخورد",
  "Back up my data": "پشتیبان‌گیری از داده‌های من",
- "Backup failed": "پشتیبان‌گیری ناموفق بود"
+ "Backup failed": "پشتیبان‌گیری ناموفق بود",
+ "Theme": "پوسته",
+ "Light": "روشن",
+ "Dark": "تیره",
+ "Midnight": "نیمه‌شب",
+ "Slate": "سنگ لوح",
+ "Ocean": "اقیانوس",
+ "Forest": "جنگل",
+ "Ember": "اخگر",
+ "Gold": "طلایی",
+ "Synthwave": "سینث‌ویو",
+ "Terminal": "ترمینال",
+ "Paper": "کاغذ",
+ "Pastel": "پاستلی",
+ "Mono": "تک‌رنگ",
+ "High contrast": "کنتراست بالا"
 }

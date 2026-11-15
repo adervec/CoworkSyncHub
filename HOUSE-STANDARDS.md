@@ -184,6 +184,29 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - The registry of apps is `CoworkSyncHub/apps.json` (published at `adervec.github.io/apps.json`).
       Add an app there, not in `portal.py`.
 
+24. **One theme list.** Every app offers exactly the same colour themes, under the same names:
+    System (the default, follows the device), Light, Dark, Midnight, Slate, Ocean, Forest, Ember,
+    Gold, Synthwave, Terminal, Paper, Pastel, Mono, High contrast. The list and the palettes live in
+    font.js and nowhere else; an app does not add, drop or rename a theme.
+    - **Offer it:** put `<app-theme-picker></app-theme-picker>` in the settings, or build your own
+      control from `appFont.themes` (`[{ id, label, dark, colors }]`), `appFont.theme()` (the
+      choice, or `'system'`) and `appFont.setTheme(id)`. Show names through `t()`.
+    - **Use it:** font.js sets the palette in force on `<html>`: `--t-bg --t-surface --t-surface2
+      --t-line --t-text --t-dim --t-accent --t-on-accent --t-good --t-warn --t-bad`, plus
+      `--t-scheme` (`color-scheme: var(--t-scheme)`), `data-house-theme` and `data-house-dark`.
+      Map them onto the app's own variables (`--bg: var(--t-bg)`), deriving any extra shade with
+      `color-mix()`. For canvas or chart colours read `appFont.themeNow().colors` and redraw on the
+      `app-theme-change` event.
+    - **Per app:** the choice is stored per app, so each app can wear a different theme. Do not
+      share one key across apps.
+    - **Moving over:** map a reader's saved old theme to the nearest house theme once (ember ->
+      ember, parchment or sepia -> paper, graphite -> slate, vaporwave -> synthwave, and so on),
+      then delete the old theme code. Never leave a reader on a theme that no longer exists.
+    - **Not themes:** skins for a thing inside the app (chess boards and pieces, guitar skins, bike
+      paint, per-album artwork palettes) are the app's own and stay.
+    - The standards check's `themes` column fails until the app offers the list and uses the palette.
+    - See them all, and a minimal adoption, at `https://adervec.github.io/portal/themes.html`.
+
 ## Working habits
 
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you. Also run `node ../CoworkSyncHub/layout-check.mjs <App>` (the live site, phone and desktop) and fix what it flags.

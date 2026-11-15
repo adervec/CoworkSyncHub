@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{quota} उपलब्ध में से {used} इस्तेमाल हुआ",
  "Send feedback": "प्रतिक्रिया भेजें",
  "Back up my data": "मेरे डेटा का बैकअप लें",
- "Backup failed": "बैकअप विफल रहा"
+ "Backup failed": "बैकअप विफल रहा",
+ "Theme": "थीम",
+ "Light": "हल्का",
+ "Dark": "गहरा",
+ "Midnight": "मध्यरात्रि",
+ "Slate": "स्लेट",
+ "Ocean": "महासागर",
+ "Forest": "वन",
+ "Ember": "अंगार",
+ "Gold": "सुनहरा",
+ "Synthwave": "सिंथवेव",
+ "Terminal": "टर्मिनल",
+ "Paper": "काग़ज़",
+ "Pastel": "पेस्टल",
+ "Mono": "एकरंगी",
+ "High contrast": "उच्च कंट्रास्ट"
 }

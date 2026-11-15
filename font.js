@@ -835,6 +835,78 @@
       .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]');
   }
 
+  // ---- One theme list for every app (house standard 24) ---------------------------------------------
+  // Every app offers exactly these themes, under these names. The choice is kept per app, so one app
+  // can be Ember while another is Paper; "System" (the default) follows the device's light/dark.
+  // font.js sets the chosen palette on <html> as CSS variables, and each app maps them onto its own:
+  //   --t-bg --t-surface --t-surface2 --t-line --t-text --t-dim --t-accent --t-on-accent --t-good --t-warn --t-bad
+  //   --t-scheme (light | dark, for `color-scheme: var(--t-scheme)`), data-house-theme="<id>", data-house-dark="1|0"
+  // To change the list, change it HERE and nowhere else (font-selftest checks every palette's contrast).
+  // i18n-keys: Light | Dark | Midnight | Slate | Ocean | Forest | Ember | Gold | Synthwave | Terminal | Paper | Pastel | Mono | High contrast
+  var T_VARS = ['bg', 'surface', 'surface2', 'line', 'text', 'dim', 'accent', 'on-accent', 'good', 'warn', 'bad'];
+  var themes = [
+    //  id            name             dark  bg     surface surface2 line   text   dim    accent on-acc good   warn   bad
+    ['light',     'Light',         0, 'f7f8fa ffffff eef0f4 d5d9e0 14171f 5b6472 1d4ed8 ffffff 15803d a16207 b91c1c'],
+    ['dark',      'Dark',          1, '121418 1a1d23 23272f 343a45 e8eaee 9aa3b2 7aa2ff 0b1220 4ade80 fbbf24 f87171'],
+    ['midnight',  'Midnight',      1, '0b0d14 12151f 1e2333 2a3042 e6e9f0 8a93a8 8b9dff 0b0d14 4ade80 fbbf24 f87171'],
+    ['slate',     'Slate',         1, '1c2128 242a33 2d343f 3f4856 e6eaf0 9ba6b5 8fb4d9 10151b 6ee7a0 f5c451 f58b8b'],
+    ['ocean',     'Ocean',         1, '071a24 0c2431 12303f 1f4a5e e2f1f7 8fb3c2 38bdf8 04131b 5eead4 fcd34d fca5a5'],
+    ['forest',    'Forest',        1, '0d1610 132018 1a2b20 2c4434 e3efe5 93ad9a 5fd38a 07140c 7ee2a0 e9c46a f28b82'],
+    ['ember',     'Ember',         1, '1a0f0b 24150f 301c14 4a2c1f f6e7dc c09a86 ff7a3d 1a0f0b 86d992 ffc857 ff8a80'],
+    ['gold',      'Gold',          1, '17130a 201a0d 2a2212 4a3c1e f5ecd6 b8a57a e6b422 17130a a3d977 ffb86b ff8a80'],
+    ['synthwave', 'Synthwave',     1, '1b0033 2a0a4a 381466 5a2a8a f6e9ff c9a9ec ff4fd8 1b0033 5eead4 ffd166 ff7a90'],
+    ['terminal',  'Terminal',      1, '030803 061006 0a1d0e 1d3a22 9dffb0 5fa870 39ff6a 030803 39ff6a e6e04a ff6b6b'],
+    ['paper',     'Paper',         0, 'f6f0e2 fffaf0 ede4d0 d6c9ab 2b2418 6b5d45 9a3412 ffffff 3f6212 92400e b91c1c'],
+    ['pastel',    'Pastel',        0, 'f3eef7 ffffff ebe3f2 d9cde6 33293d 6f6180 7c3aed ffffff 166534 8a5206 be123c'],
+    ['mono',      'Mono',          0, 'ffffff ffffff f0f0f0 b5b5b5 111111 555555 111111 ffffff 1a6b2f 7a5200 a11212'],
+    ['contrast',  'High contrast', 1, '000000 000000 1a1a1a ffffff ffffff e0e0e0 ffe600 000000 00ff7f ffe600 ff6b6b'],
+  ].map(function (t) {
+    var c = {};
+    t[3].split(' ').forEach(function (hex, i) { c[T_VARS[i]] = '#' + hex; });
+    return { id: t[0], label: t[1], dark: !!t[2], colors: c };
+  });
+  var themeById = function (id) { return themes.filter(function (t) { return t.id === id; })[0]; };
+  var T_KEY = function () { return 'maker-theme:' + appKey(); };
+  // the reader's choice for THIS app: a theme id, or 'system' when they have not chosen
+  function themeChoice() { var v = store.get(T_KEY()); return v && themeById(v) ? v : 'system'; }
+  // the theme in force now: { id, label, dark, colors } ('system' resolved to light or dark)
+  function themeNow() { var id = themeChoice(); return themeById(id === 'system' ? systemTheme() : id); }
+  function applyTheme() {
+    var t = themeNow(), r = document.documentElement;
+    T_VARS.forEach(function (k) { r.style.setProperty('--t-' + k, t.colors[k]); });
+    r.style.setProperty('--t-scheme', t.dark ? 'dark' : 'light');
+    r.dataset.houseTheme = t.id; r.dataset.houseDark = t.dark ? '1' : '0';
+  }
+  function setTheme(id) {
+    store.set(T_KEY(), themeById(id) ? id : null); // 'system' or anything unknown clears the choice
+    applyTheme();
+    document.dispatchEvent(new CustomEvent('app-theme-change', { detail: themeNow() }));
+  }
+  applyTheme();
+  if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', function () {
+    if (themeChoice() !== 'system') return; // a saved choice always wins (standard 14)
+    applyTheme();
+    document.dispatchEvent(new CustomEvent('app-theme-change', { detail: themeNow() }));
+  });
+  // <app-theme-picker label="Theme">: a plain labelled <select> in the light DOM, like the font picker
+  if (window.customElements && !customElements.get('app-theme-picker')) {
+    customElements.define('app-theme-picker', class extends HTMLElement {
+      connectedCallback() {
+        if (this.firstChild) return;
+        if (!houseReady && lang() !== 'en') { var me = this; ready.then(function () { if (!me.firstChild) me.connectedCallback(); }); return; }
+        var label = document.createElement('label'), select = document.createElement('select');
+        [{ id: 'system', label: 'System' }].concat(themes).forEach(function (t) {
+          var o = document.createElement('option'); o.value = t.id; o.textContent = tr(t.label); select.appendChild(o);
+        });
+        select.value = themeChoice();
+        select.addEventListener('change', function () { setTheme(select.value); });
+        document.addEventListener('app-theme-change', function () { select.value = themeChoice(); });
+        label.append((this.getAttribute('label') || tr('Theme')) + ' ', select);
+        this.appendChild(label);
+      }
+    });
+  }
+
   // ---- Google sign-in and the private Drive folder, one copy for everyone (hub roadmap chunk 3) -------
   // The hub and its Backup and Settings pages use this; apps still carry their own copy and should
   // move here (see HOUSE-STANDARDS). The access token lives in memory only. What is remembered is the
@@ -1081,6 +1153,7 @@
   window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice,
     esc: esc, html: html, safeUrl: safeUrl, parseJSON: parseJSON, randomId: randomId, redact: redact,
     zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice,
+    themes: themes, theme: themeChoice, themeNow: themeNow, setTheme: setTheme,
     google: { token: googleToken, signedIn: googleSignedIn, signOut: googleSignOut, read: driveRead, write: driveWrite },
     backup: { list: backupList, peek: backupPeek, build: backupBuild, download: backupDownload },
     diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,

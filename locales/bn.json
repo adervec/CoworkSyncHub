@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{quota} উপলব্ধের মধ্যে {used} ব্যবহৃত",
  "Send feedback": "মতামত পাঠান",
  "Back up my data": "আমার ডেটার ব্যাকআপ নিন",
- "Backup failed": "ব্যাকআপ ব্যর্থ হয়েছে"
+ "Backup failed": "ব্যাকআপ ব্যর্থ হয়েছে",
+ "Theme": "থিম",
+ "Light": "হালকা",
+ "Dark": "গাঢ়",
+ "Midnight": "মধ্যরাত",
+ "Slate": "স্লেট",
+ "Ocean": "সমুদ্র",
+ "Forest": "অরণ্য",
+ "Ember": "অঙ্গার",
+ "Gold": "সোনালি",
+ "Synthwave": "সিন্থওয়েভ",
+ "Terminal": "টার্মিনাল",
+ "Paper": "কাগজ",
+ "Pastel": "প্যাস্টেল",
+ "Mono": "একরঙা",
+ "High contrast": "উচ্চ কনট্রাস্ট"
 }

@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{used} imetumika kati ya {quota} inayopatikana",
  "Send feedback": "Tuma maoni",
  "Back up my data": "Hifadhi nakala ya data yangu",
- "Backup failed": "Kuhifadhi nakala kumeshindikana"
+ "Backup failed": "Kuhifadhi nakala kumeshindikana",
+ "Theme": "Mandhari",
+ "Light": "Angavu",
+ "Dark": "Giza",
+ "Midnight": "Usiku wa manane",
+ "Slate": "Kijivu cha jiwe",
+ "Ocean": "Bahari",
+ "Forest": "Msitu",
+ "Ember": "Kaa la moto",
+ "Gold": "Dhahabu",
+ "Synthwave": "Synthwave",
+ "Terminal": "Terminali",
+ "Paper": "Karatasi",
+ "Pastel": "Pastel",
+ "Mono": "Rangi moja",
+ "High contrast": "Utofautishaji wa juu"
 }

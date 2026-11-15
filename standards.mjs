@@ -177,6 +177,13 @@ const CHECKS = [
     if (!hasThemes) return ['-', 'single theme'];
     return a.has(/prefers-color-scheme|systemTheme\(\)/) ? ok() : fail('default theme ignores the device light/dark setting');
   }],
+  ['themes', 'One theme list (font.js themes)', (a) => {
+    // Not applicable: MusicStudio's themes are per-album artwork palettes, not the app's own look.
+    if (/^MusicStudio$/.test(a.app.dir)) return ['-', 'per-album palettes'];
+    if (!a.has(/<app-theme-picker|appFont\??\.(themes|setTheme|theme\(|themeNow)/)) return fail('does not offer the house theme list (appFont.themes / <app-theme-picker>)');
+    if (!a.has(/var\(\s*--t-(bg|surface|text|accent)|themeNow\(\)\.colors|app-theme-change/)) return fail('offers the list but never uses the palette (--t-* variables)');
+    return ok();
+  }],
   ['live', 'Live check + release tag after deploy', (a) => {
     const viaWorkflow = a.workflows.some((w) => /CoworkSyncHub\/\.github\/workflows\/after-deploy\.yml/.test(w.t));
     const viaScript = ['scripts/deploy.mjs', 'deploy.sh'].map((f) => path.join(a.root, f)).filter(existsSync).some((f) => /live-check\.mjs/.test(readFileSync(f, 'utf8')));
@@ -324,6 +331,9 @@ function selftest() {
   eq(check('3p', fake('<a href="https://www.openstreetmap.org/x">map</a> fetch("https://api.dropboxapi.com/2/files")')), 'ok', 'links and connected APIs are not page loads');
   eq(check('a11y', fake('/* house font: CoworkSyncHub/font.js, published at adervec.github.io/font.js */')), 'FAIL', 'a comment naming font.js is not loading it');
   eq(check('a11y', fake('<script src="https://adervec.github.io/font.js"></script>')), 'ok', 'a real font.js load passes');
+  eq(check('themes', fake('<select id="theme"><option>ember</option></select> body{background:var(--bg)}')), 'FAIL', 'an own theme list fails');
+  eq(check('themes', fake('<app-theme-picker></app-theme-picker> body{background:#fff}')), 'FAIL', 'the picker without the palette fails');
+  eq(check('themes', fake('<app-theme-picker></app-theme-picker> :root{--bg:var(--t-bg)}')), 'ok', 'the house list mapped onto the app passes');
   eq(check('theme', fake('const THEMES = [...new Set(works.flatMap(w => w.themes))]')), '-', 'subject-tag "themes" are not colour themes');
   eq(check('theme', fake('document.documentElement.setAttribute("data-theme", localStorage.getItem("t") || "ember")')), 'FAIL', 'a theme default that ignores the device fails');
   eq(check('theme', fake('data-theme ... matchMedia("(prefers-color-scheme: light)")')), 'ok', 'a device-aware default passes');

@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{used} terpakai dari {quota} tersedia",
  "Send feedback": "Kirim masukan",
  "Back up my data": "Cadangkan data saya",
- "Backup failed": "Pencadangan gagal"
+ "Backup failed": "Pencadangan gagal",
+ "Theme": "Tema",
+ "Light": "Terang",
+ "Dark": "Gelap",
+ "Midnight": "Tengah malam",
+ "Slate": "Batu sabak",
+ "Ocean": "Samudra",
+ "Forest": "Hutan",
+ "Ember": "Bara",
+ "Gold": "Emas",
+ "Synthwave": "Synthwave",
+ "Terminal": "Terminal",
+ "Paper": "Kertas",
+ "Pastel": "Pastel",
+ "Mono": "Mono",
+ "High contrast": "Kontras tinggi"
 }

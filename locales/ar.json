@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{used} مستخدمة من {quota} متاحة",
  "Send feedback": "إرسال ملاحظات",
  "Back up my data": "نسخ بياناتي احتياطيًا",
- "Backup failed": "فشل النسخ الاحتياطي"
+ "Backup failed": "فشل النسخ الاحتياطي",
+ "Theme": "السمة",
+ "Light": "فاتح",
+ "Dark": "داكن",
+ "Midnight": "منتصف الليل",
+ "Slate": "أردوازي",
+ "Ocean": "محيط",
+ "Forest": "غابة",
+ "Ember": "جمر",
+ "Gold": "ذهبي",
+ "Synthwave": "سينث ويف",
+ "Terminal": "طرفية",
+ "Paper": "ورق",
+ "Pastel": "باستيل",
+ "Mono": "أحادي اللون",
+ "High contrast": "تباين عالٍ"
 }

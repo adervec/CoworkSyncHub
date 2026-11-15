@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{used} usados de {quota} disponíveis",
  "Send feedback": "Enviar feedback",
  "Back up my data": "Fazer cópia de segurança dos meus dados",
- "Backup failed": "A cópia de segurança falhou"
+ "Backup failed": "A cópia de segurança falhou",
+ "Theme": "Tema",
+ "Light": "Claro",
+ "Dark": "Escuro",
+ "Midnight": "Meia-noite",
+ "Slate": "Ardósia",
+ "Ocean": "Oceano",
+ "Forest": "Floresta",
+ "Ember": "Brasa",
+ "Gold": "Ouro",
+ "Synthwave": "Synthwave",
+ "Terminal": "Terminal",
+ "Paper": "Papel",
+ "Pastel": "Pastel",
+ "Mono": "Mono",
+ "High contrast": "Alto contraste"
 }

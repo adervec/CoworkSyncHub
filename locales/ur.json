@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{quota} دستیاب میں سے {used} استعمال شدہ",
  "Send feedback": "رائے بھیجیں",
  "Back up my data": "میرے ڈیٹا کا بیک اپ لیں",
- "Backup failed": "بیک اپ ناکام ہو گیا"
+ "Backup failed": "بیک اپ ناکام ہو گیا",
+ "Theme": "تھیم",
+ "Light": "ہلکا",
+ "Dark": "گہرا",
+ "Midnight": "آدھی رات",
+ "Slate": "سلیٹ",
+ "Ocean": "سمندر",
+ "Forest": "جنگل",
+ "Ember": "انگارہ",
+ "Gold": "سنہرا",
+ "Synthwave": "سنتھ ویو",
+ "Terminal": "ٹرمینل",
+ "Paper": "کاغذ",
+ "Pastel": "پیسٹل",
+ "Mono": "یک رنگ",
+ "High contrast": "زیادہ کنٹراسٹ"
 }

@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "використано {used} з {quota} доступних",
  "Send feedback": "Надіслати відгук",
  "Back up my data": "Створити резервну копію моїх даних",
- "Backup failed": "Не вдалося створити резервну копію"
+ "Backup failed": "Не вдалося створити резервну копію",
+ "Theme": "Тема",
+ "Light": "Світла",
+ "Dark": "Темна",
+ "Midnight": "Північ",
+ "Slate": "Сланець",
+ "Ocean": "Океан",
+ "Forest": "Ліс",
+ "Ember": "Жар",
+ "Gold": "Золото",
+ "Synthwave": "Synthwave",
+ "Terminal": "Термінал",
+ "Paper": "Папір",
+ "Pastel": "Пастель",
+ "Mono": "Монохром",
+ "High contrast": "Висока контрастність"
 }

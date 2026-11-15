@@ -107,6 +107,33 @@
   lt.remove();
   await new Promise(function (r) { setTimeout(r, 30); });
   ok('removing the block (a framework re-render) takes its button too', !lb.isConnected);
+  // one theme list (house standard 24): every palette readable, the choice kept per app, System follows the device
+  var lum = function (hex) { var v = [1, 3, 5].map(function (i) { var c = parseInt(hex.substr(i, 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+  var cr = function (a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  var weak = [];
+  F.themes.forEach(function (t) {
+    var c = t.colors, need = t.id === 'contrast' ? 7 : 4.5;
+    [['text', 'bg', 7], ['text', 'surface', 7], ['text', 'surface2', need], ['dim', 'bg', need], ['dim', 'surface', need], ['on-accent', 'accent', 4.5],
+      ['accent', 'bg', 3], ['good', 'bg', 4.5], ['warn', 'bg', 4.5], ['bad', 'bg', 4.5], ['good', 'surface', 4.5], ['warn', 'surface', 4.5], ['bad', 'surface', 4.5]].forEach(function (p) {
+      var r = cr(c[p[0]], c[p[1]]);
+      if (r < p[2]) weak.push(t.id + ' ' + p[0] + '/' + p[1] + ' ' + r.toFixed(2) + '<' + p[2]);
+    });
+    if ((lum(c.bg) < 0.2) !== t.dark) weak.push(t.id + ' dark flag');
+  });
+  ok('every theme is readable: ' + weak.join(', '), !weak.length);
+  ok('the list is 14 themes with unique ids', F.themes.length === 14 && new Set(F.themes.map(function (t) { return t.id; })).size === 14);
+  var rootStyle = document.documentElement.style;
+  ok('no choice means System, following the device', F.theme() === 'system' && F.themeNow().id === F.systemTheme() && rootStyle.getPropertyValue('--t-bg') === F.themeNow().colors.bg);
+  var tp = document.createElement('app-theme-picker'); document.body.appendChild(tp);
+  var tsel = tp.querySelector('select'), heard = null;
+  document.addEventListener('app-theme-change', function (ev) { heard = ev.detail.id; });
+  ok('the picker lists System and every theme', tsel && tsel.options.length === 15 && tsel.options[0].value === 'system');
+  tsel.value = 'ember'; tsel.dispatchEvent(new Event('change'));
+  ok('picking a theme sets the palette and says so', F.theme() === 'ember' && heard === 'ember' && rootStyle.getPropertyValue('--t-accent') === '#ff7a3d' && rootStyle.getPropertyValue('--t-scheme') === 'dark' && document.documentElement.dataset.houseTheme === 'ember');
+  ok('the choice is kept per app', localStorage.getItem('maker-theme:font-selftest.html') === 'ember' && Object.keys(localStorage).filter(function (k) { return /^maker-theme/.test(k); }).length === 1);
+  F.setTheme('nonsense');
+  ok('an unknown theme falls back to System', F.theme() === 'system' && tsel.value === 'system' && !localStorage.getItem('maker-theme:font-selftest.html'));
+  tp.remove();
   localStorage.removeItem('maker-font');
   document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
 })();

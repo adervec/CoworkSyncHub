@@ -59,5 +59,20 @@
  "{used} used of {quota} available": "{used} uzataj el {quota} disponeblaj",
  "Send feedback": "Sendi komenton",
  "Back up my data": "Sekurkopii miajn datumojn",
- "Backup failed": "Sekurkopio malsukcesis"
+ "Backup failed": "Sekurkopio malsukcesis",
+ "Theme": "Etoso",
+ "Light": "Hela",
+ "Dark": "Malhela",
+ "Midnight": "Noktomezo",
+ "Slate": "Ardezo",
+ "Ocean": "Oceano",
+ "Forest": "Arbaro",
+ "Ember": "Ardaĵo",
+ "Gold": "Oro",
+ "Synthwave": "Synthwave",
+ "Terminal": "Terminalo",
+ "Paper": "Papero",
+ "Pastel": "Pastelo",
+ "Mono": "Unukolora",
+ "High contrast": "Alta kontrasto"
 }

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="app-name" content="House themes">
+<title>House themes</title>
+<script>window.appFontBase = '/fonts/';</script>
+<script src="font.js"></script>
+<style>
+/* This page is also the smallest example of adopting the list: map --t-* onto your own variables. */
+:root { color-scheme: var(--t-scheme); --bg: var(--t-bg); --card: var(--t-surface); --ink: var(--t-text) }
+body { font-family: var(--app-font, system-ui); margin: 0 auto; padding: 16px; max-width: 1100px; background: var(--bg); color: var(--ink); line-height: 1.5 }
+h1 { margin: 0 0 4px } .dim { color: var(--t-dim) } a { color: var(--t-accent) }
+select { font: inherit; padding: 6px; background: var(--card); color: var(--ink); border: 1px solid var(--t-line); border-radius: 8px }
+#all { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 16px }
+.c { padding: 12px; border-radius: 12px; cursor: pointer; border: 2px solid transparent; text-align: left; font: inherit }
+.c[aria-pressed=true] { border-color: var(--t-accent) }
+.s { padding: 8px; border-radius: 8px; margin: 6px 0; border: 1px solid }
+.b { display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: 600 }
+</style></head><body>
+<p class="dim"><a href="./">&larr; all apps</a></p>
+<h1>House themes</h1>
+<p class="dim">Every app offers this same list (house standard 24). Each app remembers its own choice. Tap one to try it on this page.</p>
+<app-theme-picker></app-theme-picker>
+<div id="all"></div>
+<script>
+(function () {
+  var box = document.getElementById('all');
+  var el = function (tag, text, style) { var x = document.createElement(tag); if (text != null) x.textContent = text; if (style) x.style.cssText = style; return x; };
+  appFont.themes.forEach(function (t) {
+    var c = t.colors, d = el('button', null, 'background:' + c.bg + ';color:' + c.text);
+    d.type = 'button'; d.className = 'c'; d.dataset.id = t.id;
+    d.appendChild(el('b', appFont.t(t.label)));
+    var card = el('div', 'Card text', 'background:' + c.surface + ';border-color:' + c.line); card.className = 's';
+    card.appendChild(el('div', 'dimmer note', 'color:' + c.dim));
+    var inner = el('div', 'inner', 'background:' + c.surface2 + ';border-color:' + c.line); inner.className = 's'; card.appendChild(inner);
+    d.appendChild(card);
+    var b = el('span', 'Button', 'background:' + c.accent + ';color:' + c['on-accent']); b.className = 'b'; d.appendChild(b);
+    d.appendChild(el('span', ' link', 'color:' + c.accent));
+    var row = el('div');
+    ['good', 'warn', 'bad'].forEach(function (k) { row.appendChild(el('span', k + ' ', 'color:' + c[k])); });
+    d.appendChild(row);
+    d.addEventListener('click', function () { appFont.setTheme(t.id); });
+    box.appendChild(d);
+  });
+  function mark() { [].forEach.call(box.children, function (d) { d.setAttribute('aria-pressed', String(d.dataset.id === appFont.theme())); }); }
+  document.addEventListener('app-theme-change', mark); mark();
+})();
+</script>
+</body></html>
