@@ -144,7 +144,10 @@ body{margin:0;color:var(--ink);font:15px/1.5 var(--sans);
 main{max-width:1140px;margin:0 auto;padding:28px 20px 60px}
 a{color:var(--acc)}
 h1{font:700 30px/1.15 var(--mono);letter-spacing:-.5px;margin:6px 0 10px}
-.head{display:flex;align-items:center;gap:12px}
+.head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.bk{margin-left:auto;display:inline-flex;align-items:center;height:36px;padding:0 14px;font:600 12px var(--mono);
+  color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;text-decoration:none;white-space:nowrap}
+.bk~.install,.bk~.toggle{margin-left:0}
 .wordmark{font:600 13px var(--mono);color:var(--mut);letter-spacing:.5px}
 .toggle{width:36px;height:36px;font-size:16px;color:var(--ink);cursor:pointer;
   background:var(--card);border:1px solid var(--line);border-radius:9px}
@@ -334,7 +337,7 @@ tick();setInterval(tick,30000);
 // usage counts, and the registry each installed app writes about itself (both
 // same-origin localStorage, this browser only — nothing leaves the device)
 var KEY="portal-usage",IKEY="portal-installed",VKEY="portal-visit";
-try{var lastBk=+localStorage.getItem("portal-last-backup");if(lastBk)d.getElementById("bk").textContent="Backup (last "+rel((Date.now()-lastBk)/1000)+" ago)"}catch(err){}
+try{var lastBk=+localStorage.getItem("portal-last-backup");if(lastBk)d.getElementById("bk").textContent="Backup · "+rel((Date.now()-lastBk)/1000)+" ago"}catch(err){}
 var freshOnly=false,fresh={};  // apps that shipped since the visit you last acknowledged
 function usage(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch(err){return{}}}
 // Each app restamps its entry every installed launch. Nothing can tell us about an
@@ -1057,6 +1060,7 @@ def write_site(data):
 <script src="../cowork.js" defer></script>
 <style>{PORTAL_CSS}</style></head><body><main>
 <div class="head"><div class="wordmark">{USER}.github.io</div>
+<a id="bk" class="bk" href="backup.html">Backup &amp; sign-in</a>
 <button id="install" class="install" type="button" hidden>Install</button>
 <button id="theme" class="toggle" type="button" aria-label="theme">◐</button></div>
 <h1>Free, local-first web apps</h1>
@@ -1099,7 +1103,6 @@ their own window and the ones marked <i>offline</i> keep working without a conne
 This portal installs the same way.</p>
 <footer class="page"><span>generated {e(time.strftime('%Y-%m-%d %H:%M'))}</span>
 <span>usage counts live only in this browser</span><span id="you"></span>
-<span><a href="backup.html" id="bk">Back up your data</a></span>
 <span><a href="feed.xml">RSS</a></span>
 <span><a href="https://github.com/{USER}">github.com/{USER}</a></span></footer>
 </main><script>const GEN={now:.0f};const FLEET={json.dumps(fleet)};const CHANGES={json.dumps(recent)};const APPKIND={json.dumps({a['slug']: a['kind'] for a in APPS})};const HUES={json.dumps({a['slug']: a['hue'] for a in APPS})};const TITLES={json.dumps({a['slug']: a['title'] for a in APPS})};{PORTAL_JS}</script></body></html>"""
