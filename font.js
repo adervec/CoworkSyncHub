@@ -835,6 +835,78 @@
       .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]');
   }
 
+  // ---- Google sign-in and the private Drive folder, one copy for everyone (hub roadmap chunk 3) -------
+  // The hub and its Backup and Settings pages use this; apps still carry their own copy and should
+  // move here (see HOUSE-STANDARDS). The access token lives in memory only. What is remembered is the
+  // address of the account last chosen (maker-google-hint), so the next sign-in skips the chooser.
+  // The client id is public (an identifier, not a secret); Google honours it only from registered origins.
+  var G_CLIENT = window.appGoogleClient || '547617739897-br6dj2facmsc34qnkjb5u4dbfhju39pu.apps.googleusercontent.com';
+  var G_SCOPE = 'openid email profile https://www.googleapis.com/auth/drive.appdata';
+  var G_HINT = 'maker-google-hint';
+  var gTok = null, gLoading = null;
+  function gLoad() {
+    return gLoading || (gLoading = new Promise(function (res, rej) {
+      if (window.google && google.accounts && google.accounts.oauth2) return res();
+      var s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.onload = function () { res(); };
+      s.onerror = function () { gLoading = null; rej(new Error('Could not load Google sign-in.')); };
+      document.head.appendChild(s);
+    }));
+  }
+  var googleSignedIn = function () { return !!gTok && gTok.exp > Date.now() + 60000; };
+  // -> a promise of an access token. { silent: true } never shows Google's window to the reader: it
+  // rejects instead (browsers also block it outside a tap, so call it from one when it matters).
+  function googleToken(opts) {
+    if (googleSignedIn()) return Promise.resolve(gTok.value);
+    return gLoad().then(function () {
+      return new Promise(function (res, rej) {
+        google.accounts.oauth2.initTokenClient({
+          client_id: G_CLIENT, scope: G_SCOPE, login_hint: store.get(G_HINT) || undefined,
+          callback: function (r) {
+            if (!r || !r.access_token) return rej(new Error((r && r.error) || 'Sign-in failed.'));
+            gTok = { value: r.access_token, exp: Date.now() + (+r.expires_in || 3600) * 1000 };
+            res(gTok.value);
+          },
+          error_callback: function (e) { rej(new Error((e && (e.message || e.type)) || 'Sign-in was dismissed.')); },
+        }).requestAccessToken({ prompt: opts && opts.silent ? 'none' : '' });
+      });
+    }).then(function (t) {
+      // house standard 1: the picture sits in the top bar while signed in
+      return fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + t } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) { if (j) { setAccount({ name: j.name || j.email || 'Google', picture: j.picture || '', email: j.email || '' }); store.set(G_HINT, j.email || null); } })
+        .catch(function () { /* cosmetic only */ })
+        .then(function () { return t; });
+    });
+  }
+  // forgets the account here; the grant itself stays, since the apps share it
+  function googleSignOut() { gTok = null; store.set(G_HINT, null); setAccount(null); }
+  function gApi(path, init) {
+    return googleToken({ silent: true }).then(function (t) {
+      init = init || {};
+      return fetch('https://www.googleapis.com/' + path, { method: init.method, body: init.body, headers: Object.assign({ Authorization: 'Bearer ' + t }, init.headers) });
+    }).then(function (r) { if (!r.ok) throw new Error('Google Drive answered ' + r.status + '.'); return r; });
+  }
+  function gFind(name) {
+    var q = "name='" + String(name).replace(/['\\]/g, '\\$&') + "' and trashed=false";
+    return gApi('drive/v3/files?spaces=appDataFolder&fields=files(id)&q=' + encodeURIComponent(q))
+      .then(function (r) { return r.json(); }).then(function (j) { return ((j.files || [])[0] || {}).id || null; });
+  }
+  // one named file in the private folder: -> its text, or null when there is none yet
+  function driveRead(name) {
+    return gFind(name).then(function (id) { return id ? gApi('drive/v3/files/' + id + '?alt=media').then(function (r) { return r.text(); }) : null; });
+  }
+  function driveWrite(name, text) {
+    return gFind(name).then(function (id) {
+      if (id) return gApi('upload/drive/v3/files/' + id + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: text });
+      var b = 'b' + randomId().replace(/-/g, '');
+      var body = '--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name: name, parents: ['appDataFolder'] }) +
+        '\r\n--' + b + '\r\nContent-Type: application/json\r\n\r\n' + text + '\r\n--' + b + '--';
+      return gApi('upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body: body });
+    }).then(function () {});
+  }
+
   // ---- Cold backup (hub roadmap chunk 2a) ------------------------------------------------------------
   // Every app shares the origin, so one page can read all of their settings and databases into one
   // file the reader keeps wherever they like. This half only READS: nothing here writes app data.
@@ -1006,6 +1078,7 @@
   window.appFont = { options: options, get: get, set: set, buildLabel: buildLabel, updateNotice: updateNotice,
     esc: esc, html: html, safeUrl: safeUrl, parseJSON: parseJSON, randomId: randomId, redact: redact,
     zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice,
+    google: { token: googleToken, signedIn: googleSignedIn, signOut: googleSignOut, read: driveRead, write: driveWrite },
     backup: { list: backupList, peek: backupPeek, build: backupBuild, download: backupDownload },
     diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,
     whatsNew: whatsNew, checkWhatsNew: checkWhatsNew, setWhatsNewSilenced: setWhatsNewSilenced,

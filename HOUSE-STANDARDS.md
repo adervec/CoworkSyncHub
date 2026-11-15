@@ -33,6 +33,12 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
    `appFont.setAccount({ name, email, picture })` after sign-in (`setAccount(null)` on sign-out);
    handle `app-account-click` to open the sync settings. An app's own always-visible header avatar
    (GymTracker's banner, a header sync chip with the picture) also meets it.
+   - **Sign in once (to do, per app):** font.js now carries the sign-in and Drive code every app
+     copies: `appFont.google.token({ silent })`, `.read(name)`, `.write(name, text)`, `.signOut()`.
+     It remembers the account last chosen (`maker-google-hint`), so a reader who signed in on the
+     hub is not asked to pick again. When you next touch an app's sync, move it onto these and
+     delete its own copy. Tokens stay in memory. Hub settings live in `hub-prefs.json` (hub.js);
+     an app never writes that file.
 2. **House font**: Atkinson Hyperlegible by default, reader-changeable (font.js).
 3. **Cowork** (the GymTracker / Tachyread style): named channels, each with fixed request files,
    instructions and a reply format, declared in a `cowork.json` manifest; a schedule per channel

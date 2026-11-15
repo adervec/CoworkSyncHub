@@ -59,8 +59,6 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
 <script>
 (function () {
   'use strict';
-  // Public OAuth client id shared by the apps (an identifier, not a secret); read-only use here.
-  var CLIENT_ID = '547617739897-br6dj2facmsc34qnkjb5u4dbfhju39pu.apps.googleusercontent.com';
   var HOUSE = /^(maker-|portal-|app-|cowork-)/;
   var BIG = 150e6; // a file above this is not opened whole when checking it
   var $ = function (id) { return document.getElementById(id); };
@@ -214,22 +212,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
     }).catch(function (e) { $('local').textContent = ''; $('local').appendChild(el('p', 'Could not read this browser\'s data: ' + (e.message || e), 'bad')); });
   }
 
-  // ---- Google Drive (read-only; the token stays in memory) -------------------------------------------
-  function loadGis() {
-    return new Promise(function (res, rej) {
-      if (window.google && google.accounts && google.accounts.oauth2) return res();
-      var s = el('script'); s.src = 'https://accounts.google.com/gsi/client'; s.onload = function () { res(); };
-      s.onerror = function () { rej(new Error('Could not load Google sign-in.')); };
-      document.head.appendChild(s);
-    });
-  }
-  function token() {
-    return new Promise(function (res, rej) {
-      google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.appdata',
-        callback: function (r) { r && r.access_token ? res(r.access_token) : rej(new Error((r && r.error) || 'Sign-in failed.')); },
-        error_callback: function (e) { rej(new Error((e && (e.message || e.type)) || 'Sign-in was dismissed.')); } }).requestAccessToken({ prompt: '' });
-    });
-  }
+  // ---- Google Drive (read-only; sign-in is font.js's appFont.google) -------------------------------------------
   function driveApi(path) {
     return fetch('https://www.googleapis.com/drive/v3/files' + path, { headers: { Authorization: 'Bearer ' + driveToken } }).then(function (r) {
       if (r.status === 401) throw new Error('The Google sign-in has run out. Reload this page and sign in again.');
@@ -244,7 +227,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
       return driveApi('?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,modifiedTime,mimeType,size)' + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))
         .then(function (r) { return r.json(); }).then(function (j) { files = files.concat(j.files || []); return j.nextPageToken ? page(j.nextPageToken) : files; });
     };
-    return loadGis().then(token).then(function (t) { driveToken = t; return page(); });
+    return appFont.google.token().then(function (t) { driveToken = t; return page(); });
   }
   // ',"drive":[{name,modifiedTime,mimeType,text|b64},…]' one file at a time, each handed over as its own Blob
   async function writeDrive(files, push, say) {

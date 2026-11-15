@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data: blob: https:; object-src 'none'; base-uri 'none'">
+<meta name="app-name" content="Hub settings">
+<title>Hub settings</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<script>window.appFontBase = '/fonts/';</script>
+<script src="font.js"></script>
+<script src="hub.js"></script>
+<style>
+:root { color-scheme: light dark }
+body { font-family: var(--app-font, system-ui); margin: 0 auto; padding: 16px; max-width: 760px; background: Canvas; color: CanvasText; line-height: 1.5 }
+h1 { margin: 0 0 4px } h2 { margin: 28px 0 8px; font-size: 1.15rem }
+p, ul { margin: 8px 0 } .dim { opacity: .75; font-size: .92rem }
+button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, CanvasText 30%, transparent); background: Canvas; color: CanvasText; cursor: pointer; min-height: 44px }
+button.main { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600 }
+button.danger { border-color: #dc2626; color: #dc2626 }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 }
+label.opt { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid color-mix(in srgb, CanvasText 10%, transparent) }
+label.opt input { width: 22px; height: 22px; flex: none }
+.bad { color: #dc2626; font-weight: 600 }
+#beta { margin: -16px -16px 12px; padding: 6px 12px; background: #b45309; color: #fff; font-weight: 600; text-align: center }
+</style></head><body>
+<p id="beta" hidden>BETA: the maker's preview</p>
+<p class="dim"><a href="./">&larr; all apps</a></p>
+<h1>Hub settings</h1>
+
+<h2>Your account</h2>
+<p class="dim">Signing in is optional. It lets your hub settings follow you to your other devices, through one small file in a private folder of your Google Drive. Google asks again after an hour or on your next visit: one tap, no password.</p>
+<div class="row"><app-account show-name size="36"></app-account>
+<button id="in" class="main" type="button">Sign in with Google</button>
+<button id="syncnow" type="button" hidden>Sync now</button>
+<button id="out" type="button" hidden>Sign out</button>
+<span id="acctMsg" class="dim" aria-live="polite"></span></div>
+
+<h2>Apps on your hub</h2>
+<p class="dim">Untick an app that is not for you. It leaves the hub's tiles, cards, character sheet and suggestions. Nothing is deleted: its data stays, and it still appears in backups.</p>
+<div id="apps"></div>
+
+<h2>Your activity</h2>
+<label class="opt"><input id="activity" type="checkbox"> <span>Show my activity from the apps on the hub (character sheet, habits, streak)</span></label>
+<p class="dim">The apps note what you did (a workout, a reading session) in this browser, and the hub reads it here to draw the sheet. It is never sent anywhere.</p>
+
+<h2>What is stored, and where</h2>
+<ul>
+<li><b>In this browser:</b> everything each app keeps for you, plus the hub's own notes: which apps you opened and when, which are on your home screen, your activity, your theme and these settings.</li>
+<li><b>In your Google Drive, only if you sign in:</b> each app's synced copy and the hub's settings file, in a private folder that only these apps can read. It is not among your Drive files.</li>
+<li><b>With the maker: nothing.</b> There are no accounts, servers or tracking. The maker cannot see your data.</li>
+<li><b>Other services the pages talk to:</b> Google, for sign-in and Drive, when you use them.</li>
+</ul>
+<div class="row"><button id="tobackup" type="button">Back up my data</button>
+<button id="erase" class="danger" type="button">Erase the hub's own data</button><span id="eraseMsg" aria-live="polite"></span></div>
+<p class="dim">Erasing clears the hub's notes in this browser (opens, activity, hidden apps, last backup). It does not touch any app's data or your Drive.</p>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, text, cls) { var x = document.createElement(tag); if (text != null) x.textContent = text; if (cls) x.className = cls; return x; };
+  if (/portal-beta/.test(location.pathname)) $('beta').hidden = false;
+  var WORDS = { off: '', pulled: 'Settings loaded from your Drive.', pushed: 'Settings saved to your Drive.', both: 'Settings merged with your Drive.', same: 'Settings are up to date.' };
+
+  function paintAccount() {
+    var a = appFont.getAccount();
+    $('in').hidden = !!a; $('out').hidden = !a; $('syncnow').hidden = !a;
+  }
+  function say(t, bad) { $('acctMsg').className = bad ? 'bad' : 'dim'; $('acctMsg').textContent = t; }
+  function run(p) { say('Working…'); return p.then(function (r) { say(WORDS[r] || ''); }, function (e) { say(e.message || String(e), true); }).then(paintAccount); }
+  $('in').addEventListener('click', function () { run(hubPrefs.signIn()); });
+  $('syncnow').addEventListener('click', function () { run(hubPrefs.sync(false)); });
+  $('out').addEventListener('click', function () { appFont.google.signOut(); say('Signed out on this device.'); paintAccount(); });
+  document.addEventListener('app-account-change', paintAccount);
+  // a change made here goes to Drive straight away when signed in (the tap allows Google's window if it is needed)
+  function changed() { if (appFont.getAccount()) run(hubPrefs.sync(false)); }
+
+  var apps = [];
+  function paintPrefs() {
+    var p = hubPrefs.get(), box = $('apps');
+    $('activity').checked = p.activity;
+    box.textContent = '';
+    apps.forEach(function (a) {
+      var l = el('label', null, 'opt'), c = el('input');
+      c.type = 'checkbox'; c.checked = p.hidden.indexOf(a.slug) < 0; c.dataset.slug = a.slug;
+      c.addEventListener('change', function () { hubPrefs.hide(a.slug, !c.checked); changed(); });
+      l.append(c, el('span', (a.emoji ? a.emoji + ' ' : '') + a.title));
+      box.appendChild(l);
+    });
+  }
+  $('activity').addEventListener('change', function () { hubPrefs.setActivity(this.checked); changed(); });
+  $('tobackup').addEventListener('click', function () { location.href = 'backup.html'; });
+  document.addEventListener('hub-prefs', paintPrefs);
+
+  $('erase').addEventListener('click', function () {
+    if (!confirm('Erase the hub\'s own notes in this browser? App data and your Drive are not touched.')) return;
+    var gone = 0;
+    Object.keys(localStorage).forEach(function (k) { if (/^portal-/.test(k)) { localStorage.removeItem(k); gone++; } });
+    $('eraseMsg').textContent = 'Erased ' + gone + ' item' + (gone === 1 ? '' : 's') + '.';
+    paintPrefs();
+  });
+
+  paintAccount();
+  window.settingsReady = fetch('/apps.json').then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    .then(function (list) { apps = list; paintPrefs(); });
+})();
+</script>
+</body></html>

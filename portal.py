@@ -145,7 +145,11 @@ main{max-width:1140px;margin:0 auto;padding:28px 20px 60px}
 a{color:var(--acc)}
 h1{font:700 30px/1.15 var(--mono);letter-spacing:-.5px;margin:6px 0 10px}
 .head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.bk{margin-left:auto;display:inline-flex;align-items:center;height:36px;padding:0 14px;font:600 12px var(--mono);
+#bk{margin-left:auto}
+body:not(.showhid) .nfm{display:none!important}
+.showhid .nfm{opacity:.55}
+.nfmb{font:11px var(--mono);color:var(--mut);background:none;border:0;cursor:pointer;text-decoration:underline;padding:8px 0;min-height:32px}
+.bk{cursor:pointer;display:inline-flex;align-items:center;height:36px;padding:0 14px;font:600 12px var(--mono);
   color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;text-decoration:none;white-space:nowrap}
 .bk~.install,.bk~.toggle{margin-left:0}
 .wordmark{font:600 13px var(--mono);color:var(--mut);letter-spacing:.5px}
@@ -337,7 +341,35 @@ tick();setInterval(tick,30000);
 // usage counts, and the registry each installed app writes about itself (both
 // same-origin localStorage, this browser only — nothing leaves the device)
 var KEY="portal-usage",IKEY="portal-installed",VKEY="portal-visit";
-try{var lastBk=+localStorage.getItem("portal-last-backup");if(lastBk)d.getElementById("bk").textContent="Backup · "+rel((Date.now()-lastBk)/1000)+" ago"}catch(err){}
+try{var lastBk=+localStorage.getItem("portal-last-backup");if(lastBk)d.getElementById("bk").title="last backup "+rel((Date.now()-lastBk)/1000)+" ago"}catch(err){}
+// hub preferences (hub.js): apps marked "Not for me" leave the tiles, cards, sheet and suggestions;
+// their data is untouched. A signed-in Google account carries the choices to other devices.
+var HID={},ACT=true;
+function applyPrefs(){var p=window.hubPrefs?hubPrefs.get():{hidden:[],activity:true};HID={};ACT=p.activity;
+  p.hidden.forEach(function(s){HID[s]=1});
+  d.querySelectorAll(".tiles a,.grid .app").forEach(function(el){el.classList.toggle("nfm",!!HID[el.dataset.slug])});
+  d.querySelectorAll(".grid .nfmb").forEach(function(b){b.textContent=HID[b.dataset.slug]?"Show on my hub":"Not for me"});
+  var n=p.hidden.filter(function(s){return APPKIND[s]}).length;
+  d.getElementById("hid").hidden=!n;
+  d.getElementById("hidn").textContent=n+" app"+(n>1?"s":"")+" hidden as not for you";
+  if(!n)d.body.classList.remove("showhid");
+  d.getElementById("hidshow").textContent=d.body.classList.contains("showhid")?"hide them again":"show them";}
+d.querySelectorAll(".grid .app").forEach(function(c){var b=d.createElement("button");
+  b.type="button";b.className="nfmb";b.dataset.slug=c.dataset.slug;
+  b.addEventListener("click",function(){if(!window.hubPrefs)return;
+    hubPrefs.hide(c.dataset.slug,!HID[c.dataset.slug]);hubPrefs.sync(false).catch(function(){});});
+  c.querySelector("footer").appendChild(b);});
+d.getElementById("hidshow").addEventListener("click",function(){d.body.classList.toggle("showhid");applyPrefs();});
+applyPrefs();
+d.addEventListener("hub-prefs",function(){applyPrefs();applyFilter();paintUsage();sheet();});
+// sign-in: a tap, because browsers only let Google's window open from one. Tokens stay in memory.
+var sb=d.getElementById("signin");
+function paintAcct(){sb.hidden=!window.appFont||!window.hubPrefs||!!appFont.getAccount()}
+paintAcct();d.addEventListener("app-account-change",paintAcct);
+d.addEventListener("app-account-click",function(){location.href="settings.html"});
+sb.addEventListener("click",function(){sb.disabled=true;sb.textContent="Signing in";
+  hubPrefs.signIn().then(function(){sb.textContent="Sign in"},function(){sb.textContent="Sign in: try again"})
+    .then(function(){sb.disabled=false;paintAcct()});});
 var freshOnly=false,fresh={};  // apps that shipped since the visit you last acknowledged
 function usage(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch(err){return{}}}
 // Each app restamps its entry every installed launch. Nothing can tell us about an
@@ -358,7 +390,7 @@ function paintUsage(){var u=usage(),ins=installed(),now=Date.now()/1000,tot=0,tr
   var rec=Object.keys(u).sort(function(a,b){return u[b].last-u[a].last}).slice(0,4),
       host=d.getElementById("recent");
   if(rec.length){host.hidden=false;var box=host.querySelector(".rr");box.innerHTML="";
-    rec.forEach(function(s){var c=d.getElementById(s.toLowerCase());if(!c)return;
+    rec.forEach(function(s){var c=d.getElementById(s.toLowerCase());if(!c||HID[s])return;
       var a=d.createElement("a");a.href="#"+s.toLowerCase();a.textContent=c.dataset.title;
       box.appendChild(a);});}}
 paintUsage();
@@ -394,7 +426,7 @@ d.querySelectorAll(".tiles a").forEach(function(a){
 // filter + count + empty state; badges are filter shortcuts
 var q=d.getElementById("q"),count=d.getElementById("count"),empty=d.getElementById("empty"),
     grid=d.querySelector(".grid");
-function cards(){return Array.prototype.slice.call(grid.querySelectorAll(".app"))}
+function cards(){return Array.prototype.slice.call(grid.querySelectorAll(".app:not(.nfm)"))}
 function applyFilter(){var v=q.value.toLowerCase(),n=0;
   cards().forEach(function(c){
     var show=c.dataset.k.indexOf(v)>=0&&(!freshOnly||!!fresh[c.dataset.slug]);
@@ -411,7 +443,7 @@ d.addEventListener("click",function(ev){
 d.addEventListener("keydown",function(ev){
   var t=ev.target.tagName;
   if(/^[0-9]$/.test(ev.key)&&t!=="INPUT"&&t!=="SELECT"&&t!=="TEXTAREA"&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey){
-    var tl=d.querySelectorAll(".tiles a")[ev.key==="0"?9:+ev.key-1];
+    var tl=d.querySelectorAll(".tiles a:not(.nfm)")[ev.key==="0"?9:+ev.key-1];
     if(tl){ev.preventDefault();launch(tl.dataset.slug,tl.dataset.url);}}
   if(ev.key==="/"&&t!=="INPUT"&&t!=="SELECT"&&t!=="TEXTAREA"){ev.preventDefault();q.focus();}
   if(ev.key==="Escape"&&t==="INPUT"){q.value="";applyFilter();}});
@@ -426,9 +458,9 @@ var KIND={lift:{STR:1,VIT:.3},cardio:{END:1,VIT:.4},ride:{END:1,VIT:.4},read:{IN
   aim:{DEX:1,PSI:.4},study:{INT:1,PSI:.3},compose:{PSI:.8,CHR:.6},art:{PSI:.8,INT:.4},listen:{PSI:.7,INT:.5}};
 function activity(){var ev=[];try{ev=JSON.parse(localStorage.getItem(AKEY)||"[]")}catch(err){}
   if(!Array.isArray(ev))ev=[];
-  ev=ev.filter(function(x){return Array.isArray(x)&&x.length>=3&&APPKIND[x[1]]});
+  ev=ev.filter(function(x){return Array.isArray(x)&&x.length>=3&&APPKIND[x[1]]&&!HID[x[1]]});
   var real=ev.length>0,u=usage();
-  if(!real)Object.keys(u).forEach(function(s){if(APPKIND[s])ev.push([u[s].last,s,APPKIND[s],.25*Math.min(u[s].n,8)])});
+  if(!real)Object.keys(u).forEach(function(s){if(APPKIND[s]&&!HID[s])ev.push([u[s].last,s,APPKIND[s],.25*Math.min(u[s].n,8)])});
   return{events:ev,real:real};}
 function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},rate21={};
   STATS.forEach(function(s){score[s]=0;by[s]={}});
@@ -438,7 +470,7 @@ function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},ra
     if(age<7)rate7[x[1]]=(rate7[x[1]]||0)+(+x[3]||1)/7;
     else if(age<28)rate21[x[1]]=(rate21[x[1]]||0)+(+x[3]||1)/21;});
   var host=d.getElementById("sheet");
-  if(!a.events.length){host.hidden=true;return;}
+  if(!ACT||!a.events.length){host.hidden=true;d.getElementById("ask").hidden=true;return;}
   host.hidden=false;
   var mx=Math.max.apply(null,STATS.map(function(s){return score[s]}))||1,st=d.getElementById("stats");st.innerHTML="";
   function level(v){return v?Math.min(20,Math.round(1+4*Math.log2(1+v))):1}
@@ -1058,9 +1090,11 @@ def write_site(data):
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <script src="../cowork.js" defer></script>
+<script>window.appFontBase="/fonts/"</script><script src="font.js"></script><script src="hub.js"></script>
 <style>{PORTAL_CSS}</style></head><body><main>
 <div class="head"><div class="wordmark">{USER}.github.io</div>
-<a id="bk" class="bk" href="backup.html">Backup &amp; sign-in</a>
+<a id="bk" class="bk" href="backup.html">Backup</a>
+<button id="signin" class="bk" type="button">Sign in</button><app-account id="me" size="32"></app-account>
 <button id="install" class="install" type="button" hidden>Install</button>
 <button id="theme" class="toggle" type="button" aria-label="theme">◐</button></div>
 <h1>Free, local-first web apps</h1>
@@ -1094,6 +1128,7 @@ or a person. It writes a review back and it shows here. Nothing is uploaded.</p>
 <option value="updated">Recently updated</option><option value="used">Your most used</option></select>
 </div>
 <div class="grid">{ship}{cards}</div>
+<p id="hid" class="note" hidden><span id="hidn"></span> · <button id="hidshow" class="nfmb" type="button">show them</button></p>
 <p id="empty" hidden>Nothing matches. <button id="clearq" type="button">Clear the filter</button></p>
 <p class="note"><b>Private by design:</b> one maker, {len(APPS)} free, open-source apps —
 no accounts, no servers, no tracking. Everything runs in your browser and your data stays on your device.</p>
@@ -1103,6 +1138,7 @@ their own window and the ones marked <i>offline</i> keep working without a conne
 This portal installs the same way.</p>
 <footer class="page"><span>generated {e(time.strftime('%Y-%m-%d %H:%M'))}</span>
 <span>usage counts live only in this browser</span><span id="you"></span>
+<span><a href="settings.html">Settings &amp; privacy</a></span>
 <span><a href="feed.xml">RSS</a></span>
 <span><a href="https://github.com/{USER}">github.com/{USER}</a></span></footer>
 </main><script>const GEN={now:.0f};const FLEET={json.dumps(fleet)};const CHANGES={json.dumps(recent)};const APPKIND={json.dumps({a['slug']: a['kind'] for a in APPS})};const HUES={json.dumps({a['slug']: a['hue'] for a in APPS})};const TITLES={json.dumps({a['slug']: a['title'] for a in APPS})};{PORTAL_JS}</script></body></html>"""
@@ -1111,7 +1147,7 @@ This portal installs the same way.</p>
                             "BETA: the maker's preview. <a style='color:#fff' href='/portal/'>Live portal</a></p><main", 1)
         page = page.replace("<head>", "<head><meta name='robots' content='noindex'>", 1)
     (PORTAL_DIR / "index.html").write_text(page, encoding="utf-8")
-    for f in ("backup.html", "font.js"):  # the Backup page, with its own font.js so the beta can run ahead of the live one
+    for f in ("backup.html", "settings.html", "hub.js", "font.js"):  # the Backup page, with its own font.js so the beta can run ahead of the live one
         shutil.copy(BASE / f, PORTAL_DIR / f)
     write_feed(data)
     write_pwa(stamp)
