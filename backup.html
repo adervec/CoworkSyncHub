@@ -28,6 +28,30 @@ button:disabled { opacity: .5; cursor: default }
 .kind { font-size: .75rem; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, CanvasText 12%, transparent); margin-right: 6px; white-space: nowrap }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-height: 320px; overflow: auto; background: color-mix(in srgb, CanvasText 6%, transparent); padding: 8px; border-radius: 8px; margin: 6px 0 }
 .warn { color: #b45309; font-weight: 600 } .bad { color: #dc2626; font-weight: 600 }
+.wrap { overflow-x: auto }
+#cmp { border-collapse: collapse; width: 100%; font-size: .92rem }
+#cmp th, #cmp td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid color-mix(in srgb, CanvasText 14%, transparent) }
+#cmp thead th { border-top: 0; font-size: .85rem }
+#cmp label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer }
+#cmp input[type=checkbox] { width: 20px; height: 20px; flex: none; margin: 1px 0 0 }
+#cmp .name { font: inherit; font-weight: 700; padding: 0; min-height: 0; border: 0; background: none; text-align: left; text-decoration: underline dotted; overflow-wrap: anywhere }
+#cmp .st { display: block; font-size: .8rem; font-weight: 400; opacity: .8 }
+#cmp .none { opacity: .5 }
+#cmp tr.detail td { background: color-mix(in srgb, CanvasText 4%, transparent) }
+#prog label { display: grid; grid-template-columns: 7.5em 1fr; gap: 2px 10px; align-items: center; margin: 8px 0 }
+#prog progress { width: 100%; height: 14px }
+#prog label[hidden] { display: none }
+.filebtn { box-sizing: border-box }
+@media (max-width: 560px) { /* phone: the app name on its own line, the two copies side by side under it */
+  #cmp, #cmp thead, #cmp tbody { display: block }
+  #cmp tr { display: grid; grid-template-columns: 1fr 1fr }
+  #cmp tr > th:first-child { grid-column: 1 / -1; padding-bottom: 0 }
+  #cmp thead th:first-child { display: none }
+  #cmp tbody td { border-top: 0 }
+  #cmp tr.detail, #cmp tr.detail td { display: block }
+  #cmp tr[hidden] { display: none }
+}
+#prog label span:last-child { grid-column: 2 }
 #beta { margin: -16px -16px 12px; padding: 6px 12px; background: #b45309; color: #fff; font-weight: 600; text-align: center }
 </style></head><body>
 <p id="beta" hidden>BETA: the maker's preview</p>
@@ -36,16 +60,18 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
 <p>Save a copy of everything these apps keep for you into one file, to store wherever you like: a USB stick, another cloud, an email to yourself. Your data never leaves this device unless you move the file.</p>
 <p id="last" class="dim"></p>
 
-<h2>On this device</h2>
-<p class="dim">Each browser, and on an iPhone each home-screen app, keeps its own data. This page sees what <i>this</i> browser holds. For an app on your iPhone home screen, use <b>Back up my data</b> in that app's About panel.</p>
+<h2>What you have, and where</h2>
+<p class="dim">Each row is an app. <b>This browser</b> is what this device holds right now. <b>Google Drive</b> is the synced copy kept by apps you signed in to, which also carries your other devices. They are two separate copies: tick the ones the file should hold.</p>
+<div class="row"><button id="driveBtn" type="button">Sign in with Google to show my Drive copy</button><span id="driveMsg" class="dim" aria-live="polite"></span></div>
 <div id="local"><p>Reading…</p></div>
+<p class="dim">Each browser, and on an iPhone each home-screen app, keeps its own data. For an app on your iPhone home screen, use <b>Back up my data</b> in that app's About panel.</p>
 
-<h2>Your Google Drive copy</h2>
-<p class="dim">Apps you signed in to also keep a synced copy in a private folder of your Google Drive. Adding it puts the data from your other devices into the same file.</p>
-<div class="row"><button id="driveBtn" type="button">Sign in with Google to add my Drive copy</button><span id="driveMsg" class="dim" aria-live="polite"></span></div>
-<div id="drive"></div>
-
-<div class="row"><button id="dl" class="main" type="button" disabled>Download backup</button><span id="dlMsg" aria-live="polite"></span></div>
+<p id="sum" aria-live="polite"></p>
+<div class="row"><button id="dl" class="main" type="button" disabled>Download backup</button><button id="cancel" type="button" hidden>Cancel</button><span id="dlMsg" aria-live="polite"></span></div>
+<div id="prog" hidden>
+<label><span>This browser</span><progress id="pl" value="0" max="1"></progress><span id="plt" class="dim"></span></label>
+<label id="pdrow"><span>Google Drive</span><progress id="pd" value="0" max="1"></progress><span id="pdt" class="dim"></span></label>
+</div>
 <p class="dim">The file is not encrypted and can hold personal data (training logs, recordings, notes): keep it somewhere private. Sign-in tokens are left out.</p>
 
 <h2>Check a backup file</h2>
@@ -67,7 +93,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
   var size = function (n) { return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB'; };
   var ago = function (ms) { var d = Math.floor((Date.now() - ms) / 864e5); return d < 1 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago'; };
   var plural = function (n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); };
-  var apps = [], driveList = null, driveToken = null;
+  var apps = [], driveToken = null;
   if (/portal-beta/.test(location.pathname)) $('beta').hidden = false;
 
   function paintLast() {
@@ -135,7 +161,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
   }
   function driveItems(files) {
     return files.map(function (f) {
-      return { kind: 'drive', label: 'Drive file', name: f.name, bytes: +f.size || 0, count: 1,
+      return { kind: 'drive', label: 'Drive file', name: f.name, bytes: +f.size || 0, count: 1, file: f, changed: Date.parse(f.modifiedTime) || 0,
         view: function () { return 'Last changed ' + f.modifiedTime + '.\nIts contents are fetched when you download the backup.'; } };
     });
   }
@@ -202,19 +228,122 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
     if (skipped && skipped.length) box.appendChild(el('p', 'Left out (sign-in tokens): ' + skipped.join(', '), 'dim'));
   }
 
-  // ---- this device -----------------------------------------------------------------------------------
-  var localPick = { picked: function () { return {}; } }, drivePick = null;
+  // ---- this browser and Google Drive, side by side --------------------------------------------------
+  // One row per app: what this browser holds, what the Drive folder holds, and how the two compare.
+  // The ticks decide what goes in the file; an unticked column header leaves that whole copy out.
+  var localList = null, localItems = [], driveItemsNow = null;
+  var pick = { local: {}, drive: {} }, colOn = { local: true, drive: true }, openRows = {};
+  var num = function (n) { return n.toLocaleString(); };
+  function byOwner(list) { var g = {}; (list || []).forEach(function (it) { it.owner = owner(it.kind, it.name); (g[it.owner] = g[it.owner] || []).push(it); }); return g; }
+  function slugOf(title) { for (var i = 0; i < apps.length; i++) if (apps[i].title === title) return apps[i].slug; return null; }
+  function lastOpened(title) { // when this app was last opened from the hub in this browser (ms), or 0
+    try { var u = JSON.parse(localStorage.getItem('portal-usage') || '{}')[slugOf(title)]; return u ? u.last * 1000 : 0; } catch (e) { return 0; }
+  }
+  function localText(items) {
+    var set = 0, recs = 0, dbs = 0, errs = 0;
+    items.forEach(function (it) { if (it.kind === 'indexedDB') { dbs++; recs += it.count; errs += it.error ? 1 : 0; } else set++; });
+    return [set ? plural(set, 'setting') : '', dbs ? num(recs) + ' record' + (recs === 1 ? '' : 's') : '', errs ? errs + ' unreadable' : ''].filter(Boolean).join(' · ');
+  }
+  function driveText(items) {
+    var bytes = 0, newest = 0;
+    items.forEach(function (it) { bytes += it.bytes; newest = Math.max(newest, it.changed || 0); });
+    return plural(items.length, 'file') + ' · ' + size(bytes) + (newest ? ' · changed ' + ago(newest) : '');
+  }
+  function compare(title, l, dr) { // the "diff": where this app's data is, and which copy looks newer
+    if (!driveItemsNow) return '';
+    if (!dr) return 'Only in this browser: not in your Drive';
+    if (!l) return 'Only in Google Drive: from another device or browser';
+    var newest = 0, seen = lastOpened(title);
+    dr.forEach(function (it) { newest = Math.max(newest, it.changed || 0); });
+    if (seen && newest > seen + 60000) return 'In both. Drive changed since you last opened it here (' + ago(seen) + ')';
+    if (seen && newest) return 'In both. Opened here since Drive last changed';
+    return 'In both';
+  }
+  function itemRows(box, title, items) {
+    box.appendChild(el('b', title));
+    items.forEach(function (it) {
+      var row = el('details', null, 'item'), s = el('summary');
+      s.appendChild(el('span', it.label, 'kind'));
+      s.appendChild(document.createTextNode(it.name + ' · ' + (it.kind === 'indexedDB' ? plural(it.count, 'record') : size(it.bytes))));
+      if (it.error) s.appendChild(el('span', ' could not be read: ' + it.error, 'bad'));
+      row.appendChild(s);
+      row.addEventListener('toggle', function () {
+        if (!row.open || row.querySelector('pre')) return;
+        var pre = el('pre', 'Reading…'); row.appendChild(pre);
+        Promise.resolve().then(it.view).then(function (t) { pre.textContent = t; }, function (e) { pre.textContent = 'Could not read this: ' + (e.message || e); });
+      });
+      box.appendChild(row);
+    });
+  }
+  function tick(side, name, label, text) { // a cell: a checkbox with what it stands for
+    var td = el('td'), l = el('label'), c = el('input');
+    c.type = 'checkbox'; c.dataset.side = side; c.dataset.owner = name;
+    c.checked = colOn[side] && pick[side][name] !== false; c.disabled = !colOn[side];
+    c.setAttribute('aria-label', label + ': ' + name);
+    c.addEventListener('change', function () { pick[side][name] = c.checked; summary(); });
+    l.append(c, el('span', text)); td.appendChild(l);
+    return td;
+  }
+  function paint() {
+    var box = $('local'), L = byOwner(localItems), D = byOwner(driveItemsNow), names = Object.keys(Object.assign({}, L, D)).sort(function (a, b) { return a.localeCompare(b); });
+    box.textContent = '';
+    if (!names.length) { box.appendChild(el('p', 'Nothing is stored in this browser yet.', 'dim')); summary(); return; }
+    var wrap = el('div', null, 'wrap'), table = el('table'), head = el('tr'), body = el('tbody');
+    table.id = 'cmp';
+    head.appendChild(el('th', 'App'));
+    [['local', 'This browser'], ['drive', 'Google Drive']].forEach(function (c) {
+      var th = el('th'), l = el('label'), all = el('input');
+      all.type = 'checkbox'; all.id = 'all-' + c[0]; all.checked = colOn[c[0]]; all.disabled = c[0] === 'drive' && !driveItemsNow;
+      if (all.disabled) all.checked = false;
+      all.addEventListener('change', function () { colOn[c[0]] = all.checked; paint(); });
+      l.append(all, el('span', c[1])); th.appendChild(l); head.appendChild(th);
+    });
+    var th0 = el('thead'); th0.appendChild(head); table.appendChild(th0);
+    names.forEach(function (g) {
+      var tr = el('tr'), th = el('th'), nb = el('button', g, 'name'), detail = el('tr', null, 'detail'), dc = el('td');
+      nb.type = 'button'; nb.title = 'Show what is stored';
+      th.appendChild(nb); th.appendChild(el('span', compare(g, L[g], D[g]), 'st')); tr.appendChild(th);
+      tr.appendChild(L[g] ? tick('local', g, 'This browser', localText(L[g])) : el('td', 'nothing', 'none'));
+      tr.appendChild(D[g] ? tick('drive', g, 'Google Drive', driveText(D[g])) : el('td', driveItemsNow ? 'nothing' : 'not signed in', 'none'));
+      dc.colSpan = 3; detail.appendChild(dc); detail.hidden = !openRows[g];
+      var fill = function () { if (dc.firstChild) return; if (L[g]) itemRows(dc, 'In this browser', L[g]); if (D[g]) itemRows(dc, 'In Google Drive', D[g]); };
+      if (openRows[g]) fill();
+      nb.addEventListener('click', function () { openRows[g] = detail.hidden; detail.hidden = !detail.hidden; fill(); });
+      body.appendChild(tr); body.appendChild(detail);
+    });
+    table.appendChild(body); wrap.appendChild(table); box.appendChild(wrap);
+    if (localList) notes(box, localList.note, localList.localStorage.filter(function (k) { return k.secret; }).map(function (k) { return k.name; }));
+    summary();
+  }
+  // what is ticked: -> { localApps, records, settings, driveFiles: [file…], driveBytes }
+  function chosen() {
+    var out = { localApps: {}, records: 0, settings: 0, driveFiles: [], driveBytes: 0, driveApps: {} };
+    if (colOn.local) localItems.forEach(function (it) {
+      if (pick.local[it.owner] === false) return;
+      out.localApps[it.owner] = 1; if (it.kind === 'indexedDB') out.records += it.count; else out.settings++;
+    });
+    if (colOn.drive && driveItemsNow) driveItemsNow.forEach(function (it) {
+      if (pick.drive[it.owner] === false) return;
+      out.driveApps[it.owner] = 1; out.driveFiles.push(it.file); out.driveBytes += it.bytes;
+    });
+    return out;
+  }
+  function summary() {
+    var c = chosen(), la = Object.keys(c.localApps).length, da = Object.keys(c.driveApps).length, parts = [];
+    if (la) parts.push('this browser (' + plural(la, 'app') + ', ' + plural(c.settings, 'setting') + ', ' + num(c.records) + ' record' + (c.records === 1 ? '' : 's') + ')');
+    if (da) parts.push('Google Drive (' + plural(da, 'app') + ', ' + plural(c.driveFiles.length, 'file') + ', ' + size(c.driveBytes) + ')');
+    $('sum').textContent = parts.length ? 'The file will hold: ' + parts.join(' and ') + '.' + (driveItemsNow ? '' : ' Your Google Drive copy is not included: sign in above to add it.')
+      : 'Nothing is ticked, so there is nothing to download.';
+    $('dl').disabled = !parts.length || busy;
+  }
   function readLocal() {
-    return appFont.backup.list().then(function (list) {
-      localPick = render($('local'), deviceItems(list), true, 'Nothing is stored in this browser yet.');
-      notes($('local'), list.note, list.localStorage.filter(function (k) { return k.secret; }).map(function (k) { return k.name; }));
-      $('dl').disabled = false;
-    }).catch(function (e) { $('local').textContent = ''; $('local').appendChild(el('p', 'Could not read this browser\'s data: ' + (e.message || e), 'bad')); });
+    return appFont.backup.list().then(function (list) { localList = list; localItems = deviceItems(list); paint(); })
+      .catch(function (e) { $('local').textContent = ''; $('local').appendChild(el('p', 'Could not read this browser\'s data: ' + (e.message || e), 'bad')); });
   }
 
-  // ---- Google Drive (read-only; sign-in is font.js's appFont.google) -------------------------------------------
-  function driveApi(path) {
-    return fetch('https://www.googleapis.com/drive/v3/files' + path, { headers: { Authorization: 'Bearer ' + driveToken } }).then(function (r) {
+  // ---- Google Drive (read-only; sign-in is font.js's appFont.google) ---------------------------------
+  function driveApi(path, signal) {
+    return fetch('https://www.googleapis.com/drive/v3/files' + path, { headers: { Authorization: 'Bearer ' + driveToken }, signal: signal }).then(function (r) {
       if (r.status === 401) throw new Error('The Google sign-in has run out. Reload this page and sign in again.');
       if (!r.ok) throw new Error('Google Drive answered ' + r.status + '.');
       return r;
@@ -230,43 +359,59 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
     return appFont.google.token().then(function (t) { driveToken = t; return page(); });
   }
   // ',"drive":[{name,modifiedTime,mimeType,text|b64},…]' one file at a time, each handed over as its own Blob
-  async function writeDrive(files, push, say) {
+  async function writeDrive(files, push, signal, done) {
     push(',"drive":[');
     for (var i = 0; i < files.length; i++) {
       var f = files[i];
-      say('Fetching from Google Drive: ' + (i + 1) + ' of ' + files.length + '…');
-      var buf = await (await driveApi('/' + encodeURIComponent(f.id) + '?alt=media')).arrayBuffer();
+      var buf = await (await driveApi('/' + encodeURIComponent(f.id) + '?alt=media', signal)).arrayBuffer();
       var rec = { name: f.name, modifiedTime: f.modifiedTime, mimeType: f.mimeType };
       try { rec.text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
       catch (e) { var u = new Uint8Array(buf), s = ''; for (var k = 0; k < u.length; k += 0x8000) s += String.fromCharCode.apply(null, u.subarray(k, k + 0x8000)); rec.b64 = btoa(s); }
       push(new Blob([(i ? ',' : '') + JSON.stringify(rec)]));
+      done(f, i + 1);
     }
     push(']');
   }
   $('driveBtn').addEventListener('click', function () {
     var b = $('driveBtn'); b.disabled = true; $('driveMsg').className = 'dim'; $('driveMsg').textContent = 'Signing in…';
     listDrive().then(function (list) {
-      driveList = list;
-      $('driveMsg').textContent = plural(list.length, 'file') + ' added.';
-      drivePick = render($('drive'), driveItems(list), true, 'Your Drive folder for these apps is empty.');
+      driveItemsNow = driveItems(list);
+      $('driveMsg').textContent = plural(list.length, 'file') + ' found in your Drive.';
+      b.hidden = true;
+      paint();
     }).catch(function (e) { $('driveMsg').className = 'bad'; $('driveMsg').textContent = e.message || String(e); b.disabled = false; });
   });
 
-  // ---- download --------------------------------------------------------------------------------------
+  // ---- download: progress for each copy, and Cancel -------------------------------------------------
+  var busy = false, stop = null;
+  function bar(id, value, max, text) { var p = $(id); p.max = Math.max(max, 1); p.value = Math.min(value, p.max); $(id + 't').textContent = text; }
+  $('cancel').addEventListener('click', function () { if (stop) stop.abort(); });
   $('dl').addEventListener('click', function () {
-    var b = $('dl'), keep = localPick.picked(), keepDrive = drivePick ? drivePick.picked() : {};
-    var say = function (t) { $('dlMsg').textContent = t; };
-    b.disabled = true; $('dlMsg').className = ''; say('Reading…');
-    var files = driveList ? driveList.filter(function (f) { return keepDrive[owner('drive', f.name)]; }) : null;
-    appFont.backup.download(function (kind, name) { return keep[owner(kind, name)] !== false; },
-      files ? function (push) { return writeDrive(files, push, say); } : null,
-      function (name, n) { say('Reading ' + name + ': ' + plural(n, 'record') + '…'); }).then(function (r) {
+    var c = chosen(), say = function (t, bad) { $('dlMsg').className = bad ? 'bad' : ''; $('dlMsg').textContent = t; };
+    var recs = 0, bytes = 0, files = c.driveFiles;
+    stop = new AbortController(); busy = true;
+    $('dl').disabled = true; $('cancel').hidden = false; $('prog').hidden = false; $('pdrow').hidden = !files.length;
+    say('Preparing the file…');
+    bar('pl', 0, c.records, c.records ? 'Starting…' : 'Settings only');
+    bar('pd', 0, c.driveBytes, 'Waiting for this browser…');
+    appFont.backup.download(
+      function (kind, name) { return colOn.local && pick.local[owner(kind, name)] !== false; },
+      files.length ? function (push, signal) {
+        bar('pd', 0, c.driveBytes, 'Starting…');
+        return writeDrive(files, push, signal, function (f, n) { bytes += +f.size || 0; bar('pd', bytes, c.driveBytes, n + ' of ' + plural(files.length, 'file') + ' · ' + size(bytes) + ' of ' + size(c.driveBytes)); });
+      } : null,
+      function (name, n) { recs += n; bar('pl', recs, c.records, num(recs) + ' of ' + num(Math.max(c.records, recs)) + ' records · ' + name); },
+      stop.signal
+    ).then(function (r) {
       var failed = Object.keys(r.errors);
-      $('dlMsg').className = failed.length ? 'bad' : '';
-      say(failed.length ? 'Saved (' + size(r.blob.size) + '), but these could not be read: ' + failed.map(function (n) { return n + ' (' + r.errors[n] + ')'; }).join(', ') : 'Saved to your downloads (' + size(r.blob.size) + ').');
+      bar('pl', 1, 1, c.records ? num(recs) + ' records' : 'Settings only');
+      if (files.length) bar('pd', 1, 1, plural(files.length, 'file') + ' · ' + size(bytes));
+      say(failed.length ? 'Saved (' + size(r.blob.size) + '), but these could not be read: ' + failed.map(function (n) { return n + ' (' + r.errors[n] + ')'; }).join(', ') : 'Saved to your downloads (' + size(r.blob.size) + ').', failed.length);
       paintLast();
-    }).catch(function (e) { $('dlMsg').className = 'bad'; say('Backup failed: ' + (e.message || e)); })
-      .then(function () { b.disabled = false; });
+    }, function (e) {
+      if (e && e.name === 'AbortError') { $('prog').hidden = true; say('Cancelled. Nothing was saved.'); }
+      else say('Backup failed: ' + ((e && e.message) || e), true);
+    }).then(function () { busy = false; stop = null; $('cancel').hidden = true; summary(); });
   });
 
   // ---- check a file ----------------------------------------------------------------------------------

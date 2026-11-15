@@ -70,20 +70,31 @@ await p.reload();
 await p.evaluate(() => window.backupReady);
 const before = await p.evaluate(() => indexedDB.databases().then(l => l.map(d => d.name + '@' + d.version).sort().join()));
 
-const groups = await p.$$eval('#local .group > summary b', l => l.map(x => x.textContent));
-for (const g of ['GymTracker', 'SpeechImprover', 'Tachyread', 'Shared settings (font, language, hub)', 'Other data']) ok('group shown: ' + g, groups.includes(g));
+const row = name => p.$$eval('#cmp tbody tr:not(.detail)', (l, name) => { const r = l.find(x => x.querySelector('.name').textContent === name); return r ? r.textContent : ''; }, name);
+const groups = await p.$$eval('#cmp .name', l => l.map(x => x.textContent));
+for (const g of ['GymTracker', 'SpeechImprover', 'Tachyread', 'Shared settings (font, language, hub)', 'Other data']) ok('app row shown: ' + g, groups.includes(g));
 ok('token keys are listed as left out', /Left out.*gymtracker-access-token/.test(await p.textContent('#local')) && /gymtracker-session/.test(await p.textContent('#local')));
-await p.click('#local .group > summary b'); await p.click('#local .group[open] .item summary'); // a group opens, then an item shows its value
-await p.waitForSelector('#local .item pre', { timeout: 3000 }).catch(() => {});
-ok('an item opens to show its data', await p.$('#local .item pre'));
+ok('before sign-in the Drive column says so, and the summary too', /not signed in/.test(await row('GymTracker')) && /this browser \(/.test(await p.textContent('#sum')) && /Google Drive copy is not included/.test(await p.textContent('#sum')));
+await p.click('#cmp .name'); await p.click('#cmp tr.detail:not([hidden]) .item summary'); // a row opens, then an item shows its value
+await p.waitForSelector('#cmp .item pre', { timeout: 3000 }).catch(() => {});
+ok('an item opens to show its data', await p.$('#cmp .item pre'));
 ok('no sideways scroll on a phone', await p.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1);
 
 await p.click('#driveBtn');
-await p.waitForFunction(() => /2 files added/.test(document.getElementById('driveMsg').textContent), null, { timeout: 10000 }).catch(() => {});
-ok('Drive copy added', /2 files added/.test(await p.textContent('#driveMsg')));
+await p.waitForFunction(() => /2 files found/.test(document.getElementById('driveMsg').textContent), null, { timeout: 10000 }).catch(() => {});
+ok('Drive copy listed', /2 files found/.test(await p.textContent('#driveMsg')));
+ok('the table compares the two copies', /In both/.test(await row('Tachyread')) && /1 file/.test(await row('Tachyread')) && /Only in this browser/.test(await row('SpeechImprover')) && /2 records/.test(await row('SpeechImprover')));
+ok('the summary names both copies', /this browser \(.*and Google Drive \(.*2 files/.test(await p.textContent('#sum')));
+
+// cancel: nothing is saved
+let stray = false; const onStray = () => { stray = true; }; p.on('download', onStray);
+await p.evaluate(() => { document.getElementById('dl').click(); document.getElementById('cancel').click(); });
+await p.waitForFunction(() => /Cancelled/.test(document.getElementById('dlMsg').textContent), null, { timeout: 10000 }).catch(() => {});
+ok('Cancel stops the download and saves nothing', /Cancelled/.test(await p.textContent('#dlMsg')) && !stray && await p.evaluate(() => !localStorage.getItem('portal-last-backup') && document.getElementById('cancel').hidden && !document.getElementById('dl').disabled));
+p.off('download', onStray);
 
 // leave "Other data" out, download, and read the file back
-await p.evaluate(() => { for (const s of document.querySelectorAll('#local .group > summary')) if (/Other data/.test(s.textContent)) s.querySelector('input').checked = false; });
+await p.uncheck('#cmp input[data-side=local][data-owner="Other data"]');
 const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#dl')]);
 const dir = await mkdtemp(path.join(os.tmpdir(), 'backup-check-')), file = path.join(dir, dl.suggestedFilename());
 await dl.saveAs(file);
@@ -103,13 +114,22 @@ ok('date, typed array, map, undefined kept', t.when && t.when.v === 1e12 && t.wa
 ok('a token inside a record is blanked', t.tok === '[token]');
 ok('out-of-line keys are kept', sp && sp.stores.kv.rows[0][0] === 'greeting' && sp.stores.kv.rows[0][1] === 'hello' && sp.stores.takes.rows[0][0] === 1);
 ok('inventory-declared database included', snap.indexedDB.books && snap.indexedDB.books.stores.b.rows[0][1].title === 'Dune' && snap.indexedDB.books.stores.b.autoIncrement === true);
-ok('a Drive file is matched to its app by the inventory', (await p.$$eval('#drive .group > summary b', l => l.map(x => x.textContent))).includes('Tachyread'));
+ok('a Drive file is matched to its app by the inventory', await p.$('#cmp input[data-side=drive][data-owner=Tachyread]'));
 const rows = snap.indexedDB.books.stores.b.rows;
 ok('every record of a larger database, in order, across batches', rows.length === 500 && rows.every((r, i) => r[0] === i + 1) && rows[499][1].title === 'Book 500');
 ok('no unreadable databases', JSON.stringify(snap.errors) === '{}');
 ok('Drive files included, text and binary', snap.drive && snap.drive.length === 2 && snap.drive[0].text === '{"books":2}' && bytes(snap.drive[1].b64).join() === '255,254,0,1');
 ok('backing up changed no database', before === await p.evaluate(() => indexedDB.databases().then(l => l.map(d => d.name + '@' + d.version).sort().join())));
+ok('both progress bars finish', await p.evaluate(() => { const a = document.getElementById('pl'), b = document.getElementById('pd'); return !document.getElementById('prog').hidden && a.value === a.max && b.value === b.max && /records/.test(document.getElementById('plt').textContent) && /2 files/.test(document.getElementById('pdt').textContent); }));
 ok('last backup is noted', /today/.test(await p.textContent('#last')) && /Saved/.test(await p.textContent('#dlMsg')));
+
+// the Drive column switched off: the file holds this browser only
+await p.uncheck('#all-drive');
+ok('the summary follows the column switch', !/Google Drive \(/.test(await p.textContent('#sum')));
+const [dl3] = await Promise.all([p.waitForEvent('download'), p.click('#dl')]);
+const file3 = path.join(dir, 'local-only.json'); await dl3.saveAs(file3);
+const snap3 = JSON.parse(await readFile(file3, 'utf8'));
+ok('with Drive unticked the file has no Drive part', !('drive' in snap3) && snap3.indexedDB.books && !('zz-misc' in snap3.localStorage));
 
 // check a file: the good one reads, a damaged one says so
 await p.setInputFiles('#file', file);

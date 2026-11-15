@@ -1007,7 +1007,7 @@
     return out;
   }
   // one database as JSON text in Blob pieces: {"version":n,"stores":{name:{keyPath,autoIncrement,indexes,"rows":[[key,value],…]}}}
-  async function backupDb(db, progress) {
+  async function backupDb(db, progress, signal) {
     var pieces = [], buf = '';
     var add = function (s) { buf += s; if (buf.length > 4e6) { pieces.push(new Blob([buf])); buf = ''; } };
     var names = Array.from(db.objectStoreNames);
@@ -1023,7 +1023,8 @@
         if (!kv[0].length) break;
         for (var j = 0; j < kv[0].length; j++) add((count++ ? ',' : '') + JSON.stringify(await enc([kv[0][j], kv[1][j]]))); // one at a time: one recording in memory, not fifty
         last = kv[0][kv[0].length - 1]; started = true;
-        progress(db.name, count);
+        if (signal && signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+        progress(db.name, kv[0].length);
       }
       add(']}');
     }
@@ -1033,9 +1034,11 @@
   }
   // want(kind, name) -> false leaves that key or database out (default: everything).
   // more(push): optional, appends further top-level JSON members (the hub adds ',"drive":[…]').
-  // progress(name, records): optional. -> { blob, made, skipped, errors: { database: reason } }
+  // progress(name, n): optional, called as each batch of n more records is read.
+  // signal: optional AbortSignal; cancelling rejects with an AbortError and saves nothing.
+  // -> { blob, made, skipped, errors: { database: reason } }
   // A database that cannot be read is recorded under errors, so a gap is never silent.
-  async function backupBuild(want, more, progress) {
+  async function backupBuild(want, more, progress, signal) {
     want = want || function () { return true; };
     progress = progress || function () {};
     var head = { format: 'adervec-backup', schema: 2, made: new Date().toISOString(), origin: location.origin, from: location.pathname, localStorage: {}, skipped: [] };
@@ -1054,18 +1057,18 @@
     for (var d = 0; d < dbs.length; d++) {
       var name = dbs[d].name, db = null, pieces = null;
       if (!name || !want('indexedDB', name)) continue;
-      try { db = await idbOpen(name); if (db) pieces = await backupDb(db, progress); }
-      catch (e) { errors[name] = String((e && e.message) || e); }
+      try { db = await idbOpen(name); if (db) pieces = await backupDb(db, progress, signal); }
+      catch (e) { if (db) db.close(); if (e && e.name === 'AbortError') throw e; errors[name] = String((e && e.message) || e); db = null; }
       if (db) db.close();
       if (pieces) { parts.push((first ? '' : ',') + JSON.stringify(name) + ':'); parts = parts.concat(pieces); first = false; }
     }
     parts.push('}');
-    if (more) await more(function (s) { parts.push(s); });
+    if (more) await more(function (s) { parts.push(s); }, signal);
     parts.push(',"errors":' + JSON.stringify(errors) + '}');
     return { blob: new Blob(parts, { type: 'application/json' }), made: head.made, skipped: head.skipped, errors: errors };
   }
-  function backupDownload(want, more, progress) {
-    return backupBuild(want, more, progress).then(function (r) {
+  function backupDownload(want, more, progress, signal) {
+    return backupBuild(want, more, progress, signal).then(function (r) {
       var u = URL.createObjectURL(r.blob), x = document.createElement('a');
       x.href = u; x.download = 'adervec-backup-' + r.made.slice(0, 10) + '.json';
       document.body.appendChild(x); x.click(); x.remove();
