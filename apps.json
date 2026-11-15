@@ -394,18 +394,20 @@
     "title": "LanguageLab",
     "emoji": "🗣️",
     "hue": 205,
-    "tagline": "Learn a language by using it: listen, read, take dictation, retell. Progress is what you can do, not a streak.",
+    "tagline": "Learn a language by using it: listen, read, take dictation, speak, write. Progress is the level your numbers support, not a streak.",
     "badges": [
       "PWA",
       "Drive sync",
-      "AI cowork"
+      "AI cowork",
+      "6 languages"
     ],
     "features": [
-      "A sitting: hear a story, read it, take dictation at natural speed, retell it from memory",
-      "Words you did not know come back as blanks in the sentence you met them in",
-      "Progress as ability: share caught by ear, share understood, words produced",
-      "An AI agent writes new stories at your level and grades every sitting",
-      "French first; no streaks, no points"
+      "A sitting: hear a story, answer from the ear alone, read it, take dictation at natural speed, speak, retell",
+      "Role-plays said aloud and then from memory; an AI pen pal that writes back and corrects you",
+      "Tap any word for its meaning, translated on your device; your own mistakes come back as review cards",
+      "Bring a podcast with its subtitles and take dictation from the real voices",
+      "French, Spanish, German, Italian, Portuguese and English with starter stories; any other language with your own texts",
+      "Progress as ability, level by level; no streaks, no points"
     ]
   }
 ]
