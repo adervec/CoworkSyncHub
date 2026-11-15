@@ -254,7 +254,11 @@ h1{font:700 30px/1.15 var(--mono);letter-spacing:-.5px;margin:6px 0 10px}
 #count{font:12px var(--mono);color:var(--mut);white-space:nowrap}
 kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;
   font:11px var(--mono);background:var(--card)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+/* ponytail: carousel is plain scroll-snap, no arrows/dots; add buttons if swiping proves awkward */
+.grid{display:flex;gap:16px;align-items:flex-start;overflow-x:auto;scroll-snap-type:x proximity;
+  padding:12px 2px 14px;overscroll-behavior-x:contain}
+.grid>*{flex:none;width:min(340px,86vw);scroll-snap-align:start;margin:0}
+.grid>.ship{width:min(560px,90vw)}
 .app{border:1px solid var(--line);background:var(--card);border-radius:12px;
   padding:18px;display:flex;flex-direction:column;gap:10px;position:relative}
 @media (prefers-reduced-motion:no-preference){
@@ -387,7 +391,7 @@ d.querySelectorAll(".tiles a").forEach(function(a){
 // filter + count + empty state; badges are filter shortcuts
 var q=d.getElementById("q"),count=d.getElementById("count"),empty=d.getElementById("empty"),
     grid=d.querySelector(".grid");
-function cards(){return Array.prototype.slice.call(grid.children)}
+function cards(){return Array.prototype.slice.call(grid.querySelectorAll(".app"))}
 function applyFilter(){var v=q.value.toLowerCase(),n=0;
   cards().forEach(function(c){
     var show=c.dataset.k.indexOf(v)>=0&&(!freshOnly||!!fresh[c.dataset.slug]);
@@ -1061,7 +1065,6 @@ def write_site(data):
 and holding opens that copy · keys <kbd>1</kbd>–<kbd>0</kbd> launch too</p>
 <div id="whatsnew" hidden><b></b><button id="wnshow" type="button">show me</button>
 <button id="wndismiss" type="button" title="dismiss">&times;</button></div>
-{ship}
 <section class="you" id="sheet" hidden>
 <h2 class="eyebrow">// your character sheet</h2>
 <div class="sheet"><svg id="radar" viewBox="0 0 200 200" role="img" aria-label="stat balance"></svg>
@@ -1086,7 +1089,7 @@ or a person. It writes a review back and it shows here. Nothing is uploaded.</p>
 <select id="sort" aria-label="Sort apps"><option value="name">A–Z</option>
 <option value="updated">Recently updated</option><option value="used">Your most used</option></select>
 </div>
-<div class="grid">{cards}</div>
+<div class="grid">{ship}{cards}</div>
 <p id="empty" hidden>Nothing matches. <button id="clearq" type="button">Clear the filter</button></p>
 <p class="note"><b>Private by design:</b> one maker, {len(APPS)} free, open-source apps —
 no accounts, no servers, no tracking. Everything runs in your browser and your data stays on your device.</p>
