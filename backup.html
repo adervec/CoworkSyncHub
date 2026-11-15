@@ -62,12 +62,14 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
   // Public OAuth client id shared by the apps (an identifier, not a secret); read-only use here.
   var CLIENT_ID = '547617739897-br6dj2facmsc34qnkjb5u4dbfhju39pu.apps.googleusercontent.com';
   var HOUSE = /^(maker-|portal-|app-|cowork-)/;
+  var BIG = 150e6; // a file above this is not opened whole when checking it
   var $ = function (id) { return document.getElementById(id); };
   var el = function (tag, text, cls) { var x = document.createElement(tag); if (text != null) x.textContent = text; if (cls) x.className = cls; return x; };
   var norm = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); };
   var size = function (n) { return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB'; };
   var ago = function (ms) { var d = Math.floor((Date.now() - ms) / 864e5); return d < 1 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago'; };
-  var apps = [], driveFiles = null, localSnap = null;
+  var plural = function (n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); };
+  var apps = [], driveList = null, driveToken = null;
   if (/portal-beta/.test(location.pathname)) $('beta').hidden = false;
 
   function paintLast() {
@@ -102,82 +104,112 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
     });
   }
 
-  // ---- showing a snapshot (this device, or a file) ---------------------------------------------------
+  // ---- showing what is stored ------------------------------------------------------------------------
+  // An item: { kind, label, name, bytes?, count, error?, view() -> text or a promise of it }. Nothing is
+  // read until an item is opened, and then only its first records.
   var short = function (k, v) { return k === 'b64' && typeof v === 'string' ? '[' + size(Math.round(v.length * 0.75)) + ' of binary]' : v; };
   function pretty(v) {
     if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return v.slice(0, 20000); } }
     var s = JSON.stringify(v, short, 1) || String(v);
     return s.length > 20000 ? s.slice(0, 20000) + '\n… (' + size(s.length) + ' in all)' : s;
   }
-  function items(snap) {
+  function storesText(stores) { // { store: { count, rows } }
+    return Object.keys(stores).map(function (s) {
+      var c = stores[s].count, rows = stores[s].rows || [];
+      return s + ': ' + plural(c, 'record') + (rows.length ? '\n' + pretty(rows) + (c > rows.length ? '\n… and ' + (c - rows.length) + ' more' : '') : '');
+    }).join('\n\n') || '(empty)';
+  }
+  function deviceItems(list) {
     var out = [];
+    list.localStorage.forEach(function (k) {
+      if (!k.secret) out.push({ kind: 'localStorage', label: 'setting', name: k.name, bytes: k.bytes, count: 1, view: function () { return pretty(localStorage.getItem(k.name) || ''); } });
+    });
+    list.indexedDB.forEach(function (db) {
+      var count = 0; (db.stores || []).forEach(function (s) { count += s.count; });
+      out.push({ kind: 'indexedDB', label: 'database', name: db.name, count: count, error: db.error, view: function () {
+        return appFont.backup.peek(db.name, 20).then(function (rows) {
+          var st = {}; db.stores.forEach(function (s) { st[s.name] = { count: s.count, rows: rows[s.name] }; });
+          return storesText(st);
+        });
+      } });
+    });
+    return out;
+  }
+  function driveItems(files) {
+    return files.map(function (f) {
+      return { kind: 'drive', label: 'Drive file', name: f.name, bytes: +f.size || 0, count: 1,
+        view: function () { return 'Last changed ' + f.modifiedTime + '.\nIts contents are fetched when you download the backup.'; } };
+    });
+  }
+  function fileItems(snap) { // schema 1 kept keys and values apart; schema 2 keeps rows of [key, value]
+    var out = [], errors = snap.errors || {};
     Object.keys(snap.localStorage || {}).forEach(function (k) {
       var v = snap.localStorage[k];
       out.push({ kind: 'localStorage', label: 'setting', name: k, bytes: v.length, count: 1, view: function () { return pretty(v); } });
     });
     Object.keys(snap.indexedDB || {}).forEach(function (n) {
-      var db = snap.indexedDB[n], stores = db.stores || {}, count = 0;
-      Object.keys(stores).forEach(function (s) { count += (stores[s].values || []).length; });
-      out.push({ kind: 'indexedDB', label: 'database', name: n, bytes: JSON.stringify(db).length, count: count, error: db.error,
-        view: function () {
-          return Object.keys(stores).map(function (s) {
-            var v = stores[s].values || [];
-            return s + ': ' + v.length + ' record' + (v.length === 1 ? '' : 's') + (v.length ? '\n' + pretty(v.slice(0, 20)) + (v.length > 20 ? '\n… and ' + (v.length - 20) + ' more' : '') : '');
-          }).join('\n\n') || '(empty)';
-        } });
+      var db = snap.indexedDB[n], st = {}, count = 0;
+      Object.keys(db.stores || {}).forEach(function (s) {
+        var all = db.stores[s].rows || db.stores[s].values || [];
+        st[s] = { count: all.length, rows: all.slice(0, 20) }; count += all.length;
+      });
+      out.push({ kind: 'indexedDB', label: 'database', name: n, count: count, error: db.error, view: function () { return storesText(st); } });
     });
+    Object.keys(errors).forEach(function (n) { out.push({ kind: 'indexedDB', label: 'database', name: n, count: 0, error: errors[n], view: function () { return 'Not in this file.'; } }); });
     (snap.drive || []).forEach(function (f) {
-      var body = f.text != null ? f.text : (f.b64 || '');
-      out.push({ kind: 'drive', label: 'Drive file', name: f.name, bytes: f.text != null ? body.length : Math.round(body.length * 0.75), count: 1,
-        view: function () { return (f.modifiedTime ? 'changed ' + f.modifiedTime + '\n' : '') + (f.text != null ? pretty(f.text) : '[' + size(Math.round(body.length * 0.75)) + ' of binary]'); } });
+      var bytes = f.text != null ? f.text.length : Math.round((f.b64 || '').length * 0.75);
+      out.push({ kind: 'drive', label: 'Drive file', name: f.name, bytes: bytes, count: 1,
+        view: function () { return (f.modifiedTime ? 'Last changed ' + f.modifiedTime + '\n' : '') + (f.text != null ? pretty(f.text) : '[' + size(bytes) + ' of binary]'); } });
     });
-    out.forEach(function (it) { it.owner = owner(it.kind, it.name); });
     return out;
   }
   // -> { picked(): the ticked owners } ; pick=false renders read-only (checking a file)
   function render(box, list, pick, empty) {
     box.textContent = '';
     var groups = {}, boxes = {};
-    list.forEach(function (it) { (groups[it.owner] = groups[it.owner] || []).push(it); });
+    list.forEach(function (it) { it.owner = owner(it.kind, it.name); (groups[it.owner] = groups[it.owner] || []).push(it); });
     var names = Object.keys(groups).sort(function (a, b) { return a.localeCompare(b); });
     if (!names.length) box.appendChild(el('p', empty, 'dim'));
     names.forEach(function (g) {
       var d = el('details', null, 'group'), sum = el('summary'), bytes = 0, count = 0, errs = 0;
-      groups[g].forEach(function (it) { bytes += it.bytes; count += it.count; errs += it.error ? 1 : 0; });
+      groups[g].forEach(function (it) { bytes += it.bytes || 0; count += it.count; errs += it.error ? 1 : 0; });
       if (pick) {
         var c = el('input'); c.type = 'checkbox'; c.checked = true; c.setAttribute('aria-label', 'Include ' + g);
         c.addEventListener('click', function (ev) { ev.stopPropagation(); });
         sum.appendChild(c); boxes[g] = c;
       }
       sum.appendChild(el('b', g));
-      sum.appendChild(el('span', count + ' item' + (count === 1 ? '' : 's') + ' · ' + size(bytes), 'dim'));
+      sum.appendChild(el('span', plural(count, 'item') + (bytes ? ' · ' + size(bytes) : ''), 'dim'));
       if (errs) sum.appendChild(el('span', 'could not read ' + errs, 'bad'));
       d.appendChild(sum);
       groups[g].forEach(function (it) {
         var row = el('details', null, 'item'), s = el('summary');
         s.appendChild(el('span', it.label, 'kind'));
-        s.appendChild(document.createTextNode(it.name + ' · ' + (it.kind === 'indexedDB' ? it.count + ' records · ' : '') + size(it.bytes)));
+        s.appendChild(document.createTextNode(it.name + ' · ' + (it.kind === 'indexedDB' ? plural(it.count, 'record') : size(it.bytes))));
         if (it.error) s.appendChild(el('span', ' could not be read: ' + it.error, 'bad'));
         row.appendChild(s);
-        row.addEventListener('toggle', function () { if (row.open && !row.querySelector('pre')) row.appendChild(el('pre', it.view())); });
+        row.addEventListener('toggle', function () {
+          if (!row.open || row.querySelector('pre')) return;
+          var pre = el('pre', 'Reading…'); row.appendChild(pre);
+          Promise.resolve().then(it.view).then(function (t) { pre.textContent = t; }, function (e) { pre.textContent = 'Could not read this: ' + (e.message || e); });
+        });
         d.appendChild(row);
       });
       box.appendChild(d);
     });
     return { picked: function () { var p = {}; names.forEach(function (g) { p[g] = !boxes[g] || boxes[g].checked; }); return p; } };
   }
-  function notes(box, snap) {
-    if (snap.note) box.appendChild(el('p', snap.note, 'warn'));
-    if (snap.skipped && snap.skipped.length) box.appendChild(el('p', 'Left out (sign-in tokens): ' + snap.skipped.join(', '), 'dim'));
+  function notes(box, note, skipped) {
+    if (note) box.appendChild(el('p', note, 'warn'));
+    if (skipped && skipped.length) box.appendChild(el('p', 'Left out (sign-in tokens): ' + skipped.join(', '), 'dim'));
   }
 
   // ---- this device -----------------------------------------------------------------------------------
   var localPick = { picked: function () { return {}; } }, drivePick = null;
   function readLocal() {
-    return appFont.backup.snapshot().then(function (snap) {
-      localSnap = snap;
-      localPick = render($('local'), items(snap), true, 'Nothing is stored in this browser yet.');
-      notes($('local'), snap);
+    return appFont.backup.list().then(function (list) {
+      localPick = render($('local'), deviceItems(list), true, 'Nothing is stored in this browser yet.');
+      notes($('local'), list.note, list.localStorage.filter(function (k) { return k.secret; }).map(function (k) { return k.name; }));
       $('dl').disabled = false;
     }).catch(function (e) { $('local').textContent = ''; $('local').appendChild(el('p', 'Could not read this browser\'s data: ' + (e.message || e), 'bad')); });
   }
@@ -198,54 +230,59 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
         error_callback: function (e) { rej(new Error((e && (e.message || e.type)) || 'Sign-in was dismissed.')); } }).requestAccessToken({ prompt: '' });
     });
   }
-  function readDrive() {
-    var auth, files = [];
-    var api = function (path) {
-      return fetch('https://www.googleapis.com/drive/v3/files' + path, { headers: { Authorization: 'Bearer ' + auth } })
-        .then(function (r) { if (!r.ok) throw new Error('Google Drive answered ' + r.status + '.'); return r; });
-    };
-    var page = function (pt) {
-      return api('?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,modifiedTime,mimeType)' + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))
-        .then(function (r) { return r.json(); }).then(function (j) { files = files.concat(j.files || []); return j.nextPageToken ? page(j.nextPageToken) : null; });
-    };
-    return loadGis().then(token).then(function (t) { auth = t; return page(); }).then(function () {
-      var out = [], i = 0;
-      var next = function () { // one at a time: gentle on Drive's rate limit
-        if (i >= files.length) return out;
-        var f = files[i++];
-        $('driveMsg').textContent = 'Fetching ' + i + ' of ' + files.length + '…';
-        return api('/' + encodeURIComponent(f.id) + '?alt=media').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
-          var rec = { name: f.name, modifiedTime: f.modifiedTime, mimeType: f.mimeType };
-          try { rec.text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
-          catch (e) { var u = new Uint8Array(buf), s = ''; for (var k = 0; k < u.length; k += 0x8000) s += String.fromCharCode.apply(null, u.subarray(k, k + 0x8000)); rec.b64 = btoa(s); }
-          out.push(rec);
-          return next();
-        });
-      };
-      return next();
+  function driveApi(path) {
+    return fetch('https://www.googleapis.com/drive/v3/files' + path, { headers: { Authorization: 'Bearer ' + driveToken } }).then(function (r) {
+      if (r.status === 401) throw new Error('The Google sign-in has run out. Reload this page and sign in again.');
+      if (!r.ok) throw new Error('Google Drive answered ' + r.status + '.');
+      return r;
     });
+  }
+  // sign in and LIST the folder (names and sizes only); the files themselves are fetched at download time
+  function listDrive() {
+    var files = [];
+    var page = function (pt) {
+      return driveApi('?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,modifiedTime,mimeType,size)' + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))
+        .then(function (r) { return r.json(); }).then(function (j) { files = files.concat(j.files || []); return j.nextPageToken ? page(j.nextPageToken) : files; });
+    };
+    return loadGis().then(token).then(function (t) { driveToken = t; return page(); });
+  }
+  // ',"drive":[{name,modifiedTime,mimeType,text|b64},…]' one file at a time, each handed over as its own Blob
+  async function writeDrive(files, push, say) {
+    push(',"drive":[');
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      say('Fetching from Google Drive: ' + (i + 1) + ' of ' + files.length + '…');
+      var buf = await (await driveApi('/' + encodeURIComponent(f.id) + '?alt=media')).arrayBuffer();
+      var rec = { name: f.name, modifiedTime: f.modifiedTime, mimeType: f.mimeType };
+      try { rec.text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+      catch (e) { var u = new Uint8Array(buf), s = ''; for (var k = 0; k < u.length; k += 0x8000) s += String.fromCharCode.apply(null, u.subarray(k, k + 0x8000)); rec.b64 = btoa(s); }
+      push(new Blob([(i ? ',' : '') + JSON.stringify(rec)]));
+    }
+    push(']');
   }
   $('driveBtn').addEventListener('click', function () {
     var b = $('driveBtn'); b.disabled = true; $('driveMsg').className = 'dim'; $('driveMsg').textContent = 'Signing in…';
-    readDrive().then(function (list) {
-      driveFiles = list;
-      $('driveMsg').textContent = list.length + ' file' + (list.length === 1 ? '' : 's') + ' added.';
-      drivePick = render($('drive'), items({ drive: list }), true, 'Your Drive folder for these apps is empty.');
+    listDrive().then(function (list) {
+      driveList = list;
+      $('driveMsg').textContent = plural(list.length, 'file') + ' added.';
+      drivePick = render($('drive'), driveItems(list), true, 'Your Drive folder for these apps is empty.');
     }).catch(function (e) { $('driveMsg').className = 'bad'; $('driveMsg').textContent = e.message || String(e); b.disabled = false; });
   });
 
   // ---- download --------------------------------------------------------------------------------------
   $('dl').addEventListener('click', function () {
     var b = $('dl'), keep = localPick.picked(), keepDrive = drivePick ? drivePick.picked() : {};
-    b.disabled = true; $('dlMsg').className = ''; $('dlMsg').textContent = 'Reading…';
-    var extra = driveFiles ? { drive: driveFiles.filter(function (f) { return keepDrive[owner('drive', f.name)]; }) } : {};
-    // a fresh read, so the file is as of now, not as of when the page opened
-    appFont.backup.download(function (kind, name) { return keep[owner(kind, name)] !== false; }, extra).then(function (snap) {
-      var failed = Object.keys(snap.indexedDB).filter(function (n) { return snap.indexedDB[n].error; });
+    var say = function (t) { $('dlMsg').textContent = t; };
+    b.disabled = true; $('dlMsg').className = ''; say('Reading…');
+    var files = driveList ? driveList.filter(function (f) { return keepDrive[owner('drive', f.name)]; }) : null;
+    appFont.backup.download(function (kind, name) { return keep[owner(kind, name)] !== false; },
+      files ? function (push) { return writeDrive(files, push, say); } : null,
+      function (name, n) { say('Reading ' + name + ': ' + plural(n, 'record') + '…'); }).then(function (r) {
+      var failed = Object.keys(r.errors);
       $('dlMsg').className = failed.length ? 'bad' : '';
-      $('dlMsg').textContent = failed.length ? 'Saved, but these could not be read: ' + failed.join(', ') : 'Saved to your downloads.';
+      say(failed.length ? 'Saved (' + size(r.blob.size) + '), but these could not be read: ' + failed.map(function (n) { return n + ' (' + r.errors[n] + ')'; }).join(', ') : 'Saved to your downloads (' + size(r.blob.size) + ').');
       paintLast();
-    }).catch(function (e) { $('dlMsg').className = 'bad'; $('dlMsg').textContent = 'Backup failed: ' + (e.message || e); })
+    }).catch(function (e) { $('dlMsg').className = 'bad'; say('Backup failed: ' + (e.message || e)); })
       .then(function () { b.disabled = false; });
   });
 
@@ -253,17 +290,25 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
   $('file').addEventListener('change', function () {
     var f = this.files[0], box = $('check'), msg = $('fileMsg');
     if (!f) return;
-    box.textContent = ''; msg.className = ''; msg.textContent = 'Reading…';
-    f.text().then(function (text) {
-      var snap = appFont.parseJSON(text, 2e9);
-      if (!snap || snap.format !== 'adervec-backup' || typeof snap.localStorage !== 'object') throw new Error('This is not a backup file from these apps.');
-      if (snap.schema > 1) throw new Error('This file was made by a newer version of the backup. Reload this page and try again.');
-      var list = items(snap);
-      msg.textContent = 'Readable. Made ' + new Date(snap.made).toLocaleString() + ' · ' + list.length + ' item' + (list.length === 1 ? '' : 's') + ' · ' + size(f.size);
-      render(box, list, false, 'The file is valid but holds no data.');
-      notes(box, snap);
-    }).catch(function (e) { msg.className = 'bad'; msg.textContent = /JSON|token|Unexpected/.test(e.message) ? 'This file is damaged or is not a backup: it cannot be read.' : e.message; });
     this.value = '';
+    box.textContent = ''; msg.className = ''; msg.textContent = 'Reading…';
+    if (f.size > BIG) { // too large to open whole in a browser tab: check the two ends only
+      return Promise.all([f.slice(0, 200).text(), f.slice(f.size - 1).text()]).then(function (x) {
+        var made = /"made":"([^"]+)"/.exec(x[0]), good = /"format":"adervec-backup"/.test(x[0]) && x[1] === '}';
+        msg.className = good ? '' : 'bad';
+        msg.textContent = good ? 'This is a complete backup file' + (made ? ', made ' + new Date(made[1]).toLocaleString() : '') + ' · ' + size(f.size) + '. It is too large to list here.'
+          : 'This file is damaged or is not a backup: it cannot be read.';
+      });
+    }
+    f.text().then(function (text) {
+      var snap = appFont.parseJSON(text, BIG * 2);
+      if (!snap || snap.format !== 'adervec-backup' || typeof snap.localStorage !== 'object') throw new Error('This is not a backup file from these apps.');
+      if (snap.schema > 2) throw new Error('This file was made by a newer version of the backup. Reload this page and try again.');
+      var list = fileItems(snap);
+      msg.textContent = 'Readable. Made ' + new Date(snap.made).toLocaleString() + ' · ' + plural(list.length, 'item') + ' · ' + size(f.size);
+      render(box, list, false, 'The file is valid but holds no data.');
+      notes(box, snap.note, snap.skipped);
+    }).catch(function (e) { msg.className = 'bad'; msg.textContent = /JSON|token|Unexpected/.test(e.message) ? 'This file is damaged or is not a backup: it cannot be read.' : e.message; });
   });
 
   paintLast();
