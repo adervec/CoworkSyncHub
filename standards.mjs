@@ -79,11 +79,13 @@ const FONTJS = /<script[^>]*\ssrc\s*=\s*["']https:\/\/adervec\.github\.io\/font\
 const ok = (note = '') => ['ok', note], warn = (note) => ['warn', note], fail = (note) => ['FAIL', note];
 
 const CHECKS = [
-  ['drive', 'Drive private-folder sync', (a) => a.has(/appDataFolder|drive\.appdata/) ? ok() : fail('no drive.appdata sync')],
+  ['drive', 'Drive private-folder sync', (a) => a.has(/appDataFolder|drive\.appdata|appFont\??\.google\b/) ? ok() : fail('no drive.appdata sync')],
   ['pfp', 'Google picture always visible (top bar)', (a) => {
-    if (!a.has(/oauth2\/v3\/userinfo/)) return fail('never asks Google for the profile');
+    // font.js's shared sign-in (appFont.google) asks for the profile and feeds the corner avatar itself
+    const house = a.has(/appFont\??\.google\b/);
+    if (!house && !a.has(/oauth2\/v3\/userinfo/)) return fail('never asks Google for the profile');
     // the shared corner avatar, placed in the page and fed the account
-    const shared = a.has(/<app-account|createElement\(\s*['"]app-account/) && a.has(/setAccount\(/);
+    const shared = a.has(/<app-account|createElement\(\s*['"]app-account/) && (house || a.has(/setAccount\(/));
     // or the app's own avatar in an always-visible bar: GymTracker's banner identity, or a header sync chip with the picture
     const own = a.has(/id=["']app-identity["']|ti-pfp|gsync-pfp-sm|class="gpic"/) || a.has(/class=["']gav["']|i\.className\s*=\s*["']gav["']/);
     if (shared || own) return ok(own && !shared ? 'own header avatar' : '');
@@ -198,7 +200,7 @@ const CHECKS = [
   }],
   ['aireview', 'AI review channel for graded sessions', (a) => {
     // apps that grade a whole session by algorithm (the user's list, 2026-11-13); everyone else is not applicable
-    const GRADED = /^(GymTracker|Tachyread|SpeechImprover|GuitarPicker|HandwritingHelper|ChessRetabled|BodybuildingProgressCoach|learning-pit|MarksmanApp|Run315|BlackMirrorBikeRide)$/;
+    const GRADED = /^(GymTracker|Tachyread|SpeechImprover|GuitarPicker|HandwritingHelper|ChessRetabled|BodybuildingProgressCoach|learning-pit|MarksmanApp|Run315|BlackMirrorBikeRide|LanguageLab)$/;
     if (!GRADED.test(a.app.dir)) return ['-', 'no algorithmically graded sessions'];
     // a real channel or operation: name:/dir: 'something-review', or a Tachyread-style op id 'cw-...-review':
     return a.has(/\b(name|dir|key)\s*:\s*['"][a-z0-9-]*-review['"]|['"]cw-[a-z0-9-]+-review['"]\s*:/) ? ok() : fail('no AI review channel for its graded sessions');
@@ -338,6 +340,9 @@ function selftest() {
   eq(check('a11y', fake('/* house font: CoworkSyncHub/font.js, published at adervec.github.io/font.js */')), 'FAIL', 'a comment naming font.js is not loading it');
   eq(check('a11y', fake('<script src="https://adervec.github.io/font.js"></script>')), 'ok', 'a real font.js load passes');
   eq(check('ledger', fake('appFont.logSession({ kind: "lift", minutes: 40, id: w.id })')), 'ok', 'logSession passes');
+  eq(check('pfp', fake('<header><app-account></app-account></header> const G = window.appFont?.google; G.token()')), 'ok', 'the shared sign-in with the corner avatar passes');
+  eq(check('pfp', fake('const G = window.appFont?.google; G.token()')), 'FAIL', 'the shared sign-in without the avatar in the page fails');
+  eq(check('drive', fake('const G = window.appFont?.google; G.write(name, text)')), 'ok', 'Drive through the shared sign-in passes');
   eq(check('ledger', fake('const k = "portal-activity", a = JSON.parse(localStorage.getItem(k) || "[]"); a.push([1, "X", "lift", 2])')), 'warn', 'a hand-written ledger row warns');
   eq(check('ledger', fake('saveWorkout(w)')), 'FAIL', 'no ledger fails');
   eq(check('themes', fake('<select id="theme"><option>ember</option></select> body{background:var(--bg)}')), 'FAIL', 'an own theme list fails');
