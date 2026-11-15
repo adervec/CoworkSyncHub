@@ -134,6 +134,13 @@ PORTAL_CSS = (
     "--sans:system-ui,'Segoe UI',sans-serif;" + _LIGHT + "}\n"
     "@media (prefers-color-scheme:dark){:root:not([data-theme=light]){" + _DARK + "}}\n"
     ":root[data-theme=dark]{" + _DARK + "}\n"
+    # house standard 24: once font.js has set the reader's theme, its palette replaces the two above
+    ":root[data-house-theme]{--bg:var(--t-bg);--card:var(--t-surface);--ink:var(--t-text);--mut:var(--t-dim);"
+    "--line:var(--t-line);--acc:var(--t-accent);--accink:var(--t-on-accent);--chipbg:var(--t-surface2);"
+    "--grid:color-mix(in srgb,var(--t-accent) 6%,transparent);--area:color-mix(in srgb,var(--t-accent) 13%,transparent);"
+    "color-scheme:var(--t-scheme)}\n"
+    ":root[data-house-dark='1']{--tile:45% 20%;--tileink:70% 75%;--spark:65% 62%}\n"
+    ":root[data-house-dark='0']{--tile:70% 90%;--tileink:35% 25%;--spark:60% 40%}\n"
 ) + """
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -321,16 +328,16 @@ PORTAL_JS = """
 var d=document;
 if("serviceWorker" in navigator&&location.protocol==="https:")
   navigator.serviceWorker.register("sw.js").catch(function(){});
-// theme: auto -> light -> dark, persisted
-var root=d.documentElement,tbtn=d.getElementById("theme");
-var modes=["auto","light","dark"],icons={auto:"\\u25d0",light:"\\u2600",dark:"\\u263e"};
-function setTheme(m){
-  if(m==="auto")root.removeAttribute("data-theme");else root.setAttribute("data-theme",m);
-  tbtn.textContent=icons[m];tbtn.title="theme: "+m;tbtn.setAttribute("aria-label","theme: "+m);
-  try{localStorage.setItem("portal-theme",m)}catch(err){}}
-var cur="auto";try{cur=localStorage.getItem("portal-theme")||"auto"}catch(err){}
-setTheme(cur);
-tbtn.addEventListener("click",function(){cur=modes[(modes.indexOf(cur)+1)%3];setTheme(cur)});
+// theme: the house list (font.js, standard 24); each tap moves to the next one, Settings has the full picker
+var tbtn=d.getElementById("theme"),TH=window.appFont?["system"].concat(appFont.themes.map(function(t){return t.id})):[];
+function paintTheme(){if(!TH.length)return;
+  var nm=appFont.theme()==="system"?"System":appFont.themeNow().label;
+  tbtn.title="theme: "+nm+" (tap for the next)";tbtn.setAttribute("aria-label",tbtn.title);}
+try{var oldTheme=localStorage.getItem("portal-theme");  // the old auto/light/dark choice carries over once
+  if(oldTheme&&TH.length){if(oldTheme==="light"||oldTheme==="dark")appFont.setTheme(oldTheme);localStorage.removeItem("portal-theme");}}catch(err){}
+paintTheme();
+tbtn.addEventListener("click",function(){if(!TH.length)return;
+  appFont.setTheme(TH[(TH.indexOf(appFont.theme())+1)%TH.length]);paintTheme();});
 // live relative times
 function rel(s){if(s<60)return Math.floor(s)+"s";if(s<3600)return Math.floor(s/60)+"m";
   if(s<86400)return Math.floor(s/3600)+"h";return Math.floor(s/86400)+"d";}
@@ -362,6 +369,7 @@ d.querySelectorAll(".grid .app").forEach(function(c){var b=d.createElement("butt
 d.getElementById("hidshow").addEventListener("click",function(){d.body.classList.toggle("showhid");applyPrefs();});
 applyPrefs();
 d.addEventListener("hub-prefs",function(){applyPrefs();applyFilter();paintUsage();sheet();});
+d.addEventListener("hub-ledger",function(){sheet();});
 // sign-in: a tap, because browsers only let Google's window open from one. Tokens stay in memory.
 var sb=d.getElementById("signin");
 function paintAcct(){sb.hidden=!window.appFont||!window.hubPrefs||!!appFont.getAccount()}
@@ -458,6 +466,8 @@ var KIND={lift:{STR:1,VIT:.3},cardio:{END:1,VIT:.4},ride:{END:1,VIT:.4},read:{IN
   aim:{DEX:1,PSI:.4},study:{INT:1,PSI:.3},compose:{PSI:.8,CHR:.6},art:{PSI:.8,INT:.4},listen:{PSI:.7,INT:.5}};
 function activity(){var ev=[];try{ev=JSON.parse(localStorage.getItem(AKEY)||"[]")}catch(err){}
   if(!Array.isArray(ev))ev=[];
+  // rows from the reader's other devices, fetched by hub.js when signed in
+  try{var rem=JSON.parse(localStorage.getItem("portal-activity-remote")||"[]");if(Array.isArray(rem))ev=ev.concat(rem)}catch(err){}
   ev=ev.filter(function(x){return Array.isArray(x)&&x.length>=3&&APPKIND[x[1]]&&!HID[x[1]]});
   var real=ev.length>0,u=usage();
   if(!real)Object.keys(u).forEach(function(s){if(APPKIND[s]&&!HID[s])ev.push([u[s].last,s,APPKIND[s],.25*Math.min(u[s].n,8)])});
@@ -568,7 +578,7 @@ function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},ra
   askCoach();
   d.getElementById("sheetnote").textContent=(a.real?a.events.length+" activities reported by your apps":
     "based on launches only so far \u2014 apps report real activity as they're updated")
-    +" \u00b7 last 2 weeks count double \u00b7 lives only in this browser";}
+    +" \u00b7 last 2 weeks count double \u00b7 kept in this browser, and in your own Drive if you sign in";}
 sheet();
 // ask your coach: the portal is a cowork app too — the shared panel in fs mode, one `review` channel
 var askMounted=false;

@@ -134,6 +134,15 @@
   F.setTheme('nonsense');
   ok('an unknown theme falls back to System', F.theme() === 'system' && tsel.value === 'system' && !localStorage.getItem('maker-theme:font-selftest.html'));
   tp.remove();
+  // session ledger (house standard 25)
+  var led = function () { return JSON.parse(localStorage.getItem('portal-activity') || '[]'); };
+  localStorage.removeItem('portal-activity');
+  ok('logSession needs a kind and an app', F.logSession({ app: 'Demo' }) === false && F.logSession({ kind: 'lift' }) === false && !led().length);
+  ok('logSession adds one row', F.logSession({ app: 'Demo', kind: 'lift', minutes: 42, id: 'w1' }) === true && JSON.stringify(led()[0].slice(1)) === '["Demo","lift",4,"w1"]' && Math.abs(led()[0][0] - Date.now() / 1000) < 5);
+  ok('the same session counts once', F.logSession({ app: 'Demo', kind: 'lift', minutes: 42, id: 'w1' }) === false && led().length === 1);
+  for (var li = 0; li < 2005; li++) F.logSession({ app: 'Demo', kind: 'read', amount: 1 });
+  ok('the ledger keeps the last 2000 rows', led().length === 2000 && led()[1999][2] === 'read');
+  localStorage.removeItem('portal-activity');
   localStorage.removeItem('maker-font');
   document.getElementById('log').textContent = fails.length ? 'FAILED:\n' + fails.join('\n') : 'SELFTEST PASS';
 })();

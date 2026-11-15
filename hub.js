@@ -45,6 +45,41 @@ window.hubPrefs = (function () {
       var pulled = ms !== JSON.stringify(local), push = !remote || ms !== JSON.stringify(remote);
       if (pulled) put(m);
       return (push ? appFont.google.write(FILE, ms) : Promise.resolve()).then(function () { return pulled && push ? 'both' : pulled ? 'pulled' : push ? 'pushed' : 'same'; });
+    }).then(function (res) { return syncLedger().catch(function () { /* the settings still synced */ }).then(function () { return res; }); });
+  }
+
+  // ---- the session ledger across devices (chunk 4) ----------------------------------------------------
+  // Apps add rows to localStorage 'portal-activity' (appFont.logSession). Each device writes only its
+  // own file, hub-ledger-<device>.json, so two devices never overwrite each other; the other devices'
+  // rows are kept in 'portal-activity-remote' for the hub to draw. Skipped while activity is switched off.
+  function device() {
+    var v = localStorage.getItem('portal-device');
+    if (!v) { v = appFont.randomId().replace(/-/g, '').slice(0, 16); localStorage.setItem('portal-device', v); }
+    return v;
+  }
+  function rows(text) {
+    var a = [];
+    try { a = appFont.parseJSON(text || '[]', 2e6); } catch (e) { /* unreadable: no rows */ }
+    return (Array.isArray(a) ? a : []).filter(function (x) { return Array.isArray(x) && x.length >= 3 && isFinite(x[0]) && typeof x[1] === 'string' && x[1].length < 80; }).slice(-2000);
+  }
+  function syncLedger() {
+    if (!get().activity) return Promise.resolve();
+    var mine = 'hub-ledger-' + device() + '.json', text = localStorage.getItem('portal-activity') || '[]', local = rows(text);
+    var mark = text.length + ':' + text.slice(-60); // changed since the last push?
+    var push = local.length && localStorage.getItem('portal-ledger-pushed') !== mark
+      ? appFont.google.write(mine, JSON.stringify(local)).then(function () { localStorage.setItem('portal-ledger-pushed', mark); }) : Promise.resolve();
+    return push.then(function () { return appFont.google.list('hub-ledger-'); }).then(function (names) {
+      var out = [], seen = {};
+      local.forEach(function (r) { if (r[4]) seen[r[1] + '|' + r[4]] = 1; });
+      return names.filter(function (n) { return n !== mine; }).slice(0, 20).reduce(function (p, n) { // ponytail: 20 devices is plenty
+        return p.then(function () { return appFont.google.read(n); }).then(function (t) {
+          rows(t).forEach(function (r) { var k = r[4] ? r[1] + '|' + r[4] : ''; if (k && seen[k]) return; if (k) seen[k] = 1; out.push(r.slice(0, 5)); });
+        });
+      }, Promise.resolve()).then(function () {
+        out.sort(function (a, b) { return a[0] - b[0]; });
+        localStorage.setItem('portal-activity-remote', JSON.stringify(out.slice(-6000)));
+        document.dispatchEvent(new CustomEvent('hub-ledger'));
+      });
     });
   }
   // the reader asked to sign in: Google's window may show

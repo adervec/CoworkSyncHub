@@ -37,7 +37,11 @@ async function device(viewport) {
     if (q.method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { ...cors, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
     if (q.headers().authorization !== 'Bearer ' + TOKEN) return r.fulfill({ status: 401, headers: cors });
     if (u.pathname.endsWith('/userinfo')) return json({ name: 'Test Reader', email: 'reader@example.com', picture: '' });
-    if (u.pathname === '/drive/v3/files') { const name = /name='([^']+)'/.exec(u.searchParams.get('q') || ''); return json({ files: name && name[1] in drive ? [{ id: name[1] }] : [] }); }
+    if (u.pathname === '/drive/v3/files') {
+      const q0 = u.searchParams.get('q') || '', name = /name='([^']+)'/.exec(q0), has = /name contains '([^']+)'/.exec(q0);
+      if (has) return json({ files: Object.keys(drive).filter(k => k.startsWith(has[1])).map(k => ({ id: k, name: k })) });
+      return json({ files: name && name[1] in drive ? [{ id: name[1] }] : [] });
+    }
     if (u.pathname === '/upload/drive/v3/files') { const body = q.postData(), name = JSON.parse(/\r\n\r\n(\{.*?\})\r\n--/.exec(body)[1]).name; drive[name] = body.split('\r\n\r\n')[2].split('\r\n--')[0]; return json({ id: name }); }
     const id = decodeURIComponent(u.pathname.split('/').pop());
     if (q.method() === 'PATCH') { drive[id] = q.postData(); return json({ id }); }
@@ -78,6 +82,20 @@ await p1.click('#gymtracker315 .nfmb');
 ok('and it can be put back', (await slugs(p1)).includes('GymTracker315') && !(await shown(p1, '#hid')));
 ok('nothing went to Drive without a sign-in', !('hub-prefs.json' in drive));
 
+// ---- the theme button walks the house list ----
+const themeNow = () => p1.evaluate(() => [document.documentElement.dataset.houseTheme, getComputedStyle(document.querySelector('.grid .app')).backgroundColor].join(' '));
+await p1.click('#theme'); const t1 = await themeNow();
+await p1.click('#theme'); const t2 = await themeNow();
+ok('the theme button moves through the shared list and recolours the page', t1 === 'light rgb(255, 255, 255)' && t2 === 'dark rgb(26, 29, 35)');
+await p1.reload();
+ok('the hub remembers its theme', (await themeNow()) === t2);
+await p1.evaluate(() => appFont.setTheme('system'));
+
+// ---- device 1 has done some sessions (the apps call appFont.logSession) ----
+await p1.evaluate(() => { for (let i = 0; i < 3; i++) appFont.logSession({ app: 'Run315', kind: 'cardio', minutes: 30, id: 'run' + i, at: Date.now() - i * 864e5 }); });
+await p1.reload();
+ok('logged sessions show on the hub', /3 activities reported/.test(await p1.textContent('#sheetnote')) && /Run315/.test(await p1.textContent('#stats')));
+
 // ---- device 1 signs in, then hides two apps ----
 await p1.click('#signin');
 await p1.waitForFunction(() => document.getElementById('signin').hidden, null, { timeout: 5000 }).catch(() => {});
@@ -85,6 +103,9 @@ ok('signing in swaps the button for the account picture', !(await shown(p1, '#si
 await p1.click('#gymtracker315 .nfmb'); await p1.click('#tachyread .nfmb');
 await synced(() => hidden() === 'GymTracker315,Tachyread');
 ok('hidden apps reach the Drive file', hidden() === 'GymTracker315,Tachyread');
+const ledgers = () => Object.keys(drive).filter(k => k.startsWith('hub-ledger-'));
+await synced(() => ledgers().length === 1);
+ok('this device\'s sessions go to its own Drive file', ledgers().length === 1 && JSON.parse(drive[ledgers()[0]]).length === 3 && /Run315/.test(drive[ledgers()[0]]));
 ok('the token is not kept in storage', await p1.evaluate(t => !JSON.stringify(Object.entries(localStorage)).includes(t), TOKEN));
 
 // ---- device 2: a desktop, fresh browser ----
@@ -94,6 +115,9 @@ ok('a new device starts with every app', (await slugs(p2)).includes('GymTracker3
 await p2.click('#signin');
 await p2.waitForFunction(() => document.querySelectorAll('.grid .app.nfm').length === 2, null, { timeout: 5000 }).catch(() => {});
 ok('signing in brings the hidden apps to the second device', !(await slugs(p2)).includes('GymTracker315') && !(await slugs(p2)).includes('Tachyread'));
+await p2.waitForFunction(() => /Run315/.test(localStorage.getItem('portal-activity-remote') || ''), null, { timeout: 5000 }).catch(() => {});
+ok('the second device sees the first one\'s sessions', /3 activities reported/.test(await p2.textContent('#sheetnote')) && /Run315/.test(await p2.textContent('#stats')));
+ok('a device with no sessions writes no file', ledgers().length === 1);
 // both devices now change something without seeing the other: the merge keeps both
 await p2.click('#chessretabled .nfmb');
 await synced(() => hidden() === 'ChessRetabled,GymTracker315,Tachyread');

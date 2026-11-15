@@ -9,35 +9,37 @@
 <script>window.appFontBase = '/fonts/';</script>
 <script src="font.js"></script>
 <style>
-:root { color-scheme: light dark }
-body { font-family: var(--app-font, system-ui); margin: 0 auto; padding: 16px; max-width: 760px; background: Canvas; color: CanvasText; line-height: 1.5 }
+:root { color-scheme: var(--t-scheme); accent-color: var(--t-accent) }
+a { color: var(--t-accent) }
+select { font: inherit; padding: 8px; background: var(--t-surface); color: var(--t-text); border: 1px solid var(--t-line); border-radius: 8px }
+body { font-family: var(--app-font, system-ui); margin: 0 auto; padding: 16px; max-width: 760px; background: var(--t-bg); color: var(--t-text); line-height: 1.5 }
 h1 { margin: 0 0 4px } h2 { margin: 28px 0 8px; font-size: 1.15rem }
 p { margin: 8px 0 } .dim { opacity: .75; font-size: .92rem }
-button, .filebtn { font: inherit; padding: 10px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, CanvasText 30%, transparent); background: Canvas; color: CanvasText; cursor: pointer; min-height: 44px }
-button.main { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600 }
+button, .filebtn { font: inherit; padding: 10px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--t-text) 30%, transparent); background: var(--t-bg); color: var(--t-text); cursor: pointer; min-height: 44px }
+button.main { background: var(--t-accent); border-color: var(--t-accent); color: var(--t-on-accent); font-weight: 600 }
 .filebtn { display: inline-flex; align-items: center }
 button:disabled { opacity: .5; cursor: default }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 }
-.group { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 12px; margin: 8px 0; padding: 4px 12px }
+.group { border: 1px solid color-mix(in srgb, var(--t-text) 18%, transparent); border-radius: 12px; margin: 8px 0; padding: 4px 12px }
 .group > summary { display: flex; gap: 10px; align-items: center; padding: 8px 0; cursor: pointer; list-style: none }
 .group > summary::-webkit-details-marker { display: none }
 .group > summary b { flex: 1; min-width: 0; overflow-wrap: anywhere }
 .group input[type=checkbox] { width: 22px; height: 22px; flex: none }
-.item { border-top: 1px solid color-mix(in srgb, CanvasText 10%, transparent); padding: 6px 0; font-size: .92rem }
+.item { border-top: 1px solid color-mix(in srgb, var(--t-text) 10%, transparent); padding: 6px 0; font-size: .92rem }
 .item summary { cursor: pointer; overflow-wrap: anywhere }
-.kind { font-size: .75rem; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, CanvasText 12%, transparent); margin-right: 6px; white-space: nowrap }
-pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-height: 320px; overflow: auto; background: color-mix(in srgb, CanvasText 6%, transparent); padding: 8px; border-radius: 8px; margin: 6px 0 }
-.warn { color: #b45309; font-weight: 600 } .bad { color: #dc2626; font-weight: 600 }
+.kind { font-size: .75rem; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--t-text) 12%, transparent); margin-right: 6px; white-space: nowrap }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-height: 320px; overflow: auto; background: color-mix(in srgb, var(--t-text) 6%, transparent); padding: 8px; border-radius: 8px; margin: 6px 0 }
+.warn { color: var(--t-warn); font-weight: 600 } .bad { color: var(--t-bad); font-weight: 600 }
 .wrap { overflow-x: auto }
 #cmp { border-collapse: collapse; width: 100%; font-size: .92rem }
-#cmp th, #cmp td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid color-mix(in srgb, CanvasText 14%, transparent) }
+#cmp th, #cmp td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid color-mix(in srgb, var(--t-text) 14%, transparent) }
 #cmp thead th { border-top: 0; font-size: .85rem }
 #cmp label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer }
 #cmp input[type=checkbox] { width: 20px; height: 20px; flex: none; margin: 1px 0 0 }
 #cmp .name { font: inherit; font-weight: 700; padding: 0; min-height: 0; border: 0; background: none; text-align: left; text-decoration: underline dotted; overflow-wrap: anywhere }
 #cmp .st { display: block; font-size: .8rem; font-weight: 400; opacity: .8 }
 #cmp .none { opacity: .5 }
-#cmp tr.detail td { background: color-mix(in srgb, CanvasText 4%, transparent) }
+#cmp tr.detail td { background: color-mix(in srgb, var(--t-text) 4%, transparent) }
 #prog label { display: grid; grid-template-columns: 7.5em 1fr; gap: 2px 10px; align-items: center; margin: 8px 0 }
 #prog progress { width: 100%; height: 14px }
 #prog label[hidden] { display: none }
@@ -111,7 +113,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
   }
   function owner(kind, name) {
     for (var i = 0; i < apps.length; i++) if (apps[i].inv && matches(apps[i].inv[kind], name)) return apps[i].title;
-    if (kind === 'localStorage' && HOUSE.test(name)) return 'Shared settings (font, language, hub)';
+    if ((kind === 'localStorage' && HOUSE.test(name)) || (kind === 'drive' && /^hub-/.test(name))) return 'Shared settings (font, language, hub)';
     var n = norm(name), best = null;
     apps.forEach(function (a) { // ponytail: name guess; exact once the app publishes app-data.json
       [a.slug, a.title, a.dir].forEach(function (w) { w = norm(w || ''); if (w.length > 3 && n.indexOf(w) >= 0 && (!best || w.length > best.w)) best = { w: w.length, t: a.title }; });

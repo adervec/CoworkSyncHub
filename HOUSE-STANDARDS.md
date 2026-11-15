@@ -207,6 +207,21 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - The standards check's `themes` column fails until the app offers the list and uses the palette.
     - See them all, and a minimal adoption, at `https://adervec.github.io/portal/themes.html`.
 
+25. **Session ledger.** When a session finishes (a workout, a run, a reading or typing session, a
+    practice run, a game, a check-in: the same things standard 18 grades), tell the hub once:
+    `appFont.logSession({ kind, minutes, id })`.
+    - `kind`: one of lift, cardio, ride, read, chess, practice, write, speak, paint, cook, checkin,
+      focus, aim, study, compose, art, listen. `minutes`: how long it took (or `amount`, where 1 is
+      about ten minutes of effort). `id`: the session's own id, so a re-save or a sync that brings
+      the session back never counts twice. `at`: when it ended, if not now.
+    - Do not write `portal-activity` by hand any more; replace the old copied snippet with the call.
+      Never log on a timer or per keystroke: one row per finished session.
+    - The hub draws habits, streaks and the character sheet from it. Rows stay in the browser; if
+      the reader signs in on the hub, the hub (not the app) keeps one file per device in their
+      private Drive folder (`hub-ledger-<device>.json`). An app never reads or writes those files.
+    - The standards check's `ledger` column: ok with `logSession`, a warning for a hand-written row,
+      fails when nothing is logged.
+
 ## Working habits
 
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you. Also run `node ../CoworkSyncHub/layout-check.mjs <App>` (the live site, phone and desktop) and fix what it flags.

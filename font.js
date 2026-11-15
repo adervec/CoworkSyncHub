@@ -835,6 +835,37 @@
       .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]');
   }
 
+  // ---- Session ledger (house standard 25, hub roadmap chunk 4) --------------------------------------
+  // One line per finished session, so the hub can show habits and progress across every app:
+  //   appFont.logSession({ kind: 'lift', minutes: 42, id: workout.id })
+  // kind    what it was: lift cardio ride read chess practice write speak paint cook checkin focus aim
+  //         study compose art listen (the hub maps kinds onto its stats)
+  // minutes how long it took; or amount, a size of your own (1 = about ten minutes of effort)
+  // id      the session's own id, so logging it twice (a re-save, a sync) counts once
+  // at      when it ended (ms), if not now
+  // It is a row [seconds, app, kind, amount, id] in the shared localStorage 'portal-activity' (the last
+  // 2000 per device). Nothing leaves the device unless the reader signs in on the hub, which then keeps
+  // one file per device in their own private Drive folder. Returns true when a row was added.
+  function logSession(s) {
+    s = s || {};
+    var slug = s.app || (/\.html?$/.test(homeSlug) ? '' : homeSlug);
+    if (!slug || typeof s.kind !== 'string' || !s.kind) return false;
+    var amount = isFinite(s.amount) && s.amount > 0 ? +s.amount : Math.max(1, Math.round((+s.minutes || 10) / 10));
+    amount = Math.min(100, Math.round(amount * 10) / 10);
+    var at = isFinite(s.at) && s.at > 0 ? +s.at : Date.now();
+    var id = s.id == null ? '' : String(s.id).slice(0, 80);
+    try {
+      var a = JSON.parse(localStorage.getItem('portal-activity') || '[]');
+      if (!Array.isArray(a)) a = [];
+      if (id && a.some(function (x) { return x && x[1] === slug && x[4] === id; })) return false; // already logged
+      var row = [Math.round(at > 2e10 ? at / 1000 : at), String(slug).slice(0, 80), s.kind.slice(0, 20), amount];
+      if (id) row.push(id);
+      a.push(row);
+      localStorage.setItem('portal-activity', JSON.stringify(a.slice(-2000)));
+      return true;
+    } catch (e) { return false; } // private mode, or storage full: the session itself is the app's to keep
+  }
+
   // ---- One theme list for every app (house standard 24) ---------------------------------------------
   // Every app offers exactly these themes, under these names. The choice is kept per app, so one app
   // can be Ember while another is Paper; "System" (the default) follows the device's light/dark.
@@ -968,6 +999,13 @@
   // one named file in the private folder: -> its text, or null when there is none yet
   function driveRead(name) {
     return gFind(name).then(function (id) { return id ? gApi('drive/v3/files/' + id + '?alt=media').then(function (r) { return r.text(); }) : null; });
+  }
+  // the names of the files in the private folder that start with prefix
+  function driveList(prefix) {
+    var q = "name contains '" + String(prefix).replace(/['\\]/g, '\\$&') + "' and trashed=false";
+    return gApi('drive/v3/files?spaces=appDataFolder&pageSize=1000&fields=files(id,name)&q=' + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (j) { return (j.files || []).map(function (f) { return f.name; }).filter(function (n) { return n.indexOf(prefix) === 0; }); });
   }
   function driveWrite(name, text) {
     return gFind(name).then(function (id) {
@@ -1154,7 +1192,8 @@
     esc: esc, html: html, safeUrl: safeUrl, parseJSON: parseJSON, randomId: randomId, redact: redact,
     zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice,
     themes: themes, theme: themeChoice, themeNow: themeNow, setTheme: setTheme,
-    google: { token: googleToken, signedIn: googleSignedIn, signOut: googleSignOut, read: driveRead, write: driveWrite },
+    google: { token: googleToken, signedIn: googleSignedIn, signOut: googleSignOut, read: driveRead, write: driveWrite, list: driveList },
+    logSession: logSession,
     backup: { list: backupList, peek: backupPeek, build: backupBuild, download: backupDownload },
     diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,
     whatsNew: whatsNew, checkWhatsNew: checkWhatsNew, setWhatsNewSilenced: setWhatsNewSilenced,

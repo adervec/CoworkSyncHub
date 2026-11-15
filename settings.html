@@ -10,17 +10,19 @@
 <script src="font.js"></script>
 <script src="hub.js"></script>
 <style>
-:root { color-scheme: light dark }
-body { font-family: var(--app-font, system-ui); margin: 0 auto; padding: 16px; max-width: 760px; background: Canvas; color: CanvasText; line-height: 1.5 }
+:root { color-scheme: var(--t-scheme); accent-color: var(--t-accent) }
+a { color: var(--t-accent) }
+select { font: inherit; padding: 8px; background: var(--t-surface); color: var(--t-text); border: 1px solid var(--t-line); border-radius: 8px }
+body { font-family: var(--app-font, system-ui); margin: 0 auto; padding: 16px; max-width: 760px; background: var(--t-bg); color: var(--t-text); line-height: 1.5 }
 h1 { margin: 0 0 4px } h2 { margin: 28px 0 8px; font-size: 1.15rem }
 p, ul { margin: 8px 0 } .dim { opacity: .75; font-size: .92rem }
-button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, CanvasText 30%, transparent); background: Canvas; color: CanvasText; cursor: pointer; min-height: 44px }
-button.main { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600 }
-button.danger { border-color: #dc2626; color: #dc2626 }
+button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--t-text) 30%, transparent); background: var(--t-bg); color: var(--t-text); cursor: pointer; min-height: 44px }
+button.main { background: var(--t-accent); border-color: var(--t-accent); color: var(--t-on-accent); font-weight: 600 }
+button.danger { border-color: var(--t-bad); color: var(--t-bad) }
 .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 }
-label.opt { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid color-mix(in srgb, CanvasText 10%, transparent) }
+label.opt { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--t-text) 10%, transparent) }
 label.opt input { width: 22px; height: 22px; flex: none }
-.bad { color: #dc2626; font-weight: 600 }
+.bad { color: var(--t-bad); font-weight: 600 }
 #beta { margin: -16px -16px 12px; padding: 6px 12px; background: #b45309; color: #fff; font-weight: 600; text-align: center }
 </style></head><body>
 <p id="beta" hidden>BETA: the maker's preview</p>
@@ -35,18 +37,22 @@ label.opt input { width: 22px; height: 22px; flex: none }
 <button id="out" type="button" hidden>Sign out</button>
 <span id="acctMsg" class="dim" aria-live="polite"></span></div>
 
+<h2>Look</h2>
+<app-theme-picker></app-theme-picker>
+<p class="dim">Every app has this same list of themes, and each remembers its own choice. This one is the hub's. <a href="themes.html">See them all</a>.</p>
+
 <h2>Apps on your hub</h2>
 <p class="dim">Untick an app that is not for you. It leaves the hub's tiles, cards, character sheet and suggestions. Nothing is deleted: its data stays, and it still appears in backups.</p>
 <div id="apps"></div>
 
 <h2>Your activity</h2>
 <label class="opt"><input id="activity" type="checkbox"> <span>Show my activity from the apps on the hub (character sheet, habits, streak)</span></label>
-<p class="dim">The apps note what you did (a workout, a reading session) in this browser, and the hub reads it here to draw the sheet. It is never sent anywhere.</p>
+<p class="dim">The apps note what you did (a workout, a reading session) in this browser, and the hub reads it here to draw the sheet. If you sign in, the notes also go to your own private Drive folder, one file per device, so the sheet counts your phone and your computer together. Switched off, nothing is shown and nothing is sent to Drive.</p>
 
 <h2>What is stored, and where</h2>
 <ul>
 <li><b>In this browser:</b> everything each app keeps for you, plus the hub's own notes: which apps you opened and when, which are on your home screen, your activity, your theme and these settings.</li>
-<li><b>In your Google Drive, only if you sign in:</b> each app's synced copy and the hub's settings file, in a private folder that only these apps can read. It is not among your Drive files.</li>
+<li><b>In your Google Drive, only if you sign in:</b> each app's synced copy, the hub's settings file and your activity notes (one file per device), in a private folder that only these apps can read. It is not among your Drive files.</li>
 <li><b>With the maker: nothing.</b> There are no accounts, servers or tracking. The maker cannot see your data.</li>
 <li><b>Other services the pages talk to:</b> Google, for sign-in and Drive, when you use them.</li>
 </ul>
