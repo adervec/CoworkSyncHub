@@ -178,7 +178,10 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
       button in every About panel (`appFont.backup`, in font.js) save everything on the origin, plus
       the Drive folder, to one file. Until an app has its `app-data.json` its data is matched by
       name, or lands under "Other data". Check with `node ../CoworkSyncHub/backup-check.mjs`.
-      Restore is not built yet (hub roadmap chunk 2b): do not promise it in an app's own text.
+      Restore is on the same page: it opens a backup file, shows what is in it app by app, and
+      puts back the apps the reader ticks (their settings, databases and Drive files) after saving
+      a safety copy. It recreates a database at the version the file has, so **keep every upgrade
+      step** (`onupgradeneeded` from each older version): a restored old backup must still open.
     - font.js now records the home-screen install (`portal-installed`) for every app; an app's own
       copy of that code can go.
     - The registry of apps is `CoworkSyncHub/apps.json` (published at `adervec.github.io/apps.json`).

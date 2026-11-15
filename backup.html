@@ -20,38 +20,34 @@ button.main { background: var(--t-accent); border-color: var(--t-accent); color:
 .filebtn { display: inline-flex; align-items: center }
 button:disabled { opacity: .5; cursor: default }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 }
-.group { border: 1px solid color-mix(in srgb, var(--t-text) 18%, transparent); border-radius: 12px; margin: 8px 0; padding: 4px 12px }
-.group > summary { display: flex; gap: 10px; align-items: center; padding: 8px 0; cursor: pointer; list-style: none }
-.group > summary::-webkit-details-marker { display: none }
-.group > summary b { flex: 1; min-width: 0; overflow-wrap: anywhere }
-.group input[type=checkbox] { width: 22px; height: 22px; flex: none }
 .item { border-top: 1px solid color-mix(in srgb, var(--t-text) 10%, transparent); padding: 6px 0; font-size: .92rem }
 .item summary { cursor: pointer; overflow-wrap: anywhere }
 .kind { font-size: .75rem; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--t-text) 12%, transparent); margin-right: 6px; white-space: nowrap }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-height: 320px; overflow: auto; background: color-mix(in srgb, var(--t-text) 6%, transparent); padding: 8px; border-radius: 8px; margin: 6px 0 }
 .warn { color: var(--t-warn); font-weight: 600 } .bad { color: var(--t-bad); font-weight: 600 }
 .wrap { overflow-x: auto }
-#cmp { border-collapse: collapse; width: 100%; font-size: .92rem }
-#cmp th, #cmp td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid color-mix(in srgb, var(--t-text) 14%, transparent) }
-#cmp thead th { border-top: 0; font-size: .85rem }
-#cmp label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer }
-#cmp input[type=checkbox] { width: 20px; height: 20px; flex: none; margin: 1px 0 0 }
-#cmp .name { font: inherit; font-weight: 700; padding: 0; min-height: 0; border: 0; background: none; text-align: left; text-decoration: underline dotted; overflow-wrap: anywhere }
-#cmp .st { display: block; font-size: .8rem; font-weight: 400; opacity: .8 }
-#cmp .none { opacity: .5 }
-#cmp tr.detail td { background: color-mix(in srgb, var(--t-text) 4%, transparent) }
+.cmp { border-collapse: collapse; width: 100%; font-size: .92rem }
+.cmp th, .cmp td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid color-mix(in srgb, var(--t-text) 14%, transparent) }
+.cmp thead th { border-top: 0; font-size: .85rem }
+.cmp label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer }
+.cmp input[type=checkbox] { width: 20px; height: 20px; flex: none; margin: 1px 0 0 }
+.cmp .name { font: inherit; font-weight: 700; padding: 0; min-height: 0; border: 0; background: none; text-align: left; text-decoration: underline dotted; overflow-wrap: anywhere }
+.cmp .st { display: block; font-size: .8rem; font-weight: 400; opacity: .8 }
+.cmp .none { opacity: .5 }
+.cmp tr.detail td { background: color-mix(in srgb, var(--t-text) 4%, transparent) }
 #prog label { display: grid; grid-template-columns: 7.5em 1fr; gap: 2px 10px; align-items: center; margin: 8px 0 }
-#prog progress { width: 100%; height: 14px }
+#prog progress, #fp, #rp { width: 100%; height: 14px }
+.cmp td .st { margin-top: 2px }
 #prog label[hidden] { display: none }
 .filebtn { box-sizing: border-box }
 @media (max-width: 560px) { /* phone: the app name on its own line, the two copies side by side under it */
-  #cmp, #cmp thead, #cmp tbody { display: block }
-  #cmp tr { display: grid; grid-template-columns: 1fr 1fr }
-  #cmp tr > th:first-child { grid-column: 1 / -1; padding-bottom: 0 }
-  #cmp thead th:first-child { display: none }
-  #cmp tbody td { border-top: 0 }
-  #cmp tr.detail, #cmp tr.detail td { display: block }
-  #cmp tr[hidden] { display: none }
+  .cmp, .cmp thead, .cmp tbody { display: block }
+  .cmp tr { display: grid; grid-template-columns: 1fr 1fr }
+  .cmp tr > th:first-child { grid-column: 1 / -1; padding-bottom: 0 }
+  .cmp thead th:first-child { display: none }
+  .cmp tbody td { border-top: 0 }
+  .cmp tr.detail, .cmp tr.detail td { display: block }
+  .cmp tr[hidden] { display: none }
 }
 #prog label span:last-child { grid-column: 2 }
 #beta { margin: -16px -16px 12px; padding: 6px 12px; background: #b45309; color: #fff; font-weight: 600; text-align: center }
@@ -76,19 +72,21 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
 </div>
 <p class="dim">The file is not encrypted and can hold personal data (training logs, recordings, notes): keep it somewhere private. Sign-in tokens are left out.</p>
 
-<h2>Check a backup file</h2>
-<p class="dim">Open a file you saved earlier to see what is inside. Nothing is changed.</p>
+<h2>Open a backup file</h2>
+<p class="dim">Choose a file you saved earlier to see exactly what is in it, app by app, next to what this browser has now. Opening a file changes nothing. From there you can put back one app, several, or everything.</p>
 <div class="row"><label class="filebtn">Choose a file…<input id="file" type="file" accept=".json,application/json" hidden></label><span id="fileMsg" aria-live="polite"></span></div>
+<progress id="fp" hidden></progress>
 <div id="check"></div>
-
-<h2>Restore</h2>
-<p class="dim">Putting a backup back into the apps is not built yet. Keep your files: they hold everything needed, and will restore once that arrives.</p>
+<p id="rsum" aria-live="polite"></p>
+<div class="row"><button id="restore" class="main" type="button" hidden disabled>Restore what is ticked</button><span id="rMsg" aria-live="polite"></span></div>
+<progress id="rp" hidden></progress>
+<div id="report"></div>
+<p class="dim">Restore puts back what you tick exactly as the file has it, and leaves everything else alone. Before it changes anything it downloads a safety copy of what it is about to replace. Only restore a file you made yourself.</p>
 
 <script>
 (function () {
   'use strict';
   var HOUSE = /^(maker-|portal-|app-|cowork-)/;
-  var BIG = 150e6; // a file above this is not opened whole when checking it
   var $ = function (id) { return document.getElementById(id); };
   var el = function (tag, text, cls) { var x = document.createElement(tag); if (text != null) x.textContent = text; if (cls) x.className = cls; return x; };
   var norm = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); };
@@ -167,64 +165,6 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
         view: function () { return 'Last changed ' + f.modifiedTime + '.\nIts contents are fetched when you download the backup.'; } };
     });
   }
-  function fileItems(snap) { // schema 1 kept keys and values apart; schema 2 keeps rows of [key, value]
-    var out = [], errors = snap.errors || {};
-    Object.keys(snap.localStorage || {}).forEach(function (k) {
-      var v = snap.localStorage[k];
-      out.push({ kind: 'localStorage', label: 'setting', name: k, bytes: v.length, count: 1, view: function () { return pretty(v); } });
-    });
-    Object.keys(snap.indexedDB || {}).forEach(function (n) {
-      var db = snap.indexedDB[n], st = {}, count = 0;
-      Object.keys(db.stores || {}).forEach(function (s) {
-        var all = db.stores[s].rows || db.stores[s].values || [];
-        st[s] = { count: all.length, rows: all.slice(0, 20) }; count += all.length;
-      });
-      out.push({ kind: 'indexedDB', label: 'database', name: n, count: count, error: db.error, view: function () { return storesText(st); } });
-    });
-    Object.keys(errors).forEach(function (n) { out.push({ kind: 'indexedDB', label: 'database', name: n, count: 0, error: errors[n], view: function () { return 'Not in this file.'; } }); });
-    (snap.drive || []).forEach(function (f) {
-      var bytes = f.text != null ? f.text.length : Math.round((f.b64 || '').length * 0.75);
-      out.push({ kind: 'drive', label: 'Drive file', name: f.name, bytes: bytes, count: 1,
-        view: function () { return (f.modifiedTime ? 'Last changed ' + f.modifiedTime + '\n' : '') + (f.text != null ? pretty(f.text) : '[' + size(bytes) + ' of binary]'); } });
-    });
-    return out;
-  }
-  // -> { picked(): the ticked owners } ; pick=false renders read-only (checking a file)
-  function render(box, list, pick, empty) {
-    box.textContent = '';
-    var groups = {}, boxes = {};
-    list.forEach(function (it) { it.owner = owner(it.kind, it.name); (groups[it.owner] = groups[it.owner] || []).push(it); });
-    var names = Object.keys(groups).sort(function (a, b) { return a.localeCompare(b); });
-    if (!names.length) box.appendChild(el('p', empty, 'dim'));
-    names.forEach(function (g) {
-      var d = el('details', null, 'group'), sum = el('summary'), bytes = 0, count = 0, errs = 0;
-      groups[g].forEach(function (it) { bytes += it.bytes || 0; count += it.count; errs += it.error ? 1 : 0; });
-      if (pick) {
-        var c = el('input'); c.type = 'checkbox'; c.checked = true; c.setAttribute('aria-label', 'Include ' + g);
-        c.addEventListener('click', function (ev) { ev.stopPropagation(); });
-        sum.appendChild(c); boxes[g] = c;
-      }
-      sum.appendChild(el('b', g));
-      sum.appendChild(el('span', plural(count, 'item') + (bytes ? ' · ' + size(bytes) : ''), 'dim'));
-      if (errs) sum.appendChild(el('span', 'could not read ' + errs, 'bad'));
-      d.appendChild(sum);
-      groups[g].forEach(function (it) {
-        var row = el('details', null, 'item'), s = el('summary');
-        s.appendChild(el('span', it.label, 'kind'));
-        s.appendChild(document.createTextNode(it.name + ' · ' + (it.kind === 'indexedDB' ? plural(it.count, 'record') : size(it.bytes))));
-        if (it.error) s.appendChild(el('span', ' could not be read: ' + it.error, 'bad'));
-        row.appendChild(s);
-        row.addEventListener('toggle', function () {
-          if (!row.open || row.querySelector('pre')) return;
-          var pre = el('pre', 'Reading…'); row.appendChild(pre);
-          Promise.resolve().then(it.view).then(function (t) { pre.textContent = t; }, function (e) { pre.textContent = 'Could not read this: ' + (e.message || e); });
-        });
-        d.appendChild(row);
-      });
-      box.appendChild(d);
-    });
-    return { picked: function () { var p = {}; names.forEach(function (g) { p[g] = !boxes[g] || boxes[g].checked; }); return p; } };
-  }
   function notes(box, note, skipped) {
     if (note) box.appendChild(el('p', note, 'warn'));
     if (skipped && skipped.length) box.appendChild(el('p', 'Left out (sign-in tokens): ' + skipped.join(', '), 'dim'));
@@ -291,7 +231,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
     box.textContent = '';
     if (!names.length) { box.appendChild(el('p', 'Nothing is stored in this browser yet.', 'dim')); summary(); return; }
     var wrap = el('div', null, 'wrap'), table = el('table'), head = el('tr'), body = el('tbody');
-    table.id = 'cmp';
+    table.id = 'cmp'; table.className = 'cmp';
     head.appendChild(el('th', 'App'));
     [['local', 'This browser'], ['drive', 'Google Drive']].forEach(function (c) {
       var th = el('th'), l = el('label'), all = el('input');
@@ -416,29 +356,360 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
     }).then(function () { busy = false; stop = null; $('cancel').hidden = true; summary(); });
   });
 
-  // ---- check a file ----------------------------------------------------------------------------------
+  // ---- reading a backup file of any size --------------------------------------------------------------
+  // The file is walked as it streams, never held whole. into(path) says which objects and arrays to
+  // step inside; every other value is handed over complete, as JSON text: await onValue(path, text).
+  // A path is the keys (and array indexes) from the top, e.g. ['indexedDB', 'books', 'stores', 'b', 'rows', 7].
+  async function walk(file, into, onValue, onBytes) {
+    var reader = file.stream().getReader(), utf = new TextDecoder('utf-8'), bytes = 0;
+    var stack = [], path = [], state = 'value', cap = null, kind = '', depth = 0, inStr = false, esc = false;
+    var bad = function () { return new Error('This file is damaged or is not a backup: it cannot be read.'); };
+    var after = function () { state = stack.length ? 'after' : 'end'; };
+    var close = function () { stack.pop(); path.pop(); after(); };
+    for (;;) {
+      var r = await reader.read();
+      if (r.done) break;
+      bytes += r.value.length;
+      var s = utf.decode(r.value, { stream: true }), n = s.length, i = 0, nq = -2, nb = -2;
+      while (i < n) {
+        if (cap) {
+          var from = i, fin = false;
+          if (kind === 'prim') {
+            while (i < n && ',}] \n\r\t'.indexOf(s[i]) < 0) i++;
+            fin = i < n;
+          } else {
+            while (i < n && !fin) {
+              if (inStr) {
+                if (esc) { esc = false; i++; continue; }
+                if (nq < i && nq !== -1) nq = s.indexOf('"', i);   // jump to the next quote or backslash:
+                if (nb < i && nb !== -1) nb = s.indexOf('\\', i);  // most of a backup is long base64 strings
+                var j = nq < 0 ? n : nq;
+                if (nb >= 0 && nb < j) j = nb;
+                i = j;
+                if (i >= n) break;
+                if (s.charCodeAt(i) === 92) esc = true; else { inStr = false; fin = kind !== 'box'; }
+                i++;
+              } else {
+                var c = s.charCodeAt(i++);
+                if (c === 34) inStr = true;
+                else if (c === 123 || c === 91) depth++;
+                else if (c === 125 || c === 93) { if (!--depth) fin = true; }
+              }
+            }
+          }
+          cap.push(s.slice(from, i));
+          if (!fin) continue;
+          var text = cap.join(''); cap = null;
+          if (kind === 'key') { path[path.length - 1] = JSON.parse(text); state = 'colon'; }
+          else { await onValue(path.slice(), text); after(); }
+          continue;
+        }
+        var ch = s[i];
+        if (ch === ' ' || ch === '\n' || ch === '\r' || ch === '\t') { i++; continue; }
+        if (state === 'value') {
+          if (ch === ']' && stack[stack.length - 1] === '[' && path[path.length - 1] === 0) { close(); i++; }
+          else if (ch === '{' || ch === '[') {
+            if (into(path)) { stack.push(ch); path.push(ch === '[' ? 0 : null); state = ch === '{' ? 'key' : 'value'; i++; }
+            else { cap = []; kind = 'box'; depth = 0; inStr = false; esc = false; }
+          } else if (ch === '"') { cap = ['"']; kind = 'str'; inStr = true; esc = false; i++; }
+          else { cap = []; kind = 'prim'; }
+        } else if (state === 'key') {
+          if (ch === '}') { close(); i++; }
+          else if (ch === '"') { cap = ['"']; kind = 'key'; inStr = true; esc = false; i++; }
+          else throw bad();
+        } else if (state === 'colon') {
+          if (ch !== ':') throw bad();
+          state = 'value'; i++;
+        } else if (state === 'after') {
+          if (ch === ',') { if (stack[stack.length - 1] === '[') { path[path.length - 1]++; state = 'value'; } else state = 'key'; i++; }
+          else if (ch === '}' || ch === ']') { close(); i++; }
+          else throw bad();
+        } else throw bad();
+      }
+      if (onBytes) onBytes(bytes);
+    }
+    if (state !== 'end') throw bad(); // cut short
+  }
+  // the parts of a backup that are stepped into; everything else (a setting, a record, a Drive file) arrives whole
+  function inside(p) {
+    if (!p.length) return true;
+    if (p[0] === 'drive') return p.length === 1;
+    if (p[0] !== 'indexedDB') return false;
+    return p.length <= 2 || (p.length === 3 && p[2] === 'stores') || p.length === 4 || (p.length === 5 && p[4] === 'rows');
+  }
+  var bytesOf = function (b64) { var s = atob(b64), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
+
+  // ---- open a backup file: what is in it --------------------------------------------------------------
+  // -> { file, head, ls: { key: value }, dbs: { name: { version, stores: { s: { meta, count, bytes, first } } } }, drive: [{ index, name, … }], errors }
+  async function analyse(file, onBytes) {
+    var A = { file: file, head: {}, ls: {}, dbs: {}, drive: [], errors: {} };
+    var first = await file.slice(0, 400).text();
+    if (!/"format"\s*:\s*"adervec-backup"/.test(first)) throw new Error('This is not a backup file from these apps.');
+    var store = function (p) { var db = A.dbs[p[1]] = A.dbs[p[1]] || { version: 0, stores: {} }; return db.stores[p[3]] = db.stores[p[3]] || { meta: {}, count: 0, bytes: 0, first: [] }; };
+    await walk(file, inside, function (p, text) {
+      if (p.length === 1) {
+        var v = appFont.parseJSON(text, 1e9);
+        if (p[0] === 'localStorage') A.ls = v && typeof v === 'object' ? v : {};
+        else if (p[0] === 'errors') A.errors = v && typeof v === 'object' ? v : {};
+        else if (p[0] !== 'indexedDB' && p[0] !== 'drive') A.head[p[0]] = v;
+      } else if (p[0] === 'drive') {
+        var f = appFont.parseJSON(text, 2e9);
+        A.drive.push({ index: p[1], name: String(f.name), modifiedTime: f.modifiedTime, mimeType: f.mimeType, bytes: f.text != null ? f.text.length : Math.round((f.b64 || '').length * 0.75) });
+      } else if (p.length === 3) { // a database's own fields
+        var db = A.dbs[p[1]] = A.dbs[p[1]] || { version: 0, stores: {} };
+        if (p[2] === 'version') db.version = +text; else if (p[2] === 'error') A.errors[p[1]] = JSON.parse(text);
+      } else if (p.length === 5) { // a store's own fields; the first backups kept "keys" and "values" apart
+        var st = store(p);
+        if (p[4] === 'values') { var all = appFont.parseJSON(text, 2e9); st.count = all.length; st.bytes = text.length; st.first = JSON.parse(JSON.stringify(all.slice(0, 20), short)); }
+        else if (p[4] !== 'keys') st.meta[p[4]] = JSON.parse(text);
+      } else if (p.length === 6) { // one record: [key, value]
+        var s6 = store(p);
+        s6.count++; s6.bytes += text.length;
+        if (s6.first.length < 20) s6.first.push(JSON.parse(JSON.stringify(appFont.parseJSON(text, 2e9), short)));
+      }
+    }, onBytes);
+    if (A.head.format !== 'adervec-backup') throw new Error('This is not a backup file from these apps.');
+    if (A.head.schema > 2) throw new Error('This file was made by a newer version of the backup. Reload this page and try again.');
+    return A;
+  }
+  function analysisItems(A) {
+    var out = [];
+    Object.keys(A.ls).forEach(function (k) {
+      var v = String(A.ls[k]);
+      out.push({ kind: 'localStorage', label: 'setting', name: k, bytes: v.length, count: 1, view: function () { return pretty(v); } });
+    });
+    Object.keys(A.dbs).forEach(function (n) {
+      var db = A.dbs[n], count = 0, bytes = 0, st = {};
+      Object.keys(db.stores).forEach(function (s) { count += db.stores[s].count; bytes += db.stores[s].bytes; st[s] = { count: db.stores[s].count, rows: db.stores[s].first }; });
+      out.push({ kind: 'indexedDB', label: 'database', name: n, count: count, bytes: bytes, view: function () { return 'version ' + db.version + ' · ' + size(bytes) + '\n\n' + storesText(st); } });
+    });
+    A.drive.forEach(function (f) {
+      out.push({ kind: 'drive', label: 'Drive file', name: f.name, bytes: f.bytes, count: 1, index: f.index, changed: Date.parse(f.modifiedTime) || 0,
+        view: function () { return 'Last changed ' + f.modifiedTime + ' · ' + size(f.bytes) + '\nIts contents are in the file and are put back as they are.'; } });
+    });
+    return out;
+  }
+  var opened = null, fileItems = [], rpick = { local: {}, drive: {} }, fopen = {};
+  function paintFile() {
+    var box = $('check');
+    box.textContent = '';
+    if (!opened) return;
+    var A = opened, items = fileItems, L = {}, D = {}, nowL = byOwner(localItems), nowD = byOwner(driveItemsNow);
+    items.forEach(function (it) { it.owner = owner(it.kind, it.name); var g = it.kind === 'drive' ? D : L; (g[it.owner] = g[it.owner] || []).push(it); });
+    var names = Object.keys(Object.assign({}, L, D)).sort(function (a, b) { return a.localeCompare(b); });
+    var recs = 0; items.forEach(function (it) { if (it.kind === 'indexedDB') recs += it.count; });
+    var facts = el('p');
+    facts.appendChild(el('b', 'Made ' + new Date(A.head.made).toLocaleString()));
+    facts.appendChild(document.createTextNode(' · ' + size(A.file.size) + ' · ' + plural(names.length, 'app') + ', ' + plural(Object.keys(A.ls).length, 'setting') + ', ' +
+      num(recs) + ' record' + (recs === 1 ? '' : 's') + ', ' + plural(A.drive.length, 'Drive file') + ' · saved from ' + (A.head.origin || '?') + (A.head.from || '')));
+    box.appendChild(facts);
+    var failed = Object.keys(A.errors);
+    if (failed.length) box.appendChild(el('p', 'Not in this file, because they could not be read when it was made: ' + failed.map(function (n) { return n + ' (' + A.errors[n] + ')'; }).join(', '), 'warn'));
+    if (!names.length) { box.appendChild(el('p', 'The file is valid but holds no data.', 'dim')); rsummary(); return; }
+    var wrap = el('div', null, 'wrap'), table = el('table', null, 'cmp'), head = el('tr'), body = el('tbody');
+    table.id = 'ftab';
+    head.appendChild(el('th', 'App'));
+    [['local', 'Browser data in the file'], ['drive', 'Drive files in the file']].forEach(function (c) {
+      var th = el('th'), l = el('label'), all = el('input'), g = c[0] === 'local' ? L : D, own = Object.keys(g);
+      all.type = 'checkbox'; all.id = 'fall-' + c[0]; all.disabled = !own.length;
+      all.checked = own.length > 0 && own.every(function (o) { return rpick[c[0]][o]; });
+      all.addEventListener('change', function () { own.forEach(function (o) { rpick[c[0]][o] = all.checked; }); paintFile(); });
+      l.append(all, el('span', c[1])); th.appendChild(l); head.appendChild(th);
+    });
+    var th0 = el('thead'); th0.appendChild(head); table.appendChild(th0);
+    var cell = function (side, g, text, now) {
+      var td = el('td'), l = el('label'), c = el('input'), sp = el('span', text);
+      c.type = 'checkbox'; c.dataset.side = side; c.dataset.owner = g; c.checked = !!rpick[side][g];
+      c.setAttribute('aria-label', 'Restore ' + (side === 'local' ? 'browser data' : 'Drive files') + ': ' + g);
+      c.addEventListener('change', function () { rpick[side][g] = c.checked; paintFile(); });
+      sp.appendChild(el('span', 'now: ' + now, 'st'));
+      l.append(c, sp); td.appendChild(l);
+      return td;
+    };
+    names.forEach(function (g) {
+      var tr = el('tr'), th = el('th'), nb = el('button', g, 'name'), detail = el('tr', null, 'detail'), dc = el('td');
+      nb.type = 'button'; nb.title = 'Show what is in the file';
+      var verdict = !L[g] ? 'Drive files only' : !nowL[g] ? 'Not in this browser now' : localText(L[g]) === localText(nowL[g]) ? 'Same counts as this browser has now' : 'Differs from what this browser has now';
+      th.appendChild(nb); th.appendChild(el('span', verdict, 'st')); tr.appendChild(th);
+      tr.appendChild(L[g] ? cell('local', g, localText(L[g]), nowL[g] ? localText(nowL[g]) : 'nothing here') : el('td', 'nothing', 'none'));
+      tr.appendChild(D[g] ? cell('drive', g, driveText(D[g]), !driveItemsNow ? 'sign in above to compare' : nowD[g] ? driveText(nowD[g]) : 'nothing in your Drive') : el('td', 'nothing', 'none'));
+      dc.colSpan = 3; detail.appendChild(dc); detail.hidden = !fopen[g];
+      var fill = function () { if (dc.firstChild) return; if (L[g]) itemRows(dc, 'Browser data in the file', L[g]); if (D[g]) itemRows(dc, 'Drive files in the file', D[g]); };
+      if (fopen[g]) fill();
+      nb.addEventListener('click', function () { fopen[g] = detail.hidden; detail.hidden = !detail.hidden; fill(); });
+      body.appendChild(tr); body.appendChild(detail);
+    });
+    table.appendChild(body); wrap.appendChild(table); box.appendChild(wrap);
+    notes(box, A.head.note, A.head.skipped);
+    rsummary();
+  }
+  // what is ticked for restore: -> { keys: [setting names], dbs: [database names], files: [Drive items], apps: { local: [], drive: [] } }
+  function rchosen() {
+    var out = { keys: [], dbs: [], files: [], apps: { local: {}, drive: {} } };
+    fileItems.forEach(function (it) {
+      var side = it.kind === 'drive' ? 'drive' : 'local';
+      if (!rpick[side][it.owner]) return;
+      out.apps[side][it.owner] = 1;
+      if (it.kind === 'localStorage') out.keys.push(it.name); else if (it.kind === 'indexedDB') out.dbs.push(it.name); else out.files.push(it);
+    });
+    return out;
+  }
+  function rsummary() {
+    var c = rchosen(), la = Object.keys(c.apps.local), da = Object.keys(c.apps.drive), parts = [];
+    if (la.length) parts.push('in this browser: ' + la.join(', ') + ' (' + plural(c.keys.length, 'setting') + ', ' + plural(c.dbs.length, 'database') + ')');
+    if (da.length) parts.push('in your Google Drive: ' + da.join(', ') + ' (' + plural(c.files.length, 'file') + ')');
+    $('restore').hidden = !opened || !fileItems.length;
+    $('restore').disabled = !parts.length || busy;
+    $('rsum').textContent = !opened || !fileItems.length ? '' : parts.length ? 'Ticked to put back ' + parts.join('; and ') + '.' : 'Tick what to put back. Nothing is changed until you press Restore.';
+  }
   $('file').addEventListener('change', function () {
-    var f = this.files[0], box = $('check'), msg = $('fileMsg');
+    var f = this.files[0], msg = $('fileMsg');
     if (!f) return;
     this.value = '';
-    box.textContent = ''; msg.className = ''; msg.textContent = 'Reading…';
-    if (f.size > BIG) { // too large to open whole in a browser tab: check the two ends only
-      return Promise.all([f.slice(0, 200).text(), f.slice(f.size - 1).text()]).then(function (x) {
-        var made = /"made":"([^"]+)"/.exec(x[0]), good = /"format":"adervec-backup"/.test(x[0]) && x[1] === '}';
-        msg.className = good ? '' : 'bad';
-        msg.textContent = good ? 'This is a complete backup file' + (made ? ', made ' + new Date(made[1]).toLocaleString() : '') + ' · ' + size(f.size) + '. It is too large to list here.'
-          : 'This file is damaged or is not a backup: it cannot be read.';
+    opened = null; fileItems = []; rpick = { local: {}, drive: {} }; fopen = {};
+    $('report').textContent = ''; paintFile(); rsummary();
+    msg.className = ''; msg.textContent = 'Reading…';
+    $('fp').hidden = false; $('fp').max = Math.max(f.size, 1); $('fp').value = 0;
+    analyse(f, function (b) { $('fp').value = b; }).then(function (A) {
+      opened = A; fileItems = analysisItems(A);
+      msg.textContent = 'Readable: ' + f.name;
+      paintFile();
+    }).catch(function (e) { msg.className = 'bad'; msg.textContent = /JSON|Unexpected/.test(e.message) ? 'This file is damaged or is not a backup: it cannot be read.' : e.message; })
+      .then(function () { $('fp').hidden = true; });
+  });
+
+  // ---- restore ----------------------------------------------------------------------------------------
+  // What is ticked is put back exactly as it is in the file: a ticked setting is overwritten, a ticked
+  // database is emptied and refilled, a ticked Drive file is overwritten. Anything the file does not
+  // hold is left alone. Before the first change, what is about to be replaced is saved to a safety file.
+  var idbDone = function (rq) { return new Promise(function (res, rej) { rq.onsuccess = function () { res(rq.result); }; rq.onerror = function () { rej(rq.error); }; }); };
+  var txDone = function (tx) { return new Promise(function (res, rej) { tx.oncomplete = function () { res(); }; tx.onerror = tx.onabort = function () { rej(tx.error || new Error('The browser refused to save.')); }; }); };
+  // -> an open, EMPTY database with the file's version and stores, ready to fill
+  async function emptyDb(name, plan, say) {
+    var cur = await appFont.backup.open(name), want = Object.keys(plan.stores).sort();
+    if (cur) {
+      var have = Array.from(cur.objectStoreNames).sort();
+      if (cur.version === plan.version && have.join('\n') === want.join('\n')) { // same shape: empty it in place
+        if (have.length) { var tx = cur.transaction(have, 'readwrite'); have.forEach(function (s) { tx.objectStore(s).clear(); }); await txDone(tx); }
+        return cur;
+      }
+      cur.close();
+      await new Promise(function (res, rej) { // another shape (the app has moved on since): remove it and rebuild as the file has it
+        var rq = indexedDB.deleteDatabase(name);
+        rq.onblocked = function () { say('Waiting: ' + name + ' is open in another tab or window. Close it to continue.'); };
+        rq.onsuccess = function () { res(); }; rq.onerror = function () { rej(rq.error); };
       });
     }
-    f.text().then(function (text) {
-      var snap = appFont.parseJSON(text, BIG * 2);
-      if (!snap || snap.format !== 'adervec-backup' || typeof snap.localStorage !== 'object') throw new Error('This is not a backup file from these apps.');
-      if (snap.schema > 2) throw new Error('This file was made by a newer version of the backup. Reload this page and try again.');
-      var list = fileItems(snap);
-      msg.textContent = 'Readable. Made ' + new Date(snap.made).toLocaleString() + ' · ' + plural(list.length, 'item') + ' · ' + size(f.size);
-      render(box, list, false, 'The file is valid but holds no data.');
-      notes(box, snap.note, snap.skipped);
-    }).catch(function (e) { msg.className = 'bad'; msg.textContent = /JSON|token|Unexpected/.test(e.message) ? 'This file is damaged or is not a backup: it cannot be read.' : e.message; });
+    return new Promise(function (res, rej) {
+      var rq = indexedDB.open(name, Math.max(1, plan.version));
+      rq.onupgradeneeded = function () {
+        want.forEach(function (s) {
+          var m = plan.stores[s].meta, st = rq.result.createObjectStore(s, m.keyPath == null ? { autoIncrement: !!m.autoIncrement } : { keyPath: m.keyPath, autoIncrement: !!m.autoIncrement });
+          (m.indexes || []).forEach(function (x) { st.createIndex(x.name, x.keyPath, { unique: !!x.unique, multiEntry: !!x.multiEntry }); });
+        });
+      };
+      rq.onsuccess = function () { res(rq.result); }; rq.onerror = function () { rej(rq.error); };
+      rq.onblocked = function () { say('Waiting: ' + name + ' is open in another tab or window. Close it to continue.'); };
+    });
+  }
+  async function restore(A, c, say, onBytes) {
+    var rep = { keys: 0, dbs: {}, files: 0, skipped: 0, safety: '' };
+    var wantDb = {}, wantFile = {};
+    c.dbs.forEach(function (n) { wantDb[n] = 1; });
+    c.files.forEach(function (f) { wantFile[f.index] = 1; });
+    // 1. look before touching anything: a file newer than the app this browser has is refused
+    for (var i = 0; i < c.dbs.length; i++) {
+      var cur = await appFont.backup.open(c.dbs[i]);
+      if (!cur) continue;
+      var v = cur.version; cur.close();
+      if (v < A.dbs[c.dbs[i]].version) throw new Error(c.dbs[i] + ' in this file comes from a newer version of its app than this browser has. Open that app once so it updates, then restore again. Nothing was changed.');
+    }
+    if (c.files.length) { say('Signing in to Google…'); driveToken = await appFont.google.token(); }
+    // 2. the safety file: what is here now and about to be replaced
+    say('Saving a safety copy of what will be replaced…');
+    var keySet = {}; c.keys.forEach(function (k) { keySet[k] = 1; });
+    var hereKeys = c.keys.filter(function (k) { return localStorage.getItem(k) != null; }), hereDbs = [];
+    (localList ? localList.indexedDB : []).forEach(function (d) { if (wantDb[d.name]) hereDbs.push(d.name); });
+    var hereFiles = [];
+    if (c.files.length) { var names = {}; c.files.forEach(function (f) { names[f.name] = 1; }); hereFiles = (await listDrive()).filter(function (f) { return names[f.name]; }); }
+    if (hereKeys.length || hereDbs.length || hereFiles.length) {
+      var safe = await appFont.backup.build(function (kind, name) { return kind === 'localStorage' ? !!keySet[name] : !!wantDb[name]; },
+        hereFiles.length ? function (push) { return writeDrive(hereFiles, push, undefined, function () {}); } : null);
+      var u = URL.createObjectURL(safe.blob), x = el('a'), d = new Date(), two = function (n) { return (n < 10 ? '0' : '') + n; };
+      rep.safety = 'adervec-before-restore-' + d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + '-' + two(d.getHours()) + two(d.getMinutes()) + '.json';
+      x.href = u; x.download = rep.safety; document.body.appendChild(x); x.click(); x.remove();
+      setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
+    }
+    // 3. databases: emptied (or rebuilt) first, then filled as the file streams past
+    var open = {}, buf = [], bufBytes = 0, at = null, keysV1 = null;
+    try {
+      for (var k = 0; k < c.dbs.length; k++) { say('Preparing ' + c.dbs[k] + '…'); open[c.dbs[k]] = await emptyDb(c.dbs[k], A.dbs[c.dbs[k]], say); rep.dbs[c.dbs[k]] = 0; }
+      var flush = async function () {
+        if (!buf.length) return;
+        var db = open[at[0]], meta = A.dbs[at[0]].stores[at[1]].meta, tx = db.transaction(at[1], 'readwrite'), st = tx.objectStore(at[1]);
+        buf.forEach(function (row) { if (meta.keyPath == null) st.put(row[1], row[0]); else st.put(row[1]); });
+        rep.dbs[at[0]] += buf.length; buf = []; bufBytes = 0;
+        await txDone(tx);
+      };
+      var add = function (key, value) { // a value that cannot be rebuilt (a folder permission) is skipped and counted
+        try { buf.push([appFont.backup.decode(key), appFont.backup.decode(value)]); } catch (e) { rep.skipped++; }
+      };
+      say('Putting the data back…');
+      await walk(A.file, inside, async function (p, text) {
+        if (p[0] === 'drive' && p.length === 2) {
+          if (!wantFile[p[1]]) return;
+          var f = appFont.parseJSON(text, 2e9), body = f.text != null ? f.text : new Blob([bytesOf(f.b64 || '')]);
+          await appFont.google.write(String(f.name), body, f.text != null ? 'application/json' : 'application/octet-stream');
+          rep.files++;
+          return;
+        }
+        if (p[0] !== 'indexedDB' || !wantDb[p[1]] || p.length < 5) return;
+        if (!at || at[0] !== p[1] || at[1] !== p[3]) { await flush(); at = [p[1], p[3]]; keysV1 = null; }
+        if (p.length === 6) {
+          var row = appFont.parseJSON(text, 2e9);
+          add(row[0], row[1]); bufBytes += text.length;
+          if (buf.length >= 200 || bufBytes > 8e6) await flush();
+        } else if (p[4] === 'keys') keysV1 = appFont.parseJSON(text, 2e9);
+        else if (p[4] === 'values' && keysV1) { appFont.parseJSON(text, 2e9).forEach(function (val, n) { add(keysV1[n], val); }); await flush(); }
+      }, onBytes);
+      await flush();
+    } finally { Object.keys(open).forEach(function (n) { open[n].close(); }); }
+    // 4. settings last: they are small and often point at the data above
+    c.keys.forEach(function (key) { localStorage.setItem(key, String(A.ls[key])); rep.keys++; });
+    return rep;
+  }
+  $('restore').addEventListener('click', function () {
+    var A = opened, c = rchosen(), la = Object.keys(c.apps.local), da = Object.keys(c.apps.drive), box = $('report');
+    if (!A || (!la.length && !da.length)) return;
+    if (!confirm('Put back ' + (la.length ? la.join(', ') + ' in this browser' : '') + (la.length && da.length ? ' and ' : '') + (da.length ? da.join(', ') + ' in your Google Drive' : '') +
+      '?\n\nWhat is there now is replaced by what the file holds. A safety copy of what is replaced is downloaded first.')) return;
+    var say = function (t, bad) { $('rMsg').className = bad ? 'bad' : ''; $('rMsg').textContent = t; };
+    busy = true; $('restore').disabled = true; $('dl').disabled = true; box.textContent = '';
+    $('rp').hidden = false; $('rp').max = Math.max(A.file.size, 1); $('rp').value = 0;
+    restore(A, c, say, function (b) { $('rp').value = b; }).then(function (rep) {
+      var recs = 0; Object.keys(rep.dbs).forEach(function (n) { recs += rep.dbs[n]; });
+      say('Restored.');
+      box.appendChild(el('p', 'Put back: ' + plural(rep.keys, 'setting') + ', ' + plural(Object.keys(rep.dbs).length, 'database') + ' (' + num(recs) + ' record' + (recs === 1 ? '' : 's') + ')' +
+        (c.files.length ? ', ' + plural(rep.files, 'Drive file') : '') + '.'));
+      if (rep.skipped) box.appendChild(el('p', plural(rep.skipped, 'record') + ' could not be rebuilt and were left out (for example a folder permission: the app will ask for it again).', 'warn'));
+      box.appendChild(el('p', rep.safety ? 'What was replaced is in your downloads as ' + rep.safety + '. Open that file here to undo this restore.' : 'Nothing existed to replace, so no safety file was needed.', 'dim'));
+      var tips = el('ul');
+      if (la.length) {
+        tips.appendChild(el('li', 'Reload any tab or window where these apps are open, so they read the restored data.'));
+        tips.appendChild(el('li', 'Sign-in is never kept in a backup, so an app that syncs will ask you to sign in again.'));
+        var half = la.filter(function (g) { return !c.apps.drive[g] && (fileItems.some(function (it) { return it.kind === 'drive' && it.owner === g; }) || (driveItemsNow || []).some(function (it) { return it.owner === g; })); });
+        if (half.length) tips.appendChild(el('li', half.join(', ') + ' also sync' + (half.length === 1 ? 's' : '') + ' with Google Drive, and only the browser side was restored. On its next sync an app may load its Drive copy over what you restored. To put both sides back, restore its Drive files too.'));
+      }
+      if (da.length) tips.appendChild(el('li', 'Your other devices pick up the restored Drive copy the next time those apps sync.'));
+      box.appendChild(tips);
+    }, function (e) {
+      say('Restore stopped: ' + ((e && e.message) || e), true);
+      if (!/Nothing was changed/.test((e && e.message) || '')) box.appendChild(el('p', 'Some of it may be half done. Press Restore again to finish it, or open the safety file from your downloads to go back.', 'warn'));
+    }).then(function () {
+      busy = false; $('rp').hidden = true;
+      return readLocal(); // the tables above now show what is here
+    }).then(function () { return driveItemsNow ? listDrive().then(function (list) { driveItemsNow = driveItems(list); paint(); }) : null; })
+      .catch(function () {}).then(function () { paintFile(); summary(); });
   });
 
   paintLast();

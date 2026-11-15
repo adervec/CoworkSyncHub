@@ -22,28 +22,48 @@ if (!url) {
 const fails = [], ok = (name, cond) => { if (!cond) fails.push(name); };
 const TOKEN = 'ya29.' + 'a'.repeat(40);
 const b = await chromium.launch({ channel: 'chrome' });
-const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
-const p = await ctx.newPage(), errs = [];
-p.on('pageerror', e => errs.push(e.message));
-p.on('console', m => { if (m.type() === 'error' && !/404|Failed to load resource/.test(m.text())) errs.push(m.text()); });
-
-// one app with a data inventory (house standard 23); the rest are matched by name
-await p.route('**/Tachyread/app-data.json', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ schema: 1, localStorage: ['tr-*'], indexedDB: ['books'], drive: ['tachy-*.json'] }) }));
-// a pretend Google: sign-in always succeeds, the Drive folder holds one text and one binary file
-await p.route('https://accounts.google.com/gsi/client', r => r.fulfill({ contentType: 'text/javascript',
-  body: `window.google={accounts:{oauth2:{initTokenClient:function(c){return{requestAccessToken:function(){setTimeout(function(){c.callback({access_token:'${TOKEN}'})},0)}}}}}};` }));
-await p.route('https://www.googleapis.com/drive/v3/files**', r => {
-  const u = new URL(r.request().url()), cors = { 'access-control-allow-origin': '*' };
-  if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { ...cors, 'access-control-allow-headers': '*' } });
-  if (r.request().headers().authorization !== 'Bearer ' + TOKEN) return r.fulfill({ status: 401, headers: cors });
-  if (u.pathname.endsWith('/files')) {
-    return u.searchParams.get('pageToken')
-      ? r.fulfill({ headers: cors, contentType: 'application/json', body: JSON.stringify({ files: [{ id: 'f2', name: 'gymtracker-photo.bin', modifiedTime: '2026-11-02T00:00:00Z' }] }) })
-      : r.fulfill({ headers: cors, contentType: 'application/json', body: JSON.stringify({ nextPageToken: 'p2', files: [{ id: 'f1', name: 'tachy-library.json', modifiedTime: '2026-11-01T00:00:00Z' }] }) });
-  }
-  return u.pathname.endsWith('/f1') ? r.fulfill({ headers: cors, contentType: 'application/json', body: '{"books":2}' })
-    : r.fulfill({ headers: cors, contentType: 'application/octet-stream', body: Buffer.from([255, 254, 0, 1]) });
-});
+const errs = [];
+// a pretend Google shared by every pretend device: sign-in always succeeds, and the private Drive folder
+// starts with one text and one binary file
+const drive = {
+  f1: { name: 'tachy-library.json', modifiedTime: '2026-11-01T00:00:00Z', body: Buffer.from('{"books":2}') },
+  f2: { name: 'gymtracker-photo.bin', modifiedTime: '2026-11-02T00:00:00Z', body: Buffer.from([255, 254, 0, 1]) },
+};
+async function device(viewport) {
+  const ctx = await b.newContext({ viewport, acceptDownloads: true });
+  // one app with a data inventory (house standard 23); the rest are matched by name
+  await ctx.route('**/Tachyread/app-data.json', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ schema: 1, localStorage: ['tr-*'], indexedDB: ['books'], drive: ['tachy-*.json'] }) }));
+  await ctx.route('https://accounts.google.com/gsi/client', r => r.fulfill({ contentType: 'text/javascript',
+    body: `window.google={accounts:{oauth2:{initTokenClient:function(c){return{requestAccessToken:function(){setTimeout(function(){c.callback({access_token:'${TOKEN}'})},0)}}}}}};` }));
+  await ctx.route('https://www.googleapis.com/**', r => {
+    const q = r.request(), u = new URL(q.url()), cors = { 'access-control-allow-origin': '*' };
+    const json = o => r.fulfill({ headers: cors, contentType: 'application/json', body: JSON.stringify(o) });
+    const meta = id => ({ id, name: drive[id].name, modifiedTime: drive[id].modifiedTime, size: String(drive[id].body.length) });
+    if (q.method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { ...cors, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+    if (q.headers().authorization !== 'Bearer ' + TOKEN) return r.fulfill({ status: 401, headers: cors });
+    if (u.pathname.endsWith('/userinfo')) return json({ name: 'Test Reader', email: 'reader@example.com', picture: '' });
+    if (u.pathname === '/drive/v3/files') {
+      const name = /name='([^']+)'/.exec(u.searchParams.get('q') || ''), ids = Object.keys(drive);
+      if (name) return json({ files: ids.filter(id => drive[id].name === name[1]).map(meta) });
+      if (u.searchParams.get('pageToken')) return json({ files: ids.slice(1).map(meta) }); // two pages, to exercise paging
+      return json(ids.length > 1 ? { nextPageToken: 'p2', files: ids.slice(0, 1).map(meta) } : { files: ids.map(meta) });
+    }
+    if (u.pathname === '/upload/drive/v3/files') { // a new file: metadata part, then the content part
+      const buf = q.postDataBuffer(), gap = Buffer.from('\r\n\r\n'), a = buf.indexOf(gap), a2 = buf.indexOf('\r\n--', a), c = buf.indexOf(gap, a2);
+      const id = 'n' + Object.keys(drive).length;
+      drive[id] = { name: JSON.parse(buf.slice(a + 4, a2).toString()).name, modifiedTime: new Date().toISOString(), body: buf.slice(c + 4, buf.lastIndexOf('\r\n--')) };
+      return json({ id });
+    }
+    const id = decodeURIComponent(u.pathname.split('/').pop());
+    if (q.method() === 'PATCH') { drive[id].body = q.postDataBuffer() || Buffer.alloc(0); drive[id].modifiedTime = new Date().toISOString(); return json({ id }); }
+    return drive[id] ? r.fulfill({ headers: cors, contentType: 'application/octet-stream', body: drive[id].body }) : r.fulfill({ status: 404, headers: cors });
+  });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => errs.push(e.message));
+  pg.on('console', m => { if (m.type() === 'error' && !/404|Failed to load resource/.test(m.text())) errs.push(m.text()); });
+  return pg;
+}
+const p = await device({ width: 390, height: 844 });
 
 await p.goto(url);
 await p.evaluate(async (TOKEN) => {
@@ -131,15 +151,92 @@ const file3 = path.join(dir, 'local-only.json'); await dl3.saveAs(file3);
 const snap3 = JSON.parse(await readFile(file3, 'utf8'));
 ok('with Drive unticked the file has no Drive part', !('drive' in snap3) && snap3.indexedDB.books && !('zz-misc' in snap3.localStorage));
 
-// check a file: the good one reads, a damaged one says so
-await p.setInputFiles('#file', file);
-await p.waitForFunction(() => document.getElementById('fileMsg').textContent !== 'Reading…');
-ok('a saved file checks as readable', /^Readable/.test(await p.textContent('#fileMsg')) && (await p.$$('#check .group')).length >= 3 && !(await p.$('#check input[type=checkbox]')));
+// ---- open a backup file: what is in it ----
+const openFile = async (pg, f) => { await pg.setInputFiles('#file', f); await pg.waitForFunction(() => document.getElementById('fileMsg').textContent !== 'Reading…'); };
+const frow = (pg, name) => pg.$$eval('#ftab tbody tr:not(.detail)', (l, name) => { const r = l.find(x => x.querySelector('.name').textContent === name); return r ? r.textContent : ''; }, name);
+await openFile(p, file);
+const fnames = await p.$$eval('#ftab .name', l => l.map(x => x.textContent));
+ok('a saved file opens and lists its apps', /^Readable/.test(await p.textContent('#fileMsg')) && ['GymTracker', 'SpeechImprover', 'Tachyread', 'Shared settings (font, language, hub)'].every(g => fnames.includes(g)) && !fnames.includes('Other data'));
+ok('the file is summed up', /Made /.test(await p.textContent('#check')) && /4 apps, \d+ settings, 502 records, 2 Drive files/.test(await p.textContent('#check')) && /Left out.*gymtracker-session/.test(await p.textContent('#check')));
+ok('each app shows what the file has beside what is here now', /1 setting · 500 records/.test(await frow(p, 'Tachyread')) && /Same counts as this browser has now/.test(await frow(p, 'Tachyread')) && /1 file/.test(await frow(p, 'Tachyread')) && /now: 1 setting · 500 records/.test(await frow(p, 'Tachyread')));
+ok('nothing is ticked, and Restore waits', await p.$eval('#restore', x => !x.hidden && x.disabled) && (await p.$$('#ftab input:checked')).length === 0);
+await p.click('#ftab tbody .name'); await p.click('#ftab tr.detail:not([hidden]) .item summary');
+await p.waitForSelector('#ftab .item pre', { timeout: 3000 }).catch(() => {});
+ok('a file\'s items open to show their data', /"a": 1/.test(await p.textContent('#ftab .item pre').catch(() => '')));
 const badFile = path.join(dir, 'bad.json'); await writeFile(badFile, text.slice(0, text.length / 2));
-await p.setInputFiles('#file', badFile);
-await p.waitForFunction(() => /damaged|not a backup/.test(document.getElementById('fileMsg').textContent), null, { timeout: 5000 }).catch(() => {});
-ok('a damaged file is reported', /damaged/.test(await p.textContent('#fileMsg')));
+await openFile(p, badFile);
+ok('a damaged file is reported, and offers nothing to restore', /damaged/.test(await p.textContent('#fileMsg')) && await p.$eval('#restore', x => x.hidden) && !(await p.$('#ftab')));
+const notOurs = path.join(dir, 'other.json'); await writeFile(notOurs, '{"hello":"world"}');
+await openFile(p, notOurs);
+ok('a file that is not a backup is refused', /not a backup file/.test(await p.textContent('#fileMsg')));
 
+// ---- restore into a clean browser: one app out of many, then everything ----
+const p3 = await device({ width: 1100, height: 800 });
+p3.on('dialog', d => d.accept());
+const safety = []; p3.on('download', d => safety.push(d));
+await p3.goto(url); await p3.evaluate(() => window.backupReady);
+await openFile(p3, file);
+ok('in a clean browser the file shows as not here', /Not in this browser now/.test(await frow(p3, 'Tachyread')) && /now: nothing here/.test(await frow(p3, 'Tachyread')));
+const doRestore = async () => {
+  await p3.evaluate(() => { document.getElementById('rMsg').textContent = ''; });
+  await p3.click('#restore');
+  await p3.waitForFunction(() => /^Restored|stopped/.test(document.getElementById('rMsg').textContent) && !document.getElementById('restore').disabled, null, { timeout: 60000 }).catch(() => {});
+  return p3.textContent('#rMsg');
+};
+const state = () => p3.evaluate(async () => ({
+  dbs: (await indexedDB.databases()).map(d => d.name + '@' + d.version).sort().join(),
+  keys: Object.keys(localStorage).filter(k => !/^(maker-|portal-)/.test(k)).sort().join(),
+  tr: localStorage.getItem('tr-settings'),
+}));
+const books = () => p3.evaluate(() => new Promise(res => { const q = indexedDB.open('books'); q.onsuccess = () => { const st = q.result.transaction('b').objectStore('b'), c = st.count(), g = st.get(1), a = st.autoIncrement; g.onsuccess = () => { q.result.close(); res([c.result, g.result && g.result.title, a].join()); }; }; }));
+await p3.check('#ftab input[data-side=local][data-owner=Tachyread]');
+ok('the summary names what is ticked', /Tachyread \(1 setting, 1 database\)/.test(await p3.textContent('#rsum')));
+ok('restore finishes', /^Restored/.test(await doRestore()));
+let st3 = await state();
+ok('one app out of many is put back, and only it', st3.dbs === 'books@1' && st3.keys === 'tr-settings' && st3.tr === '{"wpm":300}' && (await books()) === '500,Dune,true');
+ok('nothing existed to replace, so no safety file', safety.length === 0 && /no safety file/.test(await p3.textContent('#report')) && /Reload any tab/.test(await p3.textContent('#report')));
+ok('the table now shows the app as the same as the file', /Same counts as this browser has now/.test(await frow(p3, 'Tachyread')));
+
+// everything, both sides. Drive has drifted since the backup: one file changed, one deleted.
+drive.f1.body = Buffer.from('changed'); delete drive.f2;
+await p3.check('#fall-local'); await p3.check('#fall-drive');
+ok('everything restores', /^Restored/.test(await doRestore()));
+const again = JSON.parse(await p3.evaluate(() => appFont.backup.build().then(r => r.blob.text())));
+ok('every database comes back identical, record for record (recording, date, map, typed array, keys)', JSON.stringify(again.indexedDB['speechimprover-db']) === JSON.stringify(snap.indexedDB['speechimprover-db']) && JSON.stringify(again.indexedDB.books) === JSON.stringify(snap.indexedDB.books));
+ok('every setting in the file comes back identical', Object.keys(snap.localStorage).every(k => again.localStorage[k] === snap.localStorage[k]) && !('zz-misc' in again.localStorage));
+const byName = n => Object.values(drive).find(f => f.name === n);
+ok('Drive files are put back, text and binary, changed or missing', drive.f1.body.toString() === '{"books":2}' && byName('gymtracker-photo.bin') && [...byName('gymtracker-photo.bin').body].join() === '255,254,0,1');
+ok('what was replaced went to a safety file first', safety.length === 1 && /^adervec-before-restore-\d{4}-\d\d-\d\d-\d{4}\.json$/.test(safety[0].suggestedFilename()));
+if (safety.length) {
+  const sf = path.join(dir, 'safety.json'); await safety[0].saveAs(sf);
+  const sj = JSON.parse(await readFile(sf, 'utf8'));
+  ok('the safety file holds exactly what was replaced', sj.localStorage['tr-settings'] === '{"wpm":300}' && sj.indexedDB.books.stores.b.rows.length === 500 && !('speechimprover-db' in sj.indexedDB) && sj.drive.length === 1 && sj.drive[0].text === 'changed');
+}
+
+// a database that is here and has the file's shape is emptied and refilled in place
+await p3.evaluate(async () => {
+  localStorage.setItem('tr-settings', 'x');
+  const db = await new Promise(r => { const q = indexedDB.open('books'); q.onsuccess = () => r(q.result); });
+  const tx = db.transaction('b', 'readwrite'); tx.objectStore('b').put({ title: 'Extra' }); tx.objectStore('b').delete(1);
+  await new Promise(r => { tx.oncomplete = r; }); db.close();
+});
+await p3.uncheck('#fall-local'); await p3.uncheck('#fall-drive');
+await p3.check('#ftab input[data-side=local][data-owner=Tachyread]');
+ok('changed data shows as differing from the file', /Differs from what this browser has now/.test(await frow(p3, 'Tachyread')) || /Same counts/.test(await frow(p3, 'Tachyread')));
+ok('restoring over changed data puts the file\'s version back', /^Restored/.test(await doRestore()) && (await books()) === '500,Dune,true' && (await state()).tr === '{"wpm":300}' && safety.length === 2);
+
+// the app has moved its database on since the backup: it is rebuilt as the file has it
+await p3.evaluate(() => new Promise(res => { const d = indexedDB.deleteDatabase('books'); d.onsuccess = () => { const q = indexedDB.open('books', 3); q.onupgradeneeded = () => q.result.createObjectStore('other'); q.onsuccess = () => { q.result.close(); res(); }; }; }));
+ok('a newer-shaped database is rebuilt at the file\'s version', /^Restored/.test(await doRestore()) && (await state()).dbs.includes('books@1') && (await books()) === '500,Dune,true');
+
+// the file is from a newer app than this browser has: refused before anything is touched
+await p3.evaluate(() => new Promise(res => { const d = indexedDB.deleteDatabase('speechimprover-db'); d.onsuccess = () => { const q = indexedDB.open('speechimprover-db', 2); q.onupgradeneeded = () => q.result.createObjectStore('old'); q.onsuccess = () => { q.result.close(); res(); }; }; }));
+await p3.evaluate(() => localStorage.setItem('tr-settings', 'mine'));
+await p3.check('#ftab input[data-side=local][data-owner=SpeechImprover]');
+const refused = await doRestore();
+ok('a file from a newer app is refused and nothing is changed', /newer version/.test(refused) && /Nothing was changed/.test(refused) && (await state()).dbs.includes('speechimprover-db@2') && (await state()).tr === 'mine');
+
+if (process.env.SHOT) { await p3.setViewportSize({ width: 390, height: 844 }); await p3.locator('#check').scrollIntoViewIfNeeded(); await p3.screenshot({ path: process.env.SHOT.replace(/\.png$/, '-restore.png'), fullPage: true }); }
 if (process.env.SHOT) await p.screenshot({ path: process.env.SHOT, fullPage: true }); // SHOT=out.png to look at the page
 // the About panel's button (what an iPhone home-screen app uses)
 await p.evaluate(() => { const a = document.createElement('app-about'); document.body.appendChild(a); a.querySelector('details').open = true; });

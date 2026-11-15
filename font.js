@@ -1030,21 +1030,23 @@
       .then(function (r) { return r.json(); })
       .then(function (j) { return (j.files || []).map(function (f) { return f.name; }).filter(function (n) { return n.indexOf(prefix) === 0; }); });
   }
-  function driveWrite(name, text) {
+  // body: text, or a Blob for a binary file; mime defaults to JSON
+  function driveWrite(name, body, mime) {
+    mime = mime || 'application/json';
     return gFind(name).then(function (id) {
-      if (id) return gApi('upload/drive/v3/files/' + id + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: text });
+      if (id) return gApi('upload/drive/v3/files/' + id + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': mime }, body: body });
       var b = 'b' + randomId().replace(/-/g, '');
-      var body = '--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name: name, parents: ['appDataFolder'] }) +
-        '\r\n--' + b + '\r\nContent-Type: application/json\r\n\r\n' + text + '\r\n--' + b + '--';
-      return gApi('upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body: body });
+      var multi = new Blob(['--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name: name, parents: ['appDataFolder'] }) +
+        '\r\n--' + b + '\r\nContent-Type: ' + mime + '\r\n\r\n', body, '\r\n--' + b + '--']);
+      return gApi('upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body: multi });
     }).then(function () {});
   }
 
   // ---- Cold backup (hub roadmap chunk 2a) ------------------------------------------------------------
   // Every app shares the origin, so one page can read all of their settings and databases into one
   // file the reader keeps wherever they like. This half only READS: nothing here writes app data.
-  // TODO(chunk 2b): restore. One app at a time, a fresh backup first, tested by restoring into a clean
-  // browser and comparing every record; open problem: Drive sync pulling over, or pushing, restored data.
+  // Restore (chunk 2b) lives on the hub's Backup page (backup.html): it reads a file as a stream, takes a
+  // safety copy of what it is about to replace, and rebuilds values with dec() below.
   // Memory: records are read a batch at a time and handed to the browser as Blob pieces (which it may
   // keep on disk), so the page never holds a whole database, let alone the whole backup.
   // ponytail: one record is still held whole (a single 500 MB recording would hurt); binary is base64.
@@ -1085,6 +1087,29 @@
       keys.forEach(function (k, i) { o[k] = vals[i]; });
       return '$t' in o ? { $t: 'obj', v: o } : o;
     });
+  }
+  // the reverse of enc, for restore: a value read from a backup file becomes what it was.
+  // Throws on a value that cannot be rebuilt (a folder handle, a crypto key), so the caller can skip it.
+  var VIEWS = /^(Int8|Uint8|Uint8Clamped|Int16|Uint16|Int32|Uint32|Float32|Float64|BigInt64|BigUint64)Array$|^DataView$/;
+  function unb64(s) { var b = atob(s || ''), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function dec(v) {
+    if (v === null || typeof v !== 'object') return v;
+    if (Array.isArray(v)) return v.map(dec);
+    var o = {};
+    if (typeof v.$t !== 'string') { Object.keys(v).forEach(function (k) { o[k] = dec(v[k]); }); return o; }
+    switch (v.$t) {
+      case 'undef': return undefined;
+      case 'bigint': return BigInt(v.v);
+      case 'num': return Number(v.v);
+      case 'date': return new Date(v.v == null ? NaN : v.v);
+      case 'blob': return v.name != null ? new File([unb64(v.b64)], v.name, { type: v.type || '', lastModified: v.lastModified }) : new Blob([unb64(v.b64)], { type: v.type || '' });
+      case 'buf': return unb64(v.b64).buffer;
+      case 'view': if (!VIEWS.test(v.ctor)) throw new Error('Unknown binary kind'); return new window[v.ctor](unb64(v.b64).buffer);
+      case 'map': return new Map(dec(v.v));
+      case 'set': return new Set(dec(v.v));
+      case 'obj': Object.keys(v.v || {}).forEach(function (k) { o[k] = dec(v.v[k]); }); return o;
+      default: throw new Error('This value cannot be rebuilt: ' + (v.is || v.$t));
+    }
   }
   function idbReq(r) { return new Promise(function (res, rej) { r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); }
   // -> the open database, or null if it is not there (it is never created, and never blocks an app's upgrade)
@@ -1217,7 +1242,7 @@
     themes: themes, baseThemes: BASE_THEMES, addThemes: addThemes, theme: themeChoice, themeNow: themeNow, setTheme: setTheme,
     google: { token: googleToken, signedIn: googleSignedIn, signOut: googleSignOut, read: driveRead, write: driveWrite, list: driveList },
     logSession: logSession,
-    backup: { list: backupList, peek: backupPeek, build: backupBuild, download: backupDownload },
+    backup: { list: backupList, peek: backupPeek, build: backupBuild, download: backupDownload, open: idbOpen, decode: dec },
     diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,
     whatsNew: whatsNew, checkWhatsNew: checkWhatsNew, setWhatsNewSilenced: setWhatsNewSilenced,
     getAccount: getAccount, setAccount: setAccount,
