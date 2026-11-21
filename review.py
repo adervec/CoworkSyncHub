@@ -28,7 +28,7 @@ EXTRA = ["MacroTrackro", "LanguageLab"]  # folders worth watching that may not b
 STANDARD_OF = {"drive": 1, "pfp": 1, "font": 2, "cowork": 3, "license": 4, "ci": 5, "data": 6, "gated": 7, "live": 7, "3p": 8,
                "updates": 9, "whatsnew": 9, "days": 10, "branch": 11, "a11y": 12, "crash": 13, "theme": 14, "about": 15,
                "aireview": 18, "notes": 19, "i18n": 20, "sec": 22, "supply": 22, "datainv": 23, "themes": 24, "ledger": 25,
-               "leak": 26, "overlap": 27}
+               "leak": 26, "overlap": 27, "iso": 28}
 # the order gaps should be worked in (the adoption order put to the maker); anything else follows in column order
 ORDER = ["leak", "sec", "supply", "datainv", "data", "ci", "gated", "live", "drive", "pfp", "themes", "ledger", "overlap", "i18n"]
 GROUP = {"lift": "Fitness and body", "cardio": "Fitness and body", "ride": "Fitness and body", "checkin": "Fitness and body", "cook": "Fitness and body",

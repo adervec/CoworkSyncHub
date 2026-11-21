@@ -193,6 +193,14 @@ const CHECKS = [
     if (a.has(/['"]portal-activity['"]/) && a.has(/\.push\(\s*\[/)) return warn('writes portal-activity by hand; move to appFont.logSession');
     return fail('finished sessions are not logged for the hub (appFont.logSession)');
   }],
+  ['iso', 'ISO dates and times (through appFont.fmt)', (a) => {
+    // a date the reader sees goes through appFont.fmt, which shows ISO 8601 unless the reader chose Regional;
+    // formatting it directly skips that choice. Month and weekday NAMES are fine through fmt.custom / weekdays / months.
+    const direct = a.count(/\.toLocale(Date|Time)String\(|new Intl\.DateTimeFormat\(/) - a.count(/\/\/ iso-ok\b/);
+    const slash = a.count(/get(Month|Date)\(\)[^\n;]{0,40}['"`]\/['"`]\s*\+[^\n;]{0,40}get(Date|Month|FullYear)\(\)/);
+    if (direct + slash <= 0) return ok();
+    return fail((direct > 0 ? direct + ' date(s) formatted outside appFont.fmt' : '') + (direct > 0 && slash ? ', ' : '') + (slash ? slash + ' hand-built day/month string(s)' : '') + ' (use appFont.fmt.date / time / dateTime; mark a deliberate one with // iso-ok)');
+  }],
   ['live', 'Live check + release tag after deploy', (a) => {
     const viaWorkflow = a.workflows.some((w) => /CoworkSyncHub\/\.github\/workflows\/after-deploy\.yml/.test(w.t));
     const viaScript = ['scripts/deploy.mjs', 'deploy.sh'].map((f) => path.join(a.root, f)).filter(existsSync).some((f) => /live-check\.mjs/.test(readFileSync(f, 'utf8')));
@@ -339,7 +347,7 @@ function run(argv) {
 
 // ---- --selftest: the rules on tiny samples, so a regex edit that breaks a check is caught --------
 function selftest() {
-  const fake = (all, files = ['LICENSE'], workflows = []) => ({ app: { slug: 'X', dir: 'X' }, root: HUB, files, workflows, text: [{ f: 'a.js', t: all }], all, has: (re) => re.test(all), count: () => 0 });
+  const fake = (all, files = ['LICENSE'], workflows = []) => ({ app: { slug: 'X', dir: 'X' }, root: HUB, files, workflows, text: [{ f: 'a.js', t: all }], all, has: (re) => re.test(all), count: (re) => (all.match(new RegExp(re, re.flags.includes('g') ? re.flags : re.flags + 'g')) || []).length });
   const check = (k, a) => CHECKS.find((c) => c[0] === k)[2](a)[0];
   const eq = (got, want, what) => { if (got !== want) throw new Error(`${what}: got ${got}, want ${want}`); };
   eq(check('days', fake("const d = new Date().toISOString().slice(0, 10);")), 'FAIL', 'a UTC "today" fails');
@@ -375,6 +383,10 @@ function selftest() {
   }
   eq(check('drive', fake('await appFont.cloud.signIn(); appFont.cloud.write("x.json", s)')), 'ok', 'the shared cloud helper counts as sync');
   eq(check('drive', fake('localStorage.setItem("x", s)')), 'FAIL', 'no cloud sync fails');
+  eq(check('iso', fake('el.textContent = appFont.fmt.dateTime(s.at); const names = appFont.fmt.weekdays();')), 'ok', 'dates through appFont.fmt pass');
+  eq(check('iso', fake('el.textContent = new Date(s.at).toLocaleDateString()')), 'FAIL', 'a date formatted directly fails');
+  eq(check('iso', fake('const s = (d.getMonth() + 1) + "/" + d.getDate()')), 'FAIL', 'a hand-built month/day string fails');
+  eq(check('iso', fake('const f = new Intl.DateTimeFormat(loc, { month: "long" }) // iso-ok: month name only')), 'ok', 'a marked exception passes');
   eq(check('ledger', fake('appFont.logSession({ kind: "lift", minutes: 40, id: w.id })')), 'ok', 'logSession passes');
   eq(check('pfp', fake('<header><app-account></app-account></header> const G = window.appFont?.google; G.token()')), 'ok', 'the shared sign-in with the corner avatar passes');
   eq(check('pfp', fake('const G = window.appFont?.google; G.token()')), 'FAIL', 'the shared sign-in without the avatar in the page fails');

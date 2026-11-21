@@ -114,6 +114,9 @@ svg.trend line { stroke: var(--line) }
   var cell = function (p, k) { return (p.cells && p.cells[k]) || ['-', '']; };
   var count = function (p, s) { return keys.filter(function (k) { return cell(p, k)[0] === s; }).length; };
   var colCount = function (k, s) { return D.projects.filter(function (p) { return cell(p, k)[0] === s; }).length; };
+  var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+  var isoDay = function (t) { var d = new Date(t); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }; // house standard 28
+  var isoMin = function (t) { var d = new Date(t); return isoDay(d) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()); };
   var plural = function (n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); };
   var mem = function (k, v) { try { if (v === undefined) return localStorage.getItem('review-' + k); localStorage.setItem('review-' + k, v); } catch (e) { return null; } };
   var st = function (s) { return el('span', GLYPH[s] + ' ' + WORD[s], 'st ' + cls(s)); };
@@ -163,7 +166,7 @@ svg.trend line { stroke: var(--line) }
   }
   // the text to paste into an app's own session
   function brief(p) {
-    var lines = ['Review notes for ' + p.title + ' (' + new Date(D.generated).toLocaleDateString() + '), from the QA lead\'s review page.', ''];
+    var lines = ['Review notes for ' + p.title + ' (' + isoDay(D.generated) + '), from the QA lead\'s review page.', ''];
     if (!p.tasks.length) lines.push('Nothing is open against the house standards.');
     [1, 2, 3, 4].forEach(function (n) {
       var ts = p.tasks.filter(function (t) { return t.pri === n; }); if (!ts.length) return;
@@ -210,7 +213,7 @@ svg.trend line { stroke: var(--line) }
     if (badge[t[0]] != null) b.appendChild(el('span', String(badge[t[0]]), 'n'));
     b.addEventListener('click', function () { go(t[0]); }); $('nav').appendChild(b);
   });
-  $('when').textContent = 'generated ' + new Date(D.generated).toLocaleString() + (D.quick ? ' (quick: no CI, live or GitHub lookups)' : '') + ' · local file, not published';
+  $('when').textContent = 'generated ' + isoMin(D.generated) + (D.quick ? ' (quick: no CI, live or GitHub lookups)' : '') + ' · local file, not published';
 
   // ---- overview ----
   BUILD.overview = function (box) {
@@ -267,9 +270,9 @@ svg.trend line { stroke: var(--line) }
       var base = document.createElementNS(ns, 'line'); base.setAttribute('x1', 0); base.setAttribute('x2', W); base.setAttribute('y1', H - 8); base.setAttribute('y2', H - 8); svg.appendChild(base);
       var pl = document.createElementNS(ns, 'polyline'); pl.setAttribute('points', tr.map(function (x, i) { return pt(x, i).join(','); }).join(' ')); svg.appendChild(pl);
       tr.forEach(function (x, i) { var c = document.createElementNS(ns, 'circle'), q = pt(x, i); c.setAttribute('cx', q[0]); c.setAttribute('cy', q[1]); c.setAttribute('r', 4);
-        var ti = document.createElementNS(ns, 'title'); ti.textContent = new Date(x.t).toLocaleString() + ': ' + x.fail + ' failing, ' + x.warn + ' warnings'; c.appendChild(ti); svg.appendChild(c); });
+        var ti = document.createElementNS(ns, 'title'); ti.textContent = isoMin(x.t) + ': ' + x.fail + ' failing, ' + x.warn + ' warnings'; c.appendChild(ti); svg.appendChild(c); });
       c3.appendChild(svg);
-      c3.appendChild(el('p', tr[0].fail + ' on ' + new Date(tr[0].t).toLocaleDateString() + ' → ' + tr[tr.length - 1].fail + ' now, over ' + plural(tr.length, 'run') + '. Hover a point for its date.', 'dim small'));
+      c3.appendChild(el('p', tr[0].fail + ' on ' + isoDay(tr[0].t) + ' → ' + tr[tr.length - 1].fail + ' now, over ' + plural(tr.length, 'run') + '. Hover a point for its date.', 'dim small'));
     }
     c3.appendChild(el('h3', 'Waiting on you'));
     var ul = el('ul', null, 'todo'); (D.notes.waiting || []).forEach(function (w) { ul.appendChild(el('li', w)); });
@@ -419,7 +422,7 @@ svg.trend line { stroke: var(--line) }
       d.appendChild(row);
       if (p.note) d.appendChild(el('p', p.note));
       var kv = el('dl', null, 'kv');
-      [['What it is', p.tagline], ['Group', p.group + (p.kind ? ' · ' + p.kind : '')], ['Folder', p.dir], ['Branch', g.branch], ['Last commit', g.last ? new Date(g.last).toLocaleString() + ' · ' + (g.subject || '') : ''],
+      [['What it is', p.tagline], ['Group', p.group + (p.kind ? ' · ' + p.kind : '')], ['Folder', p.dir], ['Branch', g.branch], ['Last commit', g.last ? isoMin(g.last) + ' · ' + (g.subject || '') : ''],
         ['Stars and forks', p.stars != null ? p.stars + ' stars, ' + p.forks + ' forks' : ''],
         ['Repo visits, last 14 days', p.views ? p.views[0] + ' views by ' + plural(p.views[1], 'visitor') + '; ' + p.clones[0] + ' clones by ' + plural(p.clones[1], 'cloner') + ' (counts only; clones are mostly automated builds)' : ''],
         ['Standards', count(p, 'ok') + ' ok, ' + w + ' warnings, ' + f + ' failing, ' + count(p, '-') + ' not applicable'],

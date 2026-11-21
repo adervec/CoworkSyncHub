@@ -348,6 +348,9 @@ tbtn.addEventListener("click",function(){if(!TH.length)return;
 // live relative times
 function rel(s){if(s<60)return Math.floor(s)+"s";if(s<3600)return Math.floor(s/60)+"m";
   if(s<86400)return Math.floor(s/3600)+"h";return Math.floor(s/86400)+"d";}
+// dates the house way (standard 28): ISO unless the reader chose Regional under the font picker
+function isoDay(dt){return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0")}
+function fmtDay(dt,full){return window.appFont?appFont.fmt.date(dt,full?"full":undefined):isoDay(dt)}
 function tick(){var now=Date.now()/1000;
   d.querySelectorAll("[data-ts]").forEach(function(el){
     var t=parseFloat(el.dataset.ts);if(t)el.textContent=rel(now-t)+" ago";});}
@@ -614,7 +617,7 @@ function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},ra
   var dow=(today.getDay()+6)%7;  // this week's Monday is `dow` days back; column 11 is this week
   for(var c=0;c<12;c++)for(var r=0;r<7;r++){var k=dow+(11-c)*7-r;
     if(k<0||k>83){cells+="<i style='visibility:hidden'></i>";continue;}
-    var dd=days[k],dt=new Date(t0-k*DAY),lab=dt.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+    var dd=days[k],dt=new Date(t0-k*DAY),lab=fmtDay(dt);
     if(!dd){cells+="<i title='"+lab+"'"+(k===0?" class='today'":"")+"></i>";continue;}
     var top=Object.keys(dd.by).sort(function(p,q){return dd.by[q]-dd.by[p]})[0];
     cells+="<i class='on"+(k===0?" today":"")+"' style='--h:"+(HUES[top]||220)+";--a:"+(0.25+0.75*Math.min(1,dd.tot/mxd)).toFixed(2)+"' title='"+lab+" \u00b7 "
@@ -631,7 +634,7 @@ function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},ra
     +"<b>"+Math.round(wk)+"</b> this week"+(best!==undefined?" \u00b7 busiest on <b>"+names[best]+"</b>":"");
   var jl=d.getElementById("journal"),rows=[];
   for(var k=0;k<14;k++){if(!days[k])continue;var dt=new Date(t0-k*DAY);
-    rows.push("<li><b>"+(k===0?"today":k===1?"yesterday":dt.toLocaleDateString(undefined,{weekday:"short",day:"numeric"}))+"</b> "
+    rows.push("<li><b>"+(k===0?"today":k===1?"yesterday":fmtDay(dt,true))+"</b> "
       +Object.keys(days[k].by).map(function(s){return TITLES[s]+" \u00d7"+Math.round(days[k].by[s]*10)/10}).join(" \u00b7 ")+"</li>");}
   jl.innerHTML=rows.join("")||"<li>nothing in the last two weeks</li>";
   // per-card personal line + weekly rhythm: the same events, seen from each app
@@ -738,7 +741,7 @@ if(fs&&window.FLEET&&FLEET.length>1){
     var i=Math.min(n-1,Math.max(0,Math.round((ev.clientX-r.left)/r.width*(n-1))));
     var wk=new Date((GEN-(n-1-i)*604800)*1000);
     tip.hidden=false;
-    tip.textContent="week of "+wk.toLocaleDateString(undefined,{month:"short",day:"numeric"})
+    tip.textContent="week of "+fmtDay(wk)
       +": "+FLEET[i]+" commit"+(FLEET[i]===1?"":"s");
     var x=(ev.clientX-r.left);
     tip.style.left=Math.min(r.width-tip.offsetWidth,Math.max(0,x-tip.offsetWidth/2))+"px";

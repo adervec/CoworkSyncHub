@@ -284,6 +284,30 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - The standards check's `overlap` column fails without the file and warns when its Reviewed
       date is over 90 days old. The status board lists every entry from every app.
 
+28. **ISO dates and times.** ISO 8601 exists so that a date means one thing to everyone; the house
+    uses it wherever a date or time is shown, stored, exchanged or put in a name.
+    - **Shown:** `2026-11-21`, `14:05`, `2026-11-21 14:05` (a space, not a `T`, for people);
+      `Sat 2026-11-21` where the weekday helps; `2026-W47` when a week is named. The week starts on
+      Monday and the clock is 24-hour. Year first, always: never `11/21/26`, `21/11`, or a month
+      name inside a full date. Relative wording ("3 days ago", "today") is fine beside or instead.
+    - **How:** every date or time the reader sees goes through `appFont.fmt.date(d)`, `.time(d)` or
+      `.dateTime(d)` (`.date(d, 'full')` adds the weekday). They print ISO by default. A reader who
+      prefers their region's style picks "Dates: Regional" once under the font picker, for every
+      app, and the same calls follow it: so never format a date yourself (`toLocaleDateString`,
+      `toLocaleTimeString`, `new Intl.DateTimeFormat`, hand-built strings). Month and weekday NAMES
+      on their own (a calendar header) come from `appFont.fmt.months()`, `.weekdays()` or `.custom()`.
+    - **Stored and exchanged** (exports, backups, cowork requests and replies, shared cloud files,
+      logs): a moment is `appFont.fmt.iso(d)` (`2026-11-21T14:05:09+01:00`) or UTC with `Z`; a
+      calendar day is `appFont.fmt.isoDate(d)` (`2026-11-21`, the LOCAL day, standard 10); a week is
+      `appFont.fmt.isoWeek(d)`. These never change with the reader's choice. Existing stores that
+      keep epoch numbers may stay; anything a person or an agent will read is ISO text.
+    - **File names** carry ISO dates: `name-2026-11-21.json`, time as `1405`.
+    - **The same habit elsewhere:** where an ISO standard exists, use it and do not invent a format:
+      language codes (`fr`, `pt`), currency codes (`EUR`), country codes (`HR`), and SI units for
+      stored values (store kilograms, metres and seconds; show them in the reader's chosen units).
+    - The standards check's `iso` column fails on a date formatted outside `appFont.fmt`. Mark a
+      deliberate exception on its line with `// iso-ok: why`.
+
 ## Working habits
 
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you. Also run `node ../CoworkSyncHub/layout-check.mjs <App>` (the live site, phone and desktop) and fix what it flags.

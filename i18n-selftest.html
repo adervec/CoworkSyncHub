@@ -23,7 +23,10 @@
     ok('static HTML translates (data-t, data-t-attr)', document.querySelector('h1').textContent === 'Réglages' && document.getElementById('q').placeholder === 'Rechercher');
     ok("the house's own labels translate", /Langue/.test(document.querySelector('app-font-picker').textContent) && /Unités/.test(document.querySelector('app-font-picker').textContent));
     ok('languages are listed by their own names, no flags', /Français/.test(document.querySelector('app-font-picker').textContent) && !/[\u{1F1E6}-\u{1F1FF}]/u.test(document.querySelector('app-font-picker').textContent));
-    ok('dates follow the language', /novembre/.test(appFont.fmt.date(new Date(2026, 10, 13), 'long')));
+    ok('dates are ISO by default, with month names in the language', appFont.fmt.date(new Date(2026, 10, 13), 'long') === '2026-11-13' && /novembre/.test(appFont.fmt.months()[10]));
+    localStorage.setItem('maker-dates', 'regional');
+    ok('regional dates follow the language', /novembre/.test(appFont.fmt.date(new Date(2026, 10, 13), 'long')));
+    localStorage.removeItem('maker-dates');
     ok('numbers use the regional separator', appFont.fmt.number(1234.5) === '1 234,5' || appFont.fmt.number(1234.5) === '1 234,5');
     ok('units: metric distances and weights', /km/.test(appFont.fmt.distance(5000)) && /kg/.test(appFont.fmt.weight(80)));
     ok('the week starts on the chosen day', appFont.weekStart() === 1 && /^lun/.test(appFont.fmt.weekdays()[0]));

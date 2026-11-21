@@ -158,6 +158,16 @@
   ok('read, write and list go to the chosen cloud', C.signedIn() && (await C.read('hub-a.json')) === '{"a":1}' && (await C.read('nope')) === null && listed.length === 1 && listed[0].name === 'hub-a.json' && new Uint8Array(await C.readBytes(listed[0])).length === 7);
   C.use('google');
   ok('switching cloud signs the old one out and clears the choice', !signed && C.provider() === 'google' && !localStorage.getItem('maker-cloud'));
+  // ISO dates and times (house standard 28)
+  var when = new Date(2026, 10, 21, 14, 5, 9);
+  localStorage.removeItem('maker-dates'); localStorage.removeItem('maker-clock'); localStorage.removeItem('maker-week');
+  ok('dates show as ISO by default', F.dates() === 'iso' && F.fmt.date(when) === '2026-11-21' && F.fmt.time(when) === '14:05' && F.fmt.dateTime(when) === '2026-11-21 14:05' && /^\S+ 2026-11-21$/.test(F.fmt.date(when, 'full')));
+  ok('ISO means Monday weeks and a 24-hour clock unless chosen otherwise', F.weekStart() === 1 && F.clock() === '24');
+  ok('stored forms are ISO whatever the reader chose', F.fmt.isoDate(when) === '2026-11-21' && /^2026-11-21T14:05:09(Z|[+-]\d\d:\d\d)$/.test(F.fmt.iso(when)));
+  ok('ISO week numbers are right at the year\'s edges', F.fmt.isoWeek(new Date(2026, 0, 1)) === '2026-W01' && F.fmt.isoWeek(new Date(2027, 0, 1)) === '2026-W53' && F.fmt.isoWeek(new Date(2024, 11, 30)) === '2025-W01' && F.fmt.isoWeek(when) === '2026-W47');
+  localStorage.setItem('maker-dates', 'regional');
+  ok('a reader can choose regional dates', F.dates() === 'regional' && F.fmt.date(when) !== '2026-11-21' && /2026/.test(F.fmt.date(when)) && F.fmt.isoDate(when) === '2026-11-21');
+  localStorage.removeItem('maker-dates');
   // session ledger (house standard 25)
   var led = function () { return JSON.parse(localStorage.getItem('portal-activity') || '[]'); };
   localStorage.removeItem('portal-activity');

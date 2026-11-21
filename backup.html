@@ -489,7 +489,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
     var names = Object.keys(Object.assign({}, L, D)).sort(function (a, b) { return a.localeCompare(b); });
     var recs = 0; items.forEach(function (it) { if (it.kind === 'indexedDB') recs += it.count; });
     var facts = el('p');
-    facts.appendChild(el('b', 'Made ' + new Date(A.head.made).toLocaleString()));
+    facts.appendChild(el('b', 'Made ' + appFont.fmt.dateTime(A.head.made)));
     facts.appendChild(document.createTextNode(' · ' + size(A.file.size) + ' · ' + plural(names.length, 'app') + ', ' + plural(Object.keys(A.ls).length, 'setting') + ', ' +
       num(recs) + ' record' + (recs === 1 ? '' : 's') + ', ' + plural(A.drive.length, 'Drive file') + ' · saved from ' + (A.head.origin || '?') + (A.head.from || '')));
     box.appendChild(facts);

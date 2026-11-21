@@ -138,6 +138,7 @@
           this.appendChild(row(tr('Units'), [['auto', auto + ' (' + (units() === 'imperial' ? tr('imperial') : tr('metric')) + ')'], ['metric', tr('Metric (km, kg)')], ['imperial', tr('Imperial (mi, lb)')]], store.get(UKEY) || 'auto', function (v) { setRegional(UKEY, v); }));
           var dayName = function (d) { return new Intl.DateTimeFormat(locale(), { weekday: 'long' }).format(new Date(2026, 0, 4 + d)); };
           this.appendChild(row(tr('First day of the week'), [['auto', auto + ' (' + dayName(weekStart()) + ')'], ['mon', dayName(1)], ['sun', dayName(0)], ['sat', dayName(6)]], store.get(WKEY) || 'auto', function (v) { setRegional(WKEY, v); }));
+          this.appendChild(row(tr('Dates'), [['iso', 'ISO 8601 (' + isoDate(new Date()) + ' ' + isoTime(new Date()) + ')'], ['regional', tr('Regional') + ' (' + new Intl.DateTimeFormat(locale(), { dateStyle: 'medium' }).format(new Date()) + ')']], dates(), function (v) { setRegional(DKEY, v === 'iso' ? null : v); }));
           this.appendChild(row(tr('Clock'), [['auto', auto + ' (' + (clock() === '12' ? tr('12-hour') : tr('24-hour')) + ')'], ['24', tr('24-hour')], ['12', tr('12-hour')]], store.get(CKEY) || 'auto', function (v) { setRegional(CKEY, v); }));
         }
         // Every app has this picker in its settings, so the running build is shown under it.
@@ -594,7 +595,10 @@
     { id: 'bn', name: 'বাংলা' }, { id: 'id', name: 'Bahasa Indonesia' }, { id: 'ur', name: 'اردو', rtl: true },
     { id: 'fa', name: 'فارسی', rtl: true }, { id: 'ar', name: 'العربية', rtl: true },
   ];
-  var LKEY = 'maker-lang', UKEY = 'maker-units', WKEY = 'maker-week', CKEY = 'maker-clock', MTKEY = 'maker-mt-ack:';
+  var LKEY = 'maker-lang', UKEY = 'maker-units', WKEY = 'maker-week', CKEY = 'maker-clock', DKEY = 'maker-dates', MTKEY = 'maker-mt-ack:';
+  // House standard 28: dates and times are ISO 8601 (2026-11-21, 14:05, weeks from Monday) unless the
+  // reader picks "Regional" under the font picker. One choice for every app, like the language.
+  function dates() { return store.get(DKEY) === 'regional' ? 'regional' : 'iso'; }
   var langInfo = function (id) { return LANGS.filter(function (l) { return l.id === id; })[0] || LANGS[0]; };
   function deviceLang() {
     var ls = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
@@ -613,10 +617,11 @@
   function weekStart() { // 0 = Sunday, 1 = Monday, 6 = Saturday
     var v = store.get(WKEY);
     if (v === 'sun') return 0; if (v === 'mon') return 1; if (v === 'sat') return 6;
+    if (dates() === 'iso') return 1; // ISO 8601: the week starts on Monday
     try { var L = new Intl.Locale(navigator.language || 'en'), w = L.getWeekInfo ? L.getWeekInfo() : L.weekInfo; if (w && w.firstDay) return w.firstDay % 7; } catch (e) { /* older browser */ }
     return 1;
   }
-  function clock() { var v = store.get(CKEY); if (v === '12' || v === '24') return v; try { return /h1[12]/.test(new Intl.DateTimeFormat(navigator.language || 'en', { hour: 'numeric' }).resolvedOptions().hourCycle) ? '12' : '24'; } catch (e) { return '24'; } }
+  function clock() { var v = store.get(CKEY); if (v === '12' || v === '24') return v; if (dates() === 'iso') return '24'; try { return /h1[12]/.test(new Intl.DateTimeFormat(navigator.language || 'en', { hour: 'numeric' }).resolvedOptions().hourCycle) ? '12' : '24'; } catch (e) { return '24'; } }
   // a regional change reloads the page, so every screen of every app redraws in it
   function setRegional(key, value) { store.set(key, value == null || value === 'auto' ? null : value); location.reload(); }
 
@@ -650,12 +655,36 @@
   // formatting: always the shared locale, units, week start and clock
   function fmtNumber(n, o) { o = o || {}; try { return new Intl.NumberFormat(locale(), { maximumFractionDigits: o.max != null ? o.max : 2, minimumFractionDigits: o.min || 0 }).format(n); } catch (e) { return String(n); } }
   var asDate = function (d) { return d instanceof Date ? d : new Date(d); };
+  var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+  // ISO 8601 pieces, always in the reader's LOCAL day and time (house standards 10 and 28)
+  var isoDate = function (d) { d = asDate(d); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
+  var isoTime = function (d) { d = asDate(d); return p2(d.getHours()) + ':' + p2(d.getMinutes()); };
+  var clockTime = function (d) { return clock() === '12' ? new Intl.DateTimeFormat(locale(), { timeStyle: 'short', hour12: true }).format(asDate(d)) : isoTime(d); };
   var fmt = {
     number: fmtNumber,
     percent: function (x, max) { return new Intl.NumberFormat(locale(), { style: 'percent', maximumFractionDigits: max == null ? 0 : max }).format(x); },
-    date: function (d, style) { return new Intl.DateTimeFormat(locale(), { dateStyle: style || 'medium' }).format(asDate(d)); },
-    time: function (d) { return new Intl.DateTimeFormat(locale(), { timeStyle: 'short', hour12: clock() === '12' }).format(asDate(d)); },
-    dateTime: function (d, style) { return new Intl.DateTimeFormat(locale(), { dateStyle: style || 'medium', timeStyle: 'short', hour12: clock() === '12' }).format(asDate(d)); },
+    // What the reader sees. ISO by default: 2026-11-21, 14:05, 2026-11-21 14:05; style 'full' adds the weekday
+    // (Sat 2026-11-21). With "Regional" chosen these follow the language and region instead.
+    date: function (d, style) {
+      if (dates() === 'iso') return (style === 'full' ? new Intl.DateTimeFormat(locale(), { weekday: 'short' }).format(asDate(d)) + ' ' : '') + isoDate(d);
+      return new Intl.DateTimeFormat(locale(), { dateStyle: style || 'medium' }).format(asDate(d));
+    },
+    time: function (d) { return dates() === 'iso' ? clockTime(d) : new Intl.DateTimeFormat(locale(), { timeStyle: 'short', hour12: clock() === '12' }).format(asDate(d)); },
+    dateTime: function (d, style) {
+      if (dates() === 'iso') return fmt.date(d, style) + ' ' + clockTime(d);
+      return new Intl.DateTimeFormat(locale(), { dateStyle: style || 'medium', timeStyle: 'short', hour12: clock() === '12' }).format(asDate(d));
+    },
+    // What is stored, exported or put in a file name: never changes with the reader's choice.
+    isoDate: isoDate,                                   // 2026-11-21 (the local day)
+    iso: function (d) {                                 // 2026-11-21T14:05:09+01:00 (local time with its offset)
+      d = asDate(d); var o = -d.getTimezoneOffset(), a = Math.abs(o);
+      return isoDate(d) + 'T' + isoTime(d) + ':' + p2(d.getSeconds()) + (o === 0 ? 'Z' : (o < 0 ? '-' : '+') + p2(Math.floor(a / 60)) + ':' + p2(a % 60));
+    },
+    isoWeek: function (d) {                             // 2026-W47 (weeks from Monday; week 1 holds the year's first Thursday)
+      d = asDate(d); var t = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 3 - ((d.getDay() + 6) % 7)), y = t.getFullYear();
+      return y + '-W' + p2(1 + Math.round((t - new Date(y, 0, 4)) / 6048e5 + (((new Date(y, 0, 4).getDay() + 6) % 7) - 3) / 7));
+    },
+    // names only (a month, a weekday): a whole date or time goes through date / time / dateTime above
     custom: function (d, opts) { return new Intl.DateTimeFormat(locale(), Object.assign({ hour12: clock() === '12' }, opts)).format(asDate(d)); },
     relative: function (d) {
       var s = (asDate(d).getTime() - Date.now()) / 1000, a = Math.abs(s), rtf = new Intl.RelativeTimeFormat(locale(), { numeric: 'auto' });
@@ -1298,6 +1327,7 @@
     languages: LANGS, lang: lang, locale: locale, units: units, weekStart: weekStart, clock: clock,
     setLanguage: function (id) { setRegional(LKEY, id); }, setUnits: function (v) { setRegional(UKEY, v); },
     setWeekStart: function (v) { setRegional(WKEY, v); }, setClock: function (v) { setRegional(CKEY, v); },
+    dates: dates, setDates: function (v) { setRegional(DKEY, v === 'regional' ? 'regional' : null); },
     t: t, fmt: fmt, ready: ready, applyDom: applyDom, machineTranslated: function () { return lang() !== 'en'; } };
   window.t = window.t || t; // the short name apps write their English with
 })();

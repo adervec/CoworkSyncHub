@@ -74,5 +74,7 @@
  "Paper": "纸张",
  "Pastel": "粉彩",
  "Mono": "单色",
- "High contrast": "高对比度"
+ "High contrast": "高对比度",
+ "Dates": "日期",
+ "Regional": "区域格式"
 }
