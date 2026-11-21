@@ -27,18 +27,24 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
 
 ## The standards
 
-1. **Drive sync** to the private app folder (`drive.appdata`), and while synced the Google **profile
-   picture is always visible in the app's top bar**, on every screen, like YouTube's corner avatar,
-   not only in settings. Use font.js: put `<app-account></app-account>` in the header and call
-   `appFont.setAccount({ name, email, picture })` after sign-in (`setAccount(null)` on sign-out);
-   handle `app-account-click` to open the sync settings. An app's own always-visible header avatar
-   (GymTracker's banner, a header sync chip with the picture) also meets it.
-   - **Sign in once (to do, per app):** font.js now carries the sign-in and Drive code every app
-     copies: `appFont.google.token({ silent })`, `.read(name)`, `.write(name, text)`, `.signOut()`.
-     It remembers the account last chosen (`maker-google-hint`), so a reader who signed in on the
-     hub is not asked to pick again. When you next touch an app's sync, move it onto these and
-     delete its own copy. Tokens stay in memory. Hub settings live in `hub-prefs.json` (hub.js);
-     an app never writes that file.
+1. **Cloud sync** to the reader's private app folder, through font.js's `appFont.cloud`, and while
+   signed in the account's **picture is always visible in the app's top bar**, on every screen,
+   like YouTube's corner avatar, not only in settings.
+   - **One door:** `appFont.cloud.signIn({ silent })`, `.read(name)`, `.readBytes(name)`,
+     `.write(name, textOrBlob, mime)`, `.list(prefix)`, `.signedIn()`, `.signOut()`. An app talks to
+     no vendor directly: no Google, Dropbox or Microsoft calls of its own. font.js shows the picture
+     itself once signed in (`<app-account></app-account>` in the header; handle `app-account-click`
+     to open the sync settings). An app's own always-visible header avatar also meets the picture rule.
+   - **One vendor per reader, chosen once** for every app and the hub (in the hub's settings);
+     an app shows which one is in use (`appFont.cloud.label()`) and never offers its own choice.
+     Google Drive is the vendor today; Dropbox, OneDrive and a local folder plug into the same door
+     later, so an app written against `appFont.cloud` needs no change when they arrive.
+   - **To do, per app:** each app still carries its own copy of the Google sign-in and Drive code.
+     When you next touch an app's sync, move it onto `appFont.cloud` and delete the copy, including
+     any vendor picker of its own. The sign-in pass stays in memory. A reader who signed in on the
+     hub is not asked to pick an account again.
+   - File names are the app's own (list them in `app-data.json` under `drive`, which now means
+     "cloud files"). Hub settings live in `hub-prefs.json` (hub.js); an app never writes that file.
 2. **House font**: Atkinson Hyperlegible by default, reader-changeable (font.js).
 3. **Cowork** (the GymTracker / Tachyread style): named channels, each with fixed request files,
    instructions and a reply format, declared in a `cowork.json` manifest; a schedule per channel
@@ -272,7 +278,7 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
       produces that another could use; a setting that should be chosen once for every app.
     - **How sharing would work, once planned:** through the shared Drive folder, as a file named
       `shared-<topic>.json` that exactly ONE app owns and writes and the others only read
-      (`appFont.google.read`), declared in both apps' `app-data.json`; or as a shared piece in
+      (`appFont.cloud.read`), declared in both apps' `app-data.json`; or as a shared piece in
       font.js when it is behaviour rather than data. Never reach into another app's own keys,
       databases or Drive files, and never copy another app's code into yours.
     - The standards check's `overlap` column fails without the file and warns when its Reviewed

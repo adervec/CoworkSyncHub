@@ -80,10 +80,10 @@ const FONTJS = /<script[^>]*\ssrc\s*=\s*["']https:\/\/adervec\.github\.io\/font\
 const ok = (note = '') => ['ok', note], warn = (note) => ['warn', note], fail = (note) => ['FAIL', note];
 
 const CHECKS = [
-  ['drive', 'Drive private-folder sync', (a) => a.has(/appDataFolder|drive\.appdata|appFont\??\.google\b/) ? ok() : fail('no drive.appdata sync')],
+  ['drive', 'Cloud sync to the private app folder', (a) => a.has(/appDataFolder|drive\.appdata|appFont\??\.(cloud|google)\b/) ? ok() : fail('no cloud sync (appFont.cloud, or Drive appdata)')],
   ['pfp', 'Google picture always visible (top bar)', (a) => {
-    // font.js's shared sign-in (appFont.google) asks for the profile and feeds the corner avatar itself
-    const house = a.has(/appFont\??\.google\b/);
+    // font.js's shared sign-in (appFont.cloud) asks for the profile and feeds the corner avatar itself
+    const house = a.has(/appFont\??\.(cloud|google)\b/);
     if (!house && !a.has(/oauth2\/v3\/userinfo/)) return fail('never asks Google for the profile');
     // the shared corner avatar, placed in the page and fed the account
     const shared = a.has(/<app-account|createElement\(\s*['"]app-account/) && (house || a.has(/setAccount\(/));
@@ -373,6 +373,8 @@ function selftest() {
     writeFileSync(path.join(tmp, 'OVERLAPS.md'), 'Reviewed: ' + new Date().toISOString().slice(0, 10) + '\n');
     eq(check('overlap', { ...fake(''), root: tmp }), 'ok', 'a fresh review passes');
   }
+  eq(check('drive', fake('await appFont.cloud.signIn(); appFont.cloud.write("x.json", s)')), 'ok', 'the shared cloud helper counts as sync');
+  eq(check('drive', fake('localStorage.setItem("x", s)')), 'FAIL', 'no cloud sync fails');
   eq(check('ledger', fake('appFont.logSession({ kind: "lift", minutes: 40, id: w.id })')), 'ok', 'logSession passes');
   eq(check('pfp', fake('<header><app-account></app-account></header> const G = window.appFont?.google; G.token()')), 'ok', 'the shared sign-in with the corner avatar passes');
   eq(check('pfp', fake('const G = window.appFont?.google; G.token()')), 'FAIL', 'the shared sign-in without the avatar in the page fails');

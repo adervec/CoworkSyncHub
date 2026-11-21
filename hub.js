@@ -1,7 +1,7 @@
 // hub.js: the hub's own preferences (hub roadmap chunk 3), shared by the landing page and Settings.
 // They live in this browser (localStorage 'portal-prefs') and work without signing in. When a Google
-// account is signed in, one small file in the private Drive folder (hub-prefs.json) carries them to
-// the reader's other devices. Needs font.js (appFont.google) loaded first.
+// account is signed in, one small file in the private cloud folder (hub-prefs.json) carries them to
+// the reader's other devices. Needs font.js (appFont.cloud) loaded first.
 // Stored: { schema: 1, h: { <slug>: ±ms }, a: ±ms, g: { <STAT>: [hours a week, ms] }, o: ms }.
 // g = the attributes the reader is working on (0 hours = not chosen); o = when the first-visit question was answered. Each choice carries the time it was made
 // (positive = hidden / activity shown, negative = the opposite), so two devices merge choice by
@@ -50,13 +50,13 @@ window.hubPrefs = (function () {
   // -> 'off' (nobody signed in), 'pulled', 'pushed', 'both' or 'same'. silent: give up rather than show Google's window.
   function sync(silent) {
     if (!window.appFont || !appFont.getAccount()) return Promise.resolve('off');
-    return appFont.google.token({ silent: silent }).then(function () { return appFont.google.read(FILE); }).then(function (text) {
+    return appFont.cloud.signIn({ silent: silent }).then(function () { return appFont.cloud.read(FILE); }).then(function (text) {
       var remote = null, local = raw();
       try { if (text) remote = clean(appFont.parseJSON(text, 1e5)); } catch (e) { /* unreadable: ours replaces it */ }
       var m = merge(local, remote || clean(null)), ms = JSON.stringify(m);
       var pulled = ms !== JSON.stringify(local), push = !remote || ms !== JSON.stringify(remote);
       if (pulled) put(m);
-      return (push ? appFont.google.write(FILE, ms) : Promise.resolve()).then(function () { return pulled && push ? 'both' : pulled ? 'pulled' : push ? 'pushed' : 'same'; });
+      return (push ? appFont.cloud.write(FILE, ms) : Promise.resolve()).then(function () { return pulled && push ? 'both' : pulled ? 'pulled' : push ? 'pushed' : 'same'; });
     }).then(function (res) { return syncLedger().catch(function () { /* the settings still synced */ }).then(function () { return res; }); });
   }
 
@@ -79,12 +79,13 @@ window.hubPrefs = (function () {
     var mine = 'hub-ledger-' + device() + '.json', text = localStorage.getItem('portal-activity') || '[]', local = rows(text);
     var mark = text.length + ':' + text.slice(-60); // changed since the last push?
     var push = local.length && localStorage.getItem('portal-ledger-pushed') !== mark
-      ? appFont.google.write(mine, JSON.stringify(local)).then(function () { localStorage.setItem('portal-ledger-pushed', mark); }) : Promise.resolve();
-    return push.then(function () { return appFont.google.list('hub-ledger-'); }).then(function (names) {
+      ? appFont.cloud.write(mine, JSON.stringify(local)).then(function () { localStorage.setItem('portal-ledger-pushed', mark); }) : Promise.resolve();
+    return push.then(function () { return appFont.cloud.list('hub-ledger-'); }).then(function (files) {
+      var names = files.map(function (f) { return f.name; });
       var out = [], seen = {};
       local.forEach(function (r) { if (r[4]) seen[r[1] + '|' + r[4]] = 1; });
       return names.filter(function (n) { return n !== mine; }).slice(0, 20).reduce(function (p, n) { // ponytail: 20 devices is plenty
-        return p.then(function () { return appFont.google.read(n); }).then(function (t) {
+        return p.then(function () { return appFont.cloud.read(n); }).then(function (t) {
           rows(t).forEach(function (r) { var k = r[4] ? r[1] + '|' + r[4] : ''; if (k && seen[k]) return; if (k) seen[k] = 1; out.push(r.slice(0, 5)); });
         });
       }, Promise.resolve()).then(function () {
@@ -95,6 +96,6 @@ window.hubPrefs = (function () {
     });
   }
   // the reader asked to sign in: Google's window may show
-  function signIn() { return appFont.google.token().then(function () { return sync(false); }); }
+  function signIn() { return appFont.cloud.signIn().then(function () { return sync(false); }); }
   return { get: get, hide: hide, setActivity: setActivity, setGoals: setGoals, sync: sync, signIn: signIn };
 })();

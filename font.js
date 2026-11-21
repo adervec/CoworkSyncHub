@@ -961,11 +961,22 @@
     });
   }
 
-  // ---- Google sign-in and the private Drive folder, one copy for everyone (hub roadmap chunk 3) -------
-  // The hub and its Backup and Settings pages use this; apps still carry their own copy and should
-  // move here (see HOUSE-STANDARDS). The access token lives in memory only. What is remembered is the
-  // address of the account last chosen (maker-google-hint), so the next sign-in skips the chooser.
-  // The client id is public (an identifier, not a secret); Google honours it only from registered origins.
+  // ---- The reader's cloud, one helper for every app and the hub (house standard 1) -------------------
+  // appFont.cloud is the only door to the reader's synced copy: sign in, then read, write and list
+  // named files in an app-private folder. Which vendor is behind it is the reader's choice, made ONCE
+  // for every app and the hub (key maker-cloud); mixing vendors between apps is not supported.
+  //   appFont.cloud.signIn({ silent })   -> a promise; silent never shows the vendor's window
+  //   .read(name) -> text | null   .readBytes(nameOrEntry, signal) -> ArrayBuffer | null
+  //   .write(name, textOrBlob, mime)   .list(prefix) -> [{ name, size, modified, mime, id }]
+  //   .signedIn()  .signOut()  .provider() -> 'google'  .label() -> 'Google Drive'
+  //   .providers() -> [{ id, label, current }]  .use(id)  .register(provider)
+  // A vendor is one object with those same methods (plus id and label). Google Drive ships here; Dropbox,
+  // OneDrive and "a folder on this computer" are added with register() when they are built.
+  // The sign-in pass lives in memory only. What is remembered is the address of the account last
+  // chosen (maker-google-hint), so the next sign-in skips the chooser.
+
+  // -- Google Drive: the hidden per-app folder (appDataFolder). The client id is public (an identifier,
+  //    not a secret); Google honours it only from registered origins.
   var G_CLIENT = window.appGoogleClient || '547617739897-br6dj2facmsc34qnkjb5u4dbfhju39pu.apps.googleusercontent.com';
   var G_SCOPE = 'openid email profile https://www.googleapis.com/auth/drive.appdata';
   var G_HINT = 'maker-google-hint';
@@ -1006,12 +1017,10 @@
         .then(function () { return t; });
     });
   }
-  // forgets the account here; the grant itself stays, since the apps share it
-  function googleSignOut() { gTok = null; store.set(G_HINT, null); setAccount(null); }
   function gApi(path, init) {
+    init = init || {};
     return googleToken({ silent: true }).then(function (t) {
-      init = init || {};
-      return fetch('https://www.googleapis.com/' + path, { method: init.method, body: init.body, headers: Object.assign({ Authorization: 'Bearer ' + t }, init.headers) });
+      return fetch('https://www.googleapis.com/' + path, { method: init.method, body: init.body, signal: init.signal, headers: Object.assign({ Authorization: 'Bearer ' + t }, init.headers) });
     }).then(function (r) { if (!r.ok) throw new Error('Google Drive answered ' + r.status + '.'); return r; });
   }
   function gFind(name) {
@@ -1019,28 +1028,67 @@
     return gApi('drive/v3/files?spaces=appDataFolder&fields=files(id)&q=' + encodeURIComponent(q))
       .then(function (r) { return r.json(); }).then(function (j) { return ((j.files || [])[0] || {}).id || null; });
   }
-  // one named file in the private folder: -> its text, or null when there is none yet
-  function driveRead(name) {
-    return gFind(name).then(function (id) { return id ? gApi('drive/v3/files/' + id + '?alt=media').then(function (r) { return r.text(); }) : null; });
-  }
-  // the names of the files in the private folder that start with prefix
-  function driveList(prefix) {
-    var q = "name contains '" + String(prefix).replace(/['\\]/g, '\\$&') + "' and trashed=false";
-    return gApi('drive/v3/files?spaces=appDataFolder&pageSize=1000&fields=files(id,name)&q=' + encodeURIComponent(q))
-      .then(function (r) { return r.json(); })
-      .then(function (j) { return (j.files || []).map(function (f) { return f.name; }).filter(function (n) { return n.indexOf(prefix) === 0; }); });
-  }
-  // body: text, or a Blob for a binary file; mime defaults to JSON
-  function driveWrite(name, body, mime) {
-    mime = mime || 'application/json';
-    return gFind(name).then(function (id) {
-      if (id) return gApi('upload/drive/v3/files/' + id + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': mime }, body: body });
-      var b = 'b' + randomId().replace(/-/g, '');
-      var multi = new Blob(['--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name: name, parents: ['appDataFolder'] }) +
-        '\r\n--' + b + '\r\nContent-Type: ' + mime + '\r\n\r\n', body, '\r\n--' + b + '--']);
-      return gApi('upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body: multi });
-    }).then(function () {});
-  }
+  var GOOGLE = {
+    id: 'google', label: 'Google Drive',
+    signIn: googleToken, signedIn: googleSignedIn,
+    // forgets the account here; the grant itself stays, since every app shares it
+    signOut: function () { gTok = null; store.set(G_HINT, null); setAccount(null); },
+    read: function (name) {
+      return gFind(name).then(function (id) { return id ? gApi('drive/v3/files/' + id + '?alt=media').then(function (r) { return r.text(); }) : null; });
+    },
+    // name, or an entry from list() (two files can share a name in Drive; an entry is exact)
+    readBytes: function (what, signal) {
+      return (what && what.id ? Promise.resolve(what.id) : gFind(what)).then(function (id) {
+        return id ? gApi('drive/v3/files/' + encodeURIComponent(id) + '?alt=media', { signal: signal }).then(function (r) { return r.arrayBuffer(); }) : null;
+      });
+    },
+    list: function (prefix) {
+      prefix = prefix || '';
+      var out = [], q = prefix ? '&q=' + encodeURIComponent("name contains '" + String(prefix).replace(/['\\]/g, '\\$&') + "' and trashed=false") : '';
+      var page = function (pt) {
+        return gApi('drive/v3/files?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,size,modifiedTime,mimeType)' + q + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))
+          .then(function (r) { return r.json(); }).then(function (j) {
+            (j.files || []).forEach(function (f) { if (f.name.indexOf(prefix) === 0) out.push({ id: f.id, name: f.name, size: +f.size || 0, modified: f.modifiedTime || '', mime: f.mimeType || '' }); });
+            return j.nextPageToken ? page(j.nextPageToken) : out;
+          });
+      };
+      return page();
+    },
+    // body: text, or a Blob for a binary file; mime defaults to JSON
+    write: function (name, body, mime) {
+      mime = mime || 'application/json';
+      return gFind(name).then(function (id) {
+        if (id) return gApi('upload/drive/v3/files/' + id + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': mime }, body: body });
+        var b = 'b' + randomId().replace(/-/g, '');
+        var multi = new Blob(['--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name: name, parents: ['appDataFolder'] }) +
+          '\r\n--' + b + '\r\nContent-Type: ' + mime + '\r\n\r\n', body, '\r\n--' + b + '--']);
+        return gApi('upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body: multi });
+      }).then(function () {});
+    },
+  };
+
+  // -- the door: whichever vendor the reader chose
+  var CLOUD_KEY = 'maker-cloud', CLOUDS = { google: GOOGLE };
+  var cloudNow = function () { return CLOUDS[store.get(CLOUD_KEY)] || GOOGLE; };
+  var cloud = {
+    provider: function () { return cloudNow().id; },
+    label: function () { return cloudNow().label; },
+    providers: function () { return Object.keys(CLOUDS).map(function (k) { return { id: k, label: CLOUDS[k].label, current: CLOUDS[k] === cloudNow() }; }); },
+    // one vendor for every app and the hub; changing it does not move any data (back up, switch, restore)
+    use: function (id) {
+      if (!CLOUDS[id]) throw new Error('Unknown cloud: ' + id);
+      if (CLOUDS[id] !== cloudNow()) cloudNow().signOut();
+      store.set(CLOUD_KEY, id === 'google' ? null : id);
+      document.dispatchEvent(new CustomEvent('app-cloud-change', { detail: id }));
+    },
+    register: function (p) {
+      var need = ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list'];
+      if (!p || !/^[a-z][a-z0-9-]{1,20}$/.test(p.id || '') || !p.label || !need.every(function (m) { return typeof p[m] === 'function'; })) throw new Error('A cloud needs an id, a label and: ' + need.join(', '));
+      CLOUDS[p.id] = p;
+    },
+  };
+  ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list'].forEach(function (m) { cloud[m] = function () { var c = cloudNow(); return c[m].apply(c, arguments); }; });
+  cloud.token = cloud.signIn; // the old name (appFont.google.token), kept for notes that still say it
 
   // ---- Cold backup (hub roadmap chunk 2a) ------------------------------------------------------------
   // Every app shares the origin, so one page can read all of their settings and databases into one
@@ -1240,7 +1288,7 @@
     esc: esc, html: html, safeUrl: safeUrl, parseJSON: parseJSON, randomId: randomId, redact: redact,
     zoomAllowed: zoomAllowed, setZoomAllowed: setZoomAllowed, crashNotice: crashNotice,
     themes: themes, baseThemes: BASE_THEMES, addThemes: addThemes, theme: themeChoice, themeNow: themeNow, setTheme: setTheme,
-    google: { token: googleToken, signedIn: googleSignedIn, signOut: googleSignOut, read: driveRead, write: driveWrite, list: driveList },
+    cloud: cloud, google: cloud, // google: the helper's first name, kept so older notes still work
     logSession: logSession,
     backup: { list: backupList, peek: backupPeek, build: backupBuild, download: backupDownload, open: idbOpen, decode: dec },
     diagnostics: diagnostics, copyDiagnostics: copyDiagnostics, storageInfo: storageInfo, systemTheme: systemTheme,

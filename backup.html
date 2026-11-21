@@ -93,7 +93,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
   var size = function (n) { return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB'; };
   var ago = function (ms) { var d = Math.floor((Date.now() - ms) / 864e5); return d < 1 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago'; };
   var plural = function (n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); };
-  var apps = [], driveToken = null;
+  var apps = [];
   if (/portal-beta/.test(location.pathname)) $('beta').hidden = false;
 
   function paintLast() {
@@ -283,29 +283,19 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
       .catch(function (e) { $('local').textContent = ''; $('local').appendChild(el('p', 'Could not read this browser\'s data: ' + (e.message || e), 'bad')); });
   }
 
-  // ---- Google Drive (read-only; sign-in is font.js's appFont.google) ---------------------------------
-  function driveApi(path, signal) {
-    return fetch('https://www.googleapis.com/drive/v3/files' + path, { headers: { Authorization: 'Bearer ' + driveToken }, signal: signal }).then(function (r) {
-      if (r.status === 401) throw new Error('The Google sign-in has run out. Reload this page and sign in again.');
-      if (!r.ok) throw new Error('Google Drive answered ' + r.status + '.');
-      return r;
-    });
-  }
+  // ---- the cloud copy (read-only here; appFont.cloud is whichever vendor the reader chose) -------------
   // sign in and LIST the folder (names and sizes only); the files themselves are fetched at download time
   function listDrive() {
-    var files = [];
-    var page = function (pt) {
-      return driveApi('?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,modifiedTime,mimeType,size)' + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))
-        .then(function (r) { return r.json(); }).then(function (j) { files = files.concat(j.files || []); return j.nextPageToken ? page(j.nextPageToken) : files; });
-    };
-    return appFont.google.token().then(function (t) { driveToken = t; return page(); });
+    return appFont.cloud.signIn().then(function () { return appFont.cloud.list(''); }).then(function (files) {
+      return files.map(function (f) { return { id: f.id, name: f.name, size: f.size, modifiedTime: f.modified, mimeType: f.mime }; });
+    });
   }
   // ',"drive":[{name,modifiedTime,mimeType,text|b64},…]' one file at a time, each handed over as its own Blob
   async function writeDrive(files, push, signal, done) {
     push(',"drive":[');
     for (var i = 0; i < files.length; i++) {
       var f = files[i];
-      var buf = await (await driveApi('/' + encodeURIComponent(f.id) + '?alt=media', signal)).arrayBuffer();
+      var buf = (await appFont.cloud.readBytes(f, signal)) || new ArrayBuffer(0);
       var rec = { name: f.name, modifiedTime: f.modifiedTime, mimeType: f.mimeType };
       try { rec.text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
       catch (e) { var u = new Uint8Array(buf), s = ''; for (var k = 0; k < u.length; k += 0x8000) s += String.fromCharCode.apply(null, u.subarray(k, k + 0x8000)); rec.b64 = btoa(s); }
@@ -624,7 +614,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
       var v = cur.version; cur.close();
       if (v < A.dbs[c.dbs[i]].version) throw new Error(c.dbs[i] + ' in this file comes from a newer version of its app than this browser has. Open that app once so it updates, then restore again. Nothing was changed.');
     }
-    if (c.files.length) { say('Signing in to Google…'); driveToken = await appFont.google.token(); }
+    if (c.files.length) { say('Signing in to ' + appFont.cloud.label() + '…'); await appFont.cloud.signIn(); }
     // 2. the safety file: what is here now and about to be replaced
     say('Saving a safety copy of what will be replaced…');
     var keySet = {}; c.keys.forEach(function (k) { keySet[k] = 1; });
@@ -659,7 +649,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-heig
         if (p[0] === 'drive' && p.length === 2) {
           if (!wantFile[p[1]]) return;
           var f = appFont.parseJSON(text, 2e9), body = f.text != null ? f.text : new Blob([bytesOf(f.b64 || '')]);
-          await appFont.google.write(String(f.name), body, f.text != null ? 'application/json' : 'application/octet-stream');
+          await appFont.cloud.write(String(f.name), body, f.text != null ? 'application/json' : 'application/octet-stream');
           rep.files++;
           return;
         }

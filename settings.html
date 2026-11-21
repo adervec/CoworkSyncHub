@@ -76,7 +76,7 @@ label.opt input { width: 22px; height: 22px; flex: none }
   function run(p) { say('Working…'); return p.then(function (r) { say(WORDS[r] || ''); }, function (e) { say(e.message || String(e), true); }).then(paintAccount); }
   $('in').addEventListener('click', function () { run(hubPrefs.signIn()); });
   $('syncnow').addEventListener('click', function () { run(hubPrefs.sync(false)); });
-  $('out').addEventListener('click', function () { appFont.google.signOut(); say('Signed out on this device.'); paintAccount(); });
+  $('out').addEventListener('click', function () { appFont.cloud.signOut(); say('Signed out on this device.'); paintAccount(); });
   document.addEventListener('app-account-change', paintAccount);
   // a change made here goes to Drive straight away when signed in (the tap allows Google's window if it is needed)
   function changed() { if (appFont.getAccount()) run(hubPrefs.sync(false)); }
