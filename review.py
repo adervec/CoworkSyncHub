@@ -3,6 +3,7 @@
   python review.py            gather everything and write ../_review/index.html
   python review.py --open     ...and open it in the browser
   python review.py --quick    skip the slow network lookups (CI, live sites, pull requests, repo traffic)
+  python review.py --look     first re-run the look-and-feel scan of every live app (about 3 minutes)
 
 The page is for local reading only. It is written OUTSIDE every repo (GitHub/_review/), so it cannot be
 committed or published; only this generator and its empty template (review.html) live in the repo.
@@ -172,6 +173,10 @@ def tasks_for(p, checks, leaks, notes):
 
 def main(argv):
     quick = "--quick" in argv
+    if "--look" in argv:
+        print("look and feel scan...")
+        OUT.mkdir(exist_ok=True)
+        subprocess.run(["node", "look-check.mjs", "--out", str(OUT)], cwd=BASE, capture_output=True)
     t0 = time.time()
     notes_file = OUT / "notes.json"
     notes = json.loads(notes_file.read_text(encoding="utf-8")) if notes_file.exists() else {}
@@ -247,7 +252,9 @@ def main(argv):
         history = (history + [now])[-300:]
         hist_file.write_text(json.dumps(history), encoding="utf-8")
 
-    data = {"generated": now["t"], "quick": quick, "checks": std["checks"], "order": ORDER, "projects": projects, "standards": standards,
+    look_file = OUT / "look.json"  # written by look-check.mjs (slow, so run separately: node look-check.mjs --out ../_review)
+    look = json.loads(look_file.read_text(encoding="utf-8")) if look_file.exists() else None
+    data = {"look": look, "generated": now["t"], "quick": quick, "checks": std["checks"], "order": ORDER, "projects": projects, "standards": standards,
             "leaks": leaks, "neverList": never_n, "overlaps": overlaps, "notes": notes, "prev": prev,
             "trend": [{"t": h["t"], "fail": h["fail"], "warn": h["warn"]} for h in (history if not quick else history + [now])[-40:]]}
     page = (BASE / "review.html").read_text(encoding="utf-8").replace("/*DATA*/", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))

@@ -308,6 +308,30 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - The standards check's `iso` column fails on a date formatted outside `appFont.fmt`. Mark a
       deliberate exception on its line with `// iso-ok: why`.
 
+29. **One family look (SCAN ONLY: do not change an app for this yet).** The apps should feel like
+    one maker's family while each keeps its own character. Today they do not, and the maker has
+    asked for the differences to be measured before anything is changed. **Until this line is
+    removed, no session restyles, renames or rebrands anything because of this standard.**
+    - **What is measured** (`node ../CoworkSyncHub/look-check.mjs --out ../_review`, each app's
+      live first screen on a phone and a desktop, light and dark): the app's name everywhere it
+      appears (page title, manifest, home-screen name, portal); icons; body and heading type (family,
+      size, weight); the page and accent colours and whether they come from the shared themes;
+      whether the app follows the device's light or dark setting; button shape, height, weight and
+      wording case; card shape; the top bar (height, fixed or not, what it holds); where the main
+      navigation is; where the account picture and the settings are.
+    - **What "one family" will probably mean** (proposed from the first scan, NOT yet agreed):
+      one name per app, spelled the same everywhere; page titles as `Screen · App`; body text at
+      16 px; headings in the house font or one approved display face, on one size scale; buttons
+      with one corner radius, at least 44 px tall on a phone, sentence case, the primary one in the
+      theme's accent; cards with one corner radius; a top bar of one height with the app name on
+      the left and the account picture and settings on the right; main navigation in one place per
+      screen size; every app following the device's light or dark setting and the shared themes;
+      a full icon set.
+    - **What stays the app's own:** its name, emoji, hue, illustrations, the layout its job needs,
+      and skins for things inside it (standard 24).
+    - There is no status-board column yet: this cannot be read from source. The scan's results are
+      on the maker's local review page.
+
 ## Working habits
 
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you. Also run `node ../CoworkSyncHub/layout-check.mjs <App>` (the live site, phone and desktop) and fix what it flags.

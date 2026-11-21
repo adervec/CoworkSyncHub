@@ -96,7 +96,7 @@ svg.trend line { stroke: var(--line) }
 <nav role="tablist" id="nav"></nav></header>
 <main>
 <section id="t-overview"></section><section id="t-todo" hidden></section><section id="t-matrix" hidden></section><section id="t-projects" hidden></section>
-<section id="t-standards" hidden></section><section id="t-leaks" hidden></section><section id="t-overlaps" hidden></section><section id="t-roadmap" hidden></section>
+<section id="t-standards" hidden></section><section id="t-look" hidden></section><section id="t-leaks" hidden></section><section id="t-overlaps" hidden></section><section id="t-roadmap" hidden></section>
 </main>
 <div id="panel" hidden><button class="x" aria-label="Close">×</button><h3></h3><div id="panelBody"></div></div>
 <script id="data" type="application/json">/*DATA*/</script>
@@ -193,7 +193,7 @@ svg.trend line { stroke: var(--line) }
   }
 
   // ---- tabs ----
-  var TABS = [['overview', 'Overview'], ['todo', 'To do'], ['matrix', 'Matrix'], ['projects', 'Projects'], ['standards', 'Standards'], ['leaks', 'Leaks'], ['overlaps', 'Overlaps'], ['roadmap', 'Roadmap and decisions']];
+  var TABS = [['overview', 'Overview'], ['todo', 'To do'], ['matrix', 'Matrix'], ['projects', 'Projects'], ['standards', 'Standards'], ['look', 'Look and feel'], ['leaks', 'Leaks'], ['overlaps', 'Overlaps'], ['roadmap', 'Roadmap and decisions']];
   var built = {}, focus = null, BUILD = {};
   function go(tab, target) {
     focus = target || null;
@@ -444,6 +444,79 @@ svg.trend line { stroke: var(--line) }
       if (ov.length) { var dt = el('details'); dt.appendChild(el('summary', plural(ov.length, 'overlap') + ' that name this project')); var ul3 = el('ul', null, 'gaps'); ov.forEach(function (o) { var li = el('li'); li.append(el('div', o.state, 'dim'), el('div', o.who + ': ' + o.what)); ul3.appendChild(li); }); dt.appendChild(ul3); d.appendChild(dt); d.appendChild(el('p', '')); }
     }
     draw();
+  };
+
+
+  // ---- look and feel (house standard 29, scan only) ----
+  BUILD.look = function (box) {
+    var L = D.look;
+    if (!L) { box.appendChild(el('p', 'No scan yet. Run: python CoworkSyncHub/review.py --look', 'empty')); return; }
+    var apps = L.apps.filter(function (a) { return a.views && a.views.phone && !a.views.phone.error; });
+    box.appendChild(el('p', 'Each app\'s live first screen, measured on ' + isoMin(L.at) + ' (house standard 29: scan only, nothing is being changed). A highlighted cell differs from what most apps do.', 'dim small'));
+    // how spread out each thing is
+    var spread = function (get) { var n = {}; apps.forEach(function (a) { var v = String(get(a)); n[v] = (n[v] || 0) + 1; }); return Object.keys(n).map(function (k) { return [k, n[k]]; }).sort(function (x, y) { return y[1] - x[1]; }); };
+    var ph = function (a) { return a.views.phone; }, dk = function (a) { return a.views['phone-dark'] || {}; }, man = function (a) { return a.manifest || {}; };
+    var sameName = function (a) { var t = ph(a).title.split(/\s[—–·|-]\s/), names = [a.title, man(a).name, t[t.length - 1]].filter(Boolean).map(function (s) { return s.toLowerCase().replace(/[^a-z0-9]/g, ''); }); return names.every(function (n) { return n === names[0]; }) ? 'same everywhere' : 'differs'; };
+    var COLS = [
+      ['Name', function (a) { return sameName(a); }, function (a) { return 'Portal: ' + a.title + ' · page title: ' + ph(a).title + ' · manifest: ' + (man(a).name || 'none') + ' · home screen: ' + (man(a).short_name || 'none'); }],
+      ['Body text', function (a) { return ph(a).bodySize + ' px'; }],
+      ['Heading face', function (a) { return ph(a).headFont || 'none'; }],
+      ['Heading size', function (a) { return ph(a).headSize ? ph(a).headSize + ' px' : 'none'; }],
+      ['Button corners', function (a) { var r = ph(a).btnRadius; return r === '' ? 'none filled' : +r >= 99 ? 'pill' : r + ' px'; }],
+      ['Button height', function (a) { return ph(a).btnHeight === '' ? 'n/a' : ph(a).btnHeight + ' px'; }],
+      ['Buttons under 40 px', function (a) { return ph(a).btnSmall >= 50 ? 'most' : ph(a).btnSmall > 0 ? 'some' : 'none'; }],
+      ['Button wording', function (a) { return ph(a).btnCase || 'n/a'; }],
+      ['Card corners', function (a) { return ph(a).cardRadius === '' ? 'no cards' : ph(a).cardRadius + ' px'; }],
+      ['Top bar', function (a) { return ph(a).topBar ? ph(a).topBar + ' px' + (ph(a).topBarFixed ? ', fixed' : '') : 'none'; }],
+      ['Navigation (phone)', function (a) { return ph(a).nav; }],
+      ['Page colour', function (a) { return ph(a).bg; }],
+      ['Accent', function (a) { return ph(a).accent || 'none found'; }],
+      ['Shared themes', function (a) { return ph(a).usesHousePalette ? 'yes' : 'own colours'; }],
+      ['Follows dark setting', function (a) { return ph(a).dark ? 'always dark' : dk(a).dark ? 'yes' : 'stays light'; }],
+      ['Icons', function (a) { return (ph(a).icon === 'none' ? 'no favicon' : ph(a).icon) + (ph(a).appleIcon ? '' : ', no Apple icon'); }],
+    ];
+    var c1 = el('div', null, 'card'); c1.appendChild(el('h3', 'How far apart the apps are'));
+    var ul = el('ul', null, 'gaps');
+    COLS.forEach(function (c) {
+      var s = spread(c[1]); var li = el('li');
+      li.append(el('div', c[0]), el('div', plural(s.length, 'different value') + ': ' + s.slice(0, 6).map(function (x) { return x[0] + ' (' + x[1] + ')'; }).join(', ') + (s.length > 6 ? ', …' : '')));
+      ul.appendChild(li);
+    });
+    c1.appendChild(ul); box.appendChild(c1);
+    // the screens themselves
+    box.appendChild(el('h2', 'The first screens, side by side'));
+    var view = 'phone', tools = el('div', null, 'tools');
+    tools.appendChild(select([['phone', 'Phone, light'], ['phone-dark', 'Phone, dark setting'], ['desktop', 'Desktop']], view, function (v) { view = v; gallery(); }, 'Screen'));
+    box.appendChild(tools);
+    var grid = el('div'); grid.style.cssText = 'display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))'; box.appendChild(grid);
+    function gallery() {
+      grid.textContent = ''; grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(' + (view === 'desktop' ? 330 : 170) + 'px,1fr))';
+      apps.forEach(function (a) {
+        var f = el('a'), img = el('img'), src = 'shots/' + a.slug + '-' + view + '.png';
+        f.href = src; f.target = '_blank'; f.rel = 'noopener'; f.style.cssText = 'display:block;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;text-decoration:none;color:var(--text)';
+        img.src = src; img.alt = a.title + ' first screen'; img.loading = 'lazy'; img.style.cssText = 'width:100%;display:block';
+        f.append(img, el('div', a.title, 'small')); f.lastChild.style.padding = '4px 8px';
+        grid.appendChild(f);
+      });
+    }
+    gallery();
+    // every measurement
+    box.appendChild(el('h2', 'Every measurement'));
+    var modes = COLS.map(function (c) { return spread(c[1])[0][0]; }), state = { by: 'diff', dir: -1 }, w = el('div', null, 'wrap'); box.appendChild(w);
+    (function draw() {
+      var rows = apps.map(function (a) {
+        var r = { _sort: {}, _nowrap: ['app'] }, diff = 0;
+        var nb = el('button', a.title, 'link'); nb.addEventListener('click', function () { go('projects', a.slug); }); r.app = nb; r._sort.app = a.title.toLowerCase();
+        COLS.forEach(function (c, i) {
+          var v = String(c[1](a)), odd = v !== modes[i]; if (odd) diff++;
+          var s = el('span', v, odd ? 'tag mid' : ''); if (c[2]) s.title = c[2](a);
+          if (c[0] === 'Page colour' || c[0] === 'Accent') { var sw = el('span'); sw.style.cssText = 'display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;border:1px solid var(--axis);background:' + (/^#/.test(v) ? v : 'transparent'); var wrap2 = el('span'); wrap2.append(sw, s); s = wrap2; }
+          r['c' + i] = s; r._sort['c' + i] = (odd ? '1' : '0') + v.padStart(12, '0');
+        });
+        r.diff = String(diff); r._sort.diff = diff; return r;
+      });
+      w.textContent = ''; w.appendChild(sortableTable([['app', 'App'], ['diff', 'Differs in']].concat(COLS.map(function (c, i) { return ['c' + i, c[0]]; })), rows, state, draw));
+    })();
   };
 
   // ---- standards ----
