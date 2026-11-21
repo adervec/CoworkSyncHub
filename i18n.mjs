@@ -70,11 +70,13 @@ export function localesDir(root) {
     if (!existsSync(p)) continue;
     const m = readFileSync(p, 'utf8').match(/name=["']app-locales["'][^>]*content=["']([^"']+)["']/);
     if (m) {
-      // a path relative to the page; Vite projects keep served files in public/
+      // a path relative to the page; Vite projects keep served files in public/. Only a Vite project:
+      // a plain static app may have a public/ folder of its own source (CelebrityCrusher serves it at /public/).
       const rel = m[1].replace(/%BASE_URL%/g, '').replace(/^\.?\//, '');
       const pageDir = path.dirname(p);
       const pub = path.join(pageDir, 'public', rel);
-      return existsSync(path.join(pageDir, 'public')) ? pub : path.join(pageDir, rel);
+      const vite = ['js', 'ts', 'mjs', 'mts', 'cjs'].some((x) => existsSync(path.join(root, 'vite.config.' + x)) || existsSync(path.join(pageDir, 'vite.config.' + x)));
+      return vite && existsSync(path.join(pageDir, 'public')) ? pub : path.join(pageDir, rel);
     }
   }
   return path.join(root, 'locales');
