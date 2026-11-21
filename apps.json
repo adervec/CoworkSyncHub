@@ -215,6 +215,26 @@
     ]
   },
   {
+    "slug": "MacroTrackro",
+    "kind": "checkin",
+    "dir": "MacroTrackro",
+    "title": "MacroTrackro",
+    "emoji": "🥗",
+    "hue": 165,
+    "tagline": "Track calories and macros, and check your vitamin, supplement and pre-workout stack.",
+    "badges": [
+      "cloud sync",
+      "AI review"
+    ],
+    "features": [
+      "Food log by meal, with calories, protein, carbs and fat against your goals",
+      "Supplement stack: every ingredient added up across the products you take",
+      "Stack check: over the limit, underdosed, hidden in a blend, or flagged by FDA or Health Canada",
+      "A guide to about 170 ingredients sold in North America, with the evidence for each",
+      "AI stack review for current recalls and safety alerts"
+    ]
+  },
+  {
     "slug": "MarksmanApp",
     "kind": "aim",
     "dir": "MarksmanApp",
