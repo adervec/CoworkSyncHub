@@ -19,7 +19,7 @@ FakeDir.prototype.values = function () { var v = Object.values(this.kids), i = 0
 FakeDir.prototype.queryPermission = async function () { return 'granted'; };
 function FakeFile(name) { this.kind = 'file'; this.name = name; this.data = ''; this.mtime = 0; }
 FakeFile.prototype.getFile = async function () { var s = this; return { lastModified: s.mtime, text: async function () { return s.data; } }; };
-FakeFile.prototype.createWritable = async function () { var s = this, buf = ''; return { write: async function (t) { buf += t; }, close: async function () { s.data = buf; s.mtime = (clock += 1000); } }; };
+FakeFile.prototype.createWritable = async function () { var s = this, buf = ''; return { write: async function (t) { buf = typeof t === 'string' ? buf + t : t; }, close: async function () { s.data = buf; s.mtime = (clock += 1000); } }; };
 async function put(root, path, text) { var p = path.split('/'), d = root; for (var i = 0; i < p.length - 1; i++) d = await d.getDirectoryHandle(p[i], { create: true }); var f = await d.getFileHandle(p[p.length - 1], { create: true }); var w = await f.createWritable(); await w.write(text); await w.close(); }
 async function get(root, path) { try { var p = path.split('/'), d = root; for (var i = 0; i < p.length - 1; i++) d = await d.getDirectoryHandle(p[i]); return (await d.getFileHandle(p[p.length - 1])).data; } catch (e) { return null; } }
 
@@ -27,7 +27,7 @@ async function get(root, path) { try { var p = path.split('/'), d = root; for (v
   var fails = [], log = [];
   function ok(c, m) { (c ? log : fails).push(m); }
   ['cowork-state:enginetest', 'cowork-state:v1test'].forEach(function (k) { localStorage.removeItem(k); });
-  ok(cowork.version === 2, 'version 2');
+  ok(cowork.version === 3, 'version 3');
   ok(cowork.isDue('5m', Date.now() - 6 * 60e3, Date.now()) && !cowork.isDue('5m', Date.now() - 60e3, Date.now()) && !cowork.isDue('off', 0, Date.now()) && cowork.isDue('hourly', 0, Date.now()), 'schedules: due after the interval, a never-run channel is due, manual never');
 
   var applied = [], undone = [], coachSeen = [];
@@ -36,7 +36,7 @@ async function get(root, path) { try { var p = path.split('/'), d = root; for (v
     { name: 'plan', request: ['plan/context.json'], replyDir: 'plan/inbox', replyPrefix: 'output-' }] };
   var p = cowork.mount(document.getElementById('host'), {
     app: 'enginetest', manifest: manifest,
-    files: function (ch) { return ch === 'coach' ? { 'coach/request.json': { requestHash: 'h-coach', payload: { n: 1 } }, 'coach/INSTRUCTIONS.md': '# coach' } : { 'plan/context.json': { payload: { week: 1 } } }; },
+    files: function (ch) { return ch === 'coach' ? { 'coach/request.json': { requestHash: 'h-coach', payload: { n: 1 } }, 'coach/INSTRUCTIONS.md': '# coach', 'coach/photos/front.jpg': new Blob([new Uint8Array([255, 216, 255])], { type: 'image/jpeg' }) } : { 'plan/context.json': { payload: { week: 1 } } }; },
     channels: {
       coach: { label: 'Coach', review: false, apply: function (reply) { coachSeen.push(reply.say); return { summary: 'said ' + reply.say }; } },
       plan: { label: 'Plan', schedule: 'daily',
@@ -49,6 +49,8 @@ async function get(root, path) { try { var p = path.split('/'), d = root; for (v
   await p.useFolder(root);
   ok(JSON.parse(await get(root, 'cowork-machine.json')).deviceId === localStorage.getItem('cowork-device'), 'the first device to connect holds the sync claim');
   ok(JSON.parse(await get(root, 'cowork.json')).app === 'enginetest' && (await get(root, 'coach/INSTRUCTIONS.md')) === '# coach' && !!(await get(root, 'plan/context.json')), 'connecting writes the manifest and every request file');
+  var photo = await get(root, 'coach/photos/front.jpg');
+  ok(photo instanceof Blob && photo.size === 3 && photo.type === 'image/jpeg', 'v3: a Blob request file (a photo) is written as raw bytes, not JSON');
   var st = JSON.parse(localStorage.getItem('cowork-state:enginetest'));
   ok(st.reqHash.coach === 'h-coach' && !!st.reqHash.plan, 'the request fingerprint is remembered (declared, or a hash of what was written)');
 

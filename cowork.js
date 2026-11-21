@@ -26,7 +26,8 @@
    Adopting it:  cowork.mount(host, cfg)
      cfg.app        short id ("mise")
      cfg.manifest   the cowork.json manifest (cowork-manifest v1)
-     cfg.files(ch)  -> { "path": content } request files for one channel
+     cfg.files(ch)  -> { "path": content } request files for one channel; content is a string,
+                       a JSON value, or (v3) a Blob written as-is (a photo for a vision agent)
      cfg.apply(ch, reply)               apply a reply (v1; still works)
      cfg.channels   optional, per channel name:
        { label, schedule: "off|5m|15m|30m|hourly|daily|weekly", review: true|false,
@@ -42,7 +43,7 @@
 (function () {
   "use strict";
   var PORTAL = "https://adervec.github.io/";
-  var VERSION = 2;
+  var VERSION = 3; // 3: request files may be Blobs (images); apps check cowork.version >= 3 before sending one
 
   // ---------- small helpers ----------
   function rel(sec) {
@@ -388,7 +389,9 @@
           var files = (this._cfg.files && await this._cfg.files(ch.channel)) || {};
           var paths = Object.keys(files), all = "";
           for (var j = 0; j < paths.length; j++) {
-            var v = files[paths[j]], text = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+            var v = files[paths[j]];
+            if (typeof Blob !== "undefined" && v instanceof Blob) { await writeFile(this._root, paths[j], v); continue; } // bytes as-is; not part of the fallback hash
+            var text = typeof v === "string" ? v : JSON.stringify(v, null, 2);
             await writeFile(this._root, paths[j], text);
             if (/\.json$/.test(paths[j])) all += text;
           }

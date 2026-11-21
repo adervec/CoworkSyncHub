@@ -1050,7 +1050,7 @@ COWORK_SELFTEST = """<!doctype html><meta charset="utf-8"><title>cowork.js self-
 <script>
 (async function(){
   var fails=[],log=[];function ok(c,m){(c?log:fails).push(m);}
-  ok(window.cowork&&cowork.version===2,"global + version");
+  ok(window.cowork&&cowork.version===3,"global + version");
   ok(cowork.stateOf({review:{}})==="REVIEW","stateOf review");
   ok(cowork.stateOf({pending:true})==="PENDING","stateOf pending");
   ok(cowork.stateOf({pending:true,answered:true})==="answered","stateOf answered");
