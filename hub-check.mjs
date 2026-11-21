@@ -71,6 +71,8 @@ ok('no sideways scroll on a phone', await p1.evaluate(() => document.documentEle
 
 // ---- first visit: what do you want to work on? ----
 ok('the first visit asks what to work on', await shown(p1, '#setup') && !(await shown(p1, '#today')));
+ok('it is one line until opened', await shown(p1, '#setupask') && !(await shown(p1, '#setupopts')) && (await p1.$eval('#setup', (x) => x.getBoundingClientRect().height)) < 160);
+await p1.click('#setupchoose');
 await p1.check('#setupopts [data-stat=STR]'); await p1.check('#setupopts [data-stat=DEX]');
 await p1.click('#setupsave');
 const goalsText = () => p1.textContent('#goals');

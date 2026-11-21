@@ -142,7 +142,9 @@
   tp.remove();
   // the cloud door (house standard 1): Google by default, and any vendor that fits the same shape
   var C = F.cloud, box = {}, signed = false;
-  ok('Google Drive is the cloud until another is chosen', C.provider() === 'google' && C.label() === 'Google Drive' && C.providers().length === 1 && C.providers()[0].current && F.google === C);
+  ok('Google Drive is the cloud until another is chosen', C.provider() === 'google' && C.label() === 'Google Drive' && C.providers().filter(function (p) { return !p.soon; }).length === 1 && C.providers()[0].current && C.providers().filter(function (p) { return p.soon; }).map(function (p) { return p.id; }).join() === 'dropbox,onedrive' && F.google === C);
+  var soonOk = false; try { C.use('dropbox'); } catch (e) { soonOk = /coming soon/.test(e.message); }
+  ok('a cloud that is only coming soon cannot be chosen', soonOk && C.provider() === 'google');
   var badOk = false; try { C.register({ id: 'half', label: 'Half' }); } catch (e) { badOk = true; }
   ok('a vendor missing a method is refused', badOk);
   C.register({ id: 'memory', label: 'Test cloud',
@@ -152,7 +154,7 @@
     list: function (p) { return Promise.resolve(Object.keys(box).filter(function (n) { return n.indexOf(p || '') === 0; }).map(function (n) { return { name: n, size: box[n].length, modified: '', mime: '', id: n }; })); } });
   var heardCloud = null; document.addEventListener('app-cloud-change', function (ev) { heardCloud = ev.detail; });
   C.use('memory');
-  ok('the reader\'s one choice of cloud is remembered and announced', C.provider() === 'memory' && C.label() === 'Test cloud' && heardCloud === 'memory' && localStorage.getItem('maker-cloud') === 'memory' && C.providers().length === 2);
+  ok('the reader\'s one choice of cloud is remembered and announced', C.provider() === 'memory' && C.label() === 'Test cloud' && heardCloud === 'memory' && localStorage.getItem('maker-cloud') === 'memory' && C.providers().filter(function (p) { return !p.soon; }).length === 2);
   await C.signIn(); await C.write('hub-a.json', '{"a":1}'); await C.write('other.json', 'x');
   var listed = await C.list('hub-');
   ok('read, write and list go to the chosen cloud', C.signedIn() && (await C.read('hub-a.json')) === '{"a":1}' && (await C.read('nope')) === null && listed.length === 1 && listed[0].name === 'hub-a.json' && new Uint8Array(await C.readBytes(listed[0])).length === 7);

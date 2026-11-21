@@ -53,7 +53,8 @@ function neverPublish() {
   return readFileSync(f, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= 4 && !l.startsWith('#'));
 }
 
-// -> [{ kind, where, what }]   kind: 'name' | 'content' | 'history' | 'listed'
+// -> [{ kind, where, what, note? }]   kind: 'name' | 'content' | 'history' | 'listed' | 'path'
+// An entry with note: true is worth knowing but is not a finding: it never fails a check or stops a push.
 export function scan(root, { history = true, never = neverPublish() } = {}) {
   const out = [], tracked = git(root, 'ls-files').split('\n').filter(Boolean);
   const okFile = path.join(root, '.leak-ok');
@@ -70,7 +71,7 @@ export function scan(root, { history = true, never = neverPublish() } = {}) {
     const low = lower.length ? t.toLowerCase() : '';
     lower.forEach((s, i) => { if (low.includes(s)) out.push({ kind: 'listed', where: f, what: 'holds a never-publish string (line ' + (i + 1) + ' of your list)' }); });
     const home = HOMEDIR.exec(t);
-    if (home) out.push({ kind: 'content', where: f, what: 'a home folder path: ' + home[0].slice(0, 40) });
+    if (home) out.push({ kind: 'path', note: true, where: f, what: 'a home folder path: ' + home[0].slice(0, 40) }); // noted only: the maker does not count a bare path as a leak
     if (!CREDITS.test(f)) {
       const mail = (t.match(EMAIL) || []).find((m) => !SAFE_MAIL.test(m) && !/\.(png|jpe?g|svg|js|css|json)$/i.test(m));
       if (mail) out.push({ kind: 'content', where: f, what: 'an email address: ' + mail.replace(/^(.).*(@.*)$/, '$1…$2') });
@@ -95,13 +96,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const targets = dirs.length ? dirs.map((d) => path.resolve(d))
     : [...JSON.parse(readFileSync(path.join(HUB, 'apps.json'), 'utf8')).map((a) => path.join(GITHUB, a.dir)), HUB, path.join(HUB, 'site'), path.join(GITHUB, 'LanguageLab')].filter((d) => existsSync(d));
   const never = neverPublish(), all = {};
-  for (const d of targets) all[path.relative(GITHUB, d) || path.basename(d)] = scan(d, { history: !argv.includes('--no-history'), never });
+  const notes = {};
+  for (const d of targets) {
+    const name = path.relative(GITHUB, d) || path.basename(d), found = scan(d, { history: !argv.includes('--no-history'), never });
+    all[name] = found.filter((x) => !x.note); notes[name] = found.filter((x) => x.note);
+  }
   const total = Object.values(all).reduce((n, l) => n + l.length, 0);
   if (argv.includes('--json')) console.log(JSON.stringify(all, null, 1));
   else {
     for (const [name, list] of Object.entries(all)) {
       console.log((list.length ? 'LEAK  ' : 'clean ') + name + (list.length ? '  (' + list.length + ')' : ''));
       list.slice(0, 40).forEach((x) => console.log('   ' + x.where + '  <- ' + x.what));
+      if (notes[name].length) console.log('   (noted, not a finding: ' + notes[name].length + ' file(s) hold a home folder path)');
       if (list.length > 40) console.log('   … and ' + (list.length - 40) + ' more');
     }
     console.log(total ? `\n${total} finding(s). Remove the file from git (and from the history if it was ever pushed), or list a made-up one in .leak-ok.` : '\nleak-check: nothing found' + (never.length ? '' : ' (no never-publish list yet: ~/.adervec-runner/never-publish.txt)'));

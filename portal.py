@@ -155,6 +155,8 @@ h1{font:700 30px/1.15 var(--mono);letter-spacing:-.5px;margin:6px 0 10px}
 #bk{margin-left:auto}
 @media (max-width:430px){.head{gap:8px}.bk{padding:0 10px}}
 #suggest{font:14px var(--mono);margin:14px 0 8px}
+#setupask{margin:0;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font:13px var(--mono)}
+#setupask span{color:var(--mut);flex:1 1 200px}
 #setupopts label{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font:13px var(--mono)}
 #setupopts small{display:block;color:var(--mut);font-size:11px}
 #setupopts input[type=checkbox]{width:20px;height:20px}
@@ -502,7 +504,7 @@ function thisWeek(a){
   var sec=d.getElementById("today"),setup=d.getElementById("setup");
   if(!window.hubPrefs||!ACT){sec.hidden=true;setup.hidden=true;return;}
   var p=hubPrefs.get(),goals=p.goals,gs=STATS.filter(function(s){return goals[s]>0});
-  if(!gs.length){sec.hidden=true;window.__weeks=0;if(!p.onboarded&&setup.hidden){openSetup();setupAuto=true;}return;}
+  if(!gs.length){sec.hidden=true;window.__weeks=0;if(!p.onboarded&&setup.hidden){openSetup(true);setupAuto=true;}return;}
   if(setupAuto){setup.hidden=true;setupAuto=false;}
   sec.hidden=false;
   var ws=window.appFont?appFont.weekStart():1,t=new Date();t.setHours(0,0,0,0);
@@ -531,7 +533,8 @@ function thisWeek(a){
   if(met(0))wot++;
   window.__weeks=wot;
   d.getElementById("weeksline").textContent=wot?wot+" week"+(wot>1?"s":"")+" on target":"no full week on target yet";}
-function openSetup(){var box=d.getElementById("setupopts"),g=hubPrefs.get().goals;box.innerHTML="";
+function openSetup(asOneLine){var box=d.getElementById("setupopts"),g=hubPrefs.get().goals;box.innerHTML="";
+  d.getElementById("setupask").hidden=!asOneLine;d.getElementById("setupfull").hidden=!!asOneLine;  // the first visit shows one line; "Choose" opens the rest
   STATS.forEach(function(s){var l=d.createElement("label"),c=d.createElement("input"),h=d.createElement("input"),tx=d.createElement("span");
     c.type="checkbox";c.checked=g[s]>0;c.dataset.stat=s;
     h.type="number";h.min=.5;h.max=40;h.step=.5;h.value=g[s]||DEFH[s]||1;h.dataset.hours=s;h.setAttribute("aria-label",s+": hours a week");
@@ -552,8 +555,10 @@ d.getElementById("setupsave").addEventListener("click",function(){var g={},any=f
   if(!off.hidden)d.getElementById("hidenames").textContent=idle.length+" app"+(idle.length>1?"s":"")+" on your hub train"+(idle.length>1?"":"s")+" none of these: "+idle.map(function(k){return TITLES[k]}).join(", ")+". ";
   d.getElementById("hideidle").onclick=function(){idle.forEach(function(k){hubPrefs.hide(k,true)});off.hidden=true;hubPrefs.sync(false).catch(function(){});};});
 d.getElementById("hidekeep").addEventListener("click",function(){d.getElementById("hideoffer").hidden=true});
+d.getElementById("setupchoose").addEventListener("click",function(){d.getElementById("setupask").hidden=true;d.getElementById("setupfull").hidden=false;});
+d.getElementById("setupno").addEventListener("click",function(){d.getElementById("setupskip").click();});
 d.getElementById("setupskip").addEventListener("click",function(){setupAuto=false;d.getElementById("setup").hidden=true;hubPrefs.setGoals({});});
-d.querySelectorAll(".editgoals").forEach(function(b){b.addEventListener("click",function(){if(!window.hubPrefs)return;setupAuto=false;openSetup();d.getElementById("setup").scrollIntoView({block:"nearest"});});});
+d.querySelectorAll(".editgoals").forEach(function(b){b.addEventListener("click",function(){if(!window.hubPrefs)return;setupAuto=false;openSetup(false);d.getElementById("setup").scrollIntoView({block:"nearest"});});});
 function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},rate21={};
   STATS.forEach(function(s){score[s]=0;by[s]={}});
   a.events.forEach(function(x){var ts=+x[0]>2e10?x[0]/1000:+x[0],age=(now-ts)/86400;if(!(age>=0))return;
@@ -1192,10 +1197,14 @@ def write_site(data):
 <button id="theme" class="toggle" type="button" aria-label="theme">◐</button></div>
 <h1>Free, local-first web apps</h1>
 <section class="you" id="setup" hidden>
+<p id="setupask"><b>What do you want to work on?</b> <span>Set a weekly target for the things you care about.</span>
+<button id="setupchoose" class="bk" type="button">Choose</button> <button id="setupno" class="nfmb" type="button">not now</button></p>
+<div id="setupfull" hidden>
 <h2 class="eyebrow">// what do you want to work on?</h2>
 <p class="caption">Pick two to four. Each gets a weekly target, and any app that trains it counts toward it: typing, handwriting and guitar all fill the same DEX bar. Nothing is asked of you daily.</p>
 <div id="setupopts"></div>
 <p><button id="setupsave" class="bk" type="button">Save</button> <button id="setupskip" class="nfmb" type="button">not now</button></p>
+</div>
 </section>
 <section class="you" id="today" hidden>
 <h2 class="eyebrow">// this week</h2>

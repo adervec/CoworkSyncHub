@@ -270,7 +270,7 @@ const CHECKS = [
     return ok(`schema ${d.schema}`);
   }],
   ['leak', 'No personal data in the repo or its history', (a) => {
-    const found = leakScan(a.root);
+    const found = leakScan(a.root).filter((x) => !x.note);
     return found.length ? fail(found.length + ' finding(s), first: ' + found[0].where + ' <- ' + found[0].what + ' (node leak-check.mjs lists them)') : ok();
   }],
   ['overlap', 'Overlaps with other apps written down (OVERLAPS.md)', (a) => {

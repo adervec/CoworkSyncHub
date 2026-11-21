@@ -47,6 +47,8 @@ the code: an app's session should correct anything here that is wrong.
 
 ## Across every app
 
+- [planned] GymTracker + Run315 + CelebrityCrusher + BlackMirrorBikeRide + BodybuildingProgressCoach + hub: the fitness apps see the same activity in different ways (plus hand-entered detail such as sets), so the hub must not assume "opened app X" means "trained attribute Y" -> the hub compiles ONE de-duplicated list of real activities from the shared feed and the apps' own entries, and gives STR / END / VIT by what each activity was; part of the Garmin and Strava feed project (shared-activities, shared-body)
+
 - [done] every app + hub: sessions reported once for habits and the character sheet -> `appFont.logSession` (standard 25)
 - [planned] every app + hub: each app carries its own Google sign-in and Drive code -> `appFont.google` (standard 1, per app)
 - [planned] every app + hub: each app has its own theme list -> the shared base list in font.js (standard 24, per app)

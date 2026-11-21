@@ -1098,14 +1098,19 @@
 
   // -- the door: whichever vendor the reader chose
   var CLOUD_KEY = 'maker-cloud', CLOUDS = { google: GOOGLE };
+  var CLOUD_SOON = [{ id: 'dropbox', label: 'Dropbox' }, { id: 'onedrive', label: 'OneDrive' }]; // planned, not built: shown as "coming soon"
   var cloudNow = function () { return CLOUDS[store.get(CLOUD_KEY)] || GOOGLE; };
   var cloud = {
     provider: function () { return cloudNow().id; },
     label: function () { return cloudNow().label; },
-    providers: function () { return Object.keys(CLOUDS).map(function (k) { return { id: k, label: CLOUDS[k].label, current: CLOUDS[k] === cloudNow() }; }); },
+    // every vendor, ready or not: [{ id, label, current, soon }] (soon: true = not built yet, cannot be chosen)
+    providers: function () {
+      return Object.keys(CLOUDS).map(function (k) { return { id: k, label: CLOUDS[k].label, current: CLOUDS[k] === cloudNow(), soon: false }; })
+        .concat(CLOUD_SOON.filter(function (s) { return !CLOUDS[s.id]; }).map(function (s) { return { id: s.id, label: s.label, current: false, soon: true }; }));
+    },
     // one vendor for every app and the hub; changing it does not move any data (back up, switch, restore)
     use: function (id) {
-      if (!CLOUDS[id]) throw new Error('Unknown cloud: ' + id);
+      if (!CLOUDS[id]) throw new Error(CLOUD_SOON.some(function (s) { return s.id === id; }) ? 'That cloud is coming soon; it is not available yet.' : 'Unknown cloud: ' + id);
       if (CLOUDS[id] !== cloudNow()) cloudNow().signOut();
       store.set(CLOUD_KEY, id === 'google' ? null : id);
       document.dispatchEvent(new CustomEvent('app-cloud-change', { detail: id }));

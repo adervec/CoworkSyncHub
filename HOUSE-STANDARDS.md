@@ -229,6 +229,12 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
       focus, aim, study, compose, art, listen. `minutes`: how long it took (or `amount`, where 1 is
       about ten minutes of effort). `id`: the session's own id, so a re-save or a sync that brings
       the session back never counts twice. `at`: when it ended, if not now.
+    - **Log only what happened in THIS app and nowhere else.** The fitness apps look at the same
+      runs, rides and workouts in different ways. An app that only analyses, judges or displays an
+      activity another app or the shared feed already holds (Run315 analysing a run, Celebrity
+      Crusher scoring it) does not log it again. The hub is moving to one compiled, de-duplicated
+      activity list and gives credit by what the activity WAS (strength, endurance), not by which
+      app was open, so a duplicate row only distorts the picture.
     - Do not write `portal-activity` by hand any more; replace the old copied snippet with the call.
       Never log on a timer or per keystroke: one row per finished session.
     - The hub draws habits, streaks and the character sheet from it. Rows stay in the browser; if
@@ -244,7 +250,9 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - **Never commit:** hub backups (`adervec-backup-*.json`, `adervec-before-restore-*.json`), an
       app's own export or backup, cowork hand-off files (`request.json`, `reply.json`,
       `context.json`, `BRIEF.md`), the daily brief, `.fit` / `.gpx` / `.tcx` files, biometrics,
-      recordings or photos of a person, `.env` and token files, or anything under a home folder.
+      recordings or photos of a person, `.env` and token files, or any file copied out of a home
+      folder. (A home-folder PATH written in code or a test is poor form and is noted by the
+      checker, but it is not counted as a leak.)
     - **Test and demo data is made up.** Write it by hand or generate it; never copy a real log and
       trim it. Keep it under `test/`, `fixtures/`, `samples/` or `demo/`. Never point a test at a
       real folder (`C:\Users\...\Cowork\...`): use a temp folder or a fixture.
