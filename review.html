@@ -28,44 +28,49 @@ nav button .n { font-size: 11.5px; background: var(--surface2); border-radius: 9
 main { padding: 16px 18px 60px; max-width: 1500px; margin: 0 auto }
 section[hidden] { display: none }
 h2 { font-size: 15px; margin: 22px 0 8px } h2:first-child { margin-top: 0 }
+h3 { font-size: 14px; margin: 12px 0 4px }
 p { margin: 6px 0 } .dim { color: var(--dim) } .small { font-size: 12.5px }
 a { color: var(--accent) }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer; text-align: left; font: inherit; color: inherit }
 .tile b { display: block; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums }
-.tile span { color: var(--dim); font-size: 12.5px }
+.tile span { color: var(--dim); font-size: 12.5px; display: block }
 .tile.bad b { color: var(--crit-text) } .tile.ok b { color: var(--good-text) } .tile.mid b { color: var(--warn-text) }
-.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 6px }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px }
-.card h3 { margin: 0 0 6px; font-size: 14px }
+.tile .delta { font-size: 12px; font-weight: 600 } .delta.down { color: var(--good-text) } .delta.up { color: var(--crit-text) }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 12px }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0 }
+.card h3 { margin: 0 0 6px }
+.card.wide { grid-column: 1 / -1 }
 .bars { display: grid; grid-template-columns: max-content 1fr max-content; gap: 5px 10px; align-items: center }
-.bars button { font: inherit; background: none; border: 0; color: var(--text); padding: 0; cursor: pointer; text-align: left; text-decoration: underline dotted }
+.link { font: inherit; background: none; border: 0; color: var(--text); padding: 0; cursor: pointer; text-align: left; text-decoration: underline dotted }
 .bar { height: 10px; background: var(--surface2); border-radius: 4px; display: flex; gap: 2px; overflow: hidden; min-width: 80px }
 .bar i { display: block; height: 100% } .bar .f { background: var(--crit) } .bar .w { background: var(--warn) } .bar .o { background: var(--good) }
 .num { font-variant-numeric: tabular-nums; color: var(--dim); font-size: 12.5px; white-space: nowrap }
 .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px }
 .tools input[type=search], .tools select { font: inherit; padding: 6px 9px; border: 1px solid var(--axis); border-radius: 8px; background: var(--surface); color: var(--text) }
+.tools .sep { width: 1px; align-self: stretch; background: var(--line) }
 .chip { font: inherit; padding: 5px 11px; border-radius: 15px; border: 1px solid var(--axis); background: var(--surface); color: var(--text); cursor: pointer }
 .chip[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--on-accent) }
 .wrap { overflow: auto; max-height: calc(100vh - 190px); border: 1px solid var(--line); border-radius: 10px; background: var(--surface) }
 table { border-collapse: separate; border-spacing: 0; font-size: 13px }
 th, td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap }
-thead th { position: sticky; top: 0; background: var(--surface); z-index: 2; vertical-align: bottom; height: 96px; cursor: pointer }
-thead th span { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: 600 }
-thead th:first-child, tbody th { position: sticky; left: 0; background: var(--surface); text-align: left; z-index: 1 }
-thead th:first-child { z-index: 3; cursor: default }
-tbody th button { font: inherit; font-weight: 600; background: none; border: 0; color: var(--text); cursor: pointer; padding: 0; text-decoration: underline dotted }
-tbody tr:hover th, tbody tr:hover td { background: var(--surface2) }
+table.matrix thead th { position: sticky; top: 0; background: var(--surface); z-index: 2; vertical-align: bottom; height: 96px; cursor: pointer }
+table.matrix thead th span { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: 600 }
+table.matrix thead th.sorted span { color: var(--accent); text-decoration: underline }
+table.matrix thead th:first-child, table.matrix tbody th { position: sticky; left: 0; background: var(--surface); text-align: left; z-index: 1 }
+table.matrix thead th:first-child { z-index: 3; cursor: default }
+table.matrix tbody tr:hover th, table.matrix tbody tr:hover td { background: var(--surface2) }
 .c { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; font-size: 12px; font-weight: 700; cursor: pointer; border: 0; color: #fff }
 .c.ok { background: var(--good) } .c.warn { background: var(--warn); color: #0b0b0b } .c.FAIL { background: var(--crit) }
 .c.na { background: none; color: var(--na) } .c.q { background: var(--serious); color: #0b0b0b }
-.c:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
-.st { display: inline-flex; align-items: center; gap: 5px; font-weight: 600 }
-.st.FAIL { color: var(--crit-text) } .st.warn { color: var(--warn-text) } .st.ok { color: var(--good-text) } .st.na { color: var(--dim) }
-.proj { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; padding: 0 14px }
-.proj > summary { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 10px 0; cursor: pointer; list-style: none }
-.proj > summary::-webkit-details-marker { display: none }
+.c:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.st { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; white-space: nowrap }
+.st.FAIL, .st.p1 { color: var(--crit-text) } .st.warn, .st.p3 { color: var(--warn-text) } .st.ok { color: var(--good-text) } .st.na, .st.p4 { color: var(--dim) } .st.p2 { color: var(--text) }
+.proj, .std { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; padding: 0 14px }
+.proj > summary { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px 0; cursor: pointer; list-style: none }
+.proj > summary::-webkit-details-marker, .std > summary::-webkit-details-marker { display: none }
 .proj > summary b { font-size: 15px; min-width: 190px }
+.proj > summary .next { flex-basis: 100%; color: var(--dim); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .tag { font-size: 11.5px; padding: 1px 8px; border-radius: 9px; background: var(--surface2); color: var(--dim); white-space: nowrap }
 .tag.bad { background: color-mix(in srgb, var(--crit) 18%, transparent); color: var(--crit-text); font-weight: 600 }
 .tag.mid { background: color-mix(in srgb, var(--warn) 25%, transparent); color: var(--warn-text); font-weight: 600 }
@@ -73,30 +78,25 @@ tbody tr:hover th, tbody tr:hover td { background: var(--surface2) }
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 4px 0 10px }
 .kv dt { color: var(--dim) } .kv dd { margin: 0; overflow-wrap: anywhere }
 ul.gaps { list-style: none; padding: 0; margin: 4px 0 12px }
-ul.gaps li { padding: 5px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 120px 1fr; gap: 10px }
-ul.gaps li button { font: inherit; background: none; border: 0; padding: 0; color: var(--text); cursor: pointer; text-align: left; text-decoration: underline dotted }
-.std { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; padding: 0 14px }
+ul.gaps li { padding: 5px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 130px 1fr; gap: 10px; overflow-wrap: anywhere }
 .std > summary { display: grid; grid-template-columns: 34px 1fr 150px max-content; gap: 10px; align-items: center; padding: 10px 0; cursor: pointer; list-style: none }
-.std > summary::-webkit-details-marker { display: none }
 .std pre { white-space: pre-wrap; font: 12.5px/1.5 ui-monospace, Consolas, monospace; background: var(--surface2); padding: 10px; border-radius: 8px; max-height: 260px; overflow: auto }
-table.plain { width: 100%; font-size: 13px } table.plain th, table.plain td { text-align: left; white-space: normal; vertical-align: top; position: static; height: auto; cursor: default }
-table.plain thead th { position: static; height: auto }
+table.plain { width: 100%; font-size: 13px } table.plain th, table.plain td { text-align: left; white-space: normal; vertical-align: top; overflow-wrap: anywhere }
+table.plain th { position: sticky; top: 0; background: var(--surface); cursor: pointer; white-space: nowrap } table.plain th.sorted { color: var(--accent) }
+table.plain td.nowrap { white-space: nowrap }
 #panel { position: fixed; right: 14px; bottom: 14px; width: min(440px, calc(100vw - 28px)); background: var(--surface); border: 1px solid var(--axis); border-radius: 12px; padding: 12px 14px; box-shadow: 0 8px 30px rgba(0,0,0,.25); z-index: 9 }
-#panel[hidden] { display: none } #panel h3 { margin: 0 26px 4px 0; font-size: 14px } #panel .x { position: absolute; right: 8px; top: 6px; border: 0; background: none; color: var(--dim); font-size: 18px; cursor: pointer }
+#panel[hidden] { display: none } #panel h3 { margin: 0 26px 4px 0 } #panel .x { position: absolute; right: 8px; top: 6px; border: 0; background: none; color: var(--dim); font-size: 18px; cursor: pointer }
 #panel p { overflow-wrap: anywhere }
 .todo li { margin: 4px 0 }
-.empty { color: var(--dim); padding: 14px 0 }
+.empty { color: var(--dim); padding: 14px }
+svg.trend { width: 100%; height: 70px; display: block } svg.trend polyline { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round } svg.trend circle { fill: var(--accent); stroke: var(--surface); stroke-width: 2 }
+svg.trend line { stroke: var(--line) }
 </style></head><body>
 <header><h1>Project review</h1><span class="when" id="when"></span>
 <nav role="tablist" id="nav"></nav></header>
 <main>
-<section id="t-overview"></section>
-<section id="t-matrix" hidden></section>
-<section id="t-projects" hidden></section>
-<section id="t-standards" hidden></section>
-<section id="t-leaks" hidden></section>
-<section id="t-overlaps" hidden></section>
-<section id="t-roadmap" hidden></section>
+<section id="t-overview"></section><section id="t-todo" hidden></section><section id="t-matrix" hidden></section><section id="t-projects" hidden></section>
+<section id="t-standards" hidden></section><section id="t-leaks" hidden></section><section id="t-overlaps" hidden></section><section id="t-roadmap" hidden></section>
 </main>
 <div id="panel" hidden><button class="x" aria-label="Close">×</button><h3></h3><div id="panelBody"></div></div>
 <script id="data" type="application/json">/*DATA*/</script>
@@ -107,6 +107,7 @@ table.plain thead th { position: static; height: auto }
   var $ = function (id) { return document.getElementById(id); };
   var el = function (tag, text, cls) { var x = document.createElement(tag); if (text != null) x.textContent = text; if (cls) x.className = cls; return x; };
   var GLYPH = { ok: '✓', warn: '!', FAIL: '✕', '-': '–', '?': '?' }, WORD = { ok: 'ok', warn: 'warning', FAIL: 'fails', '-': 'not applicable', '?': 'unknown' };
+  var PRI = { 1: 'urgent', 2: 'gap', 3: 'loose end', 4: 'someday' }, PGLYPH = { 1: '‼', 2: '✕', 3: '!', 4: '·' };
   var cls = function (s) { return s === '-' ? 'na' : s === '?' ? 'q' : s; };
   var keys = D.checks.map(function (c) { return c[0]; }), label = {};
   D.checks.forEach(function (c) { label[c[0]] = c[1]; });
@@ -115,127 +116,235 @@ table.plain thead th { position: static; height: auto }
   var colCount = function (k, s) { return D.projects.filter(function (p) { return cell(p, k)[0] === s; }).length; };
   var plural = function (n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); };
   var mem = function (k, v) { try { if (v === undefined) return localStorage.getItem('review-' + k); localStorage.setItem('review-' + k, v); } catch (e) { return null; } };
-  var st = function (s) { var x = el('span', GLYPH[s] + ' ' + WORD[s], 'st ' + cls(s)); return x; };
+  var st = function (s) { return el('span', GLYPH[s] + ' ' + WORD[s], 'st ' + cls(s)); };
+  var pri = function (n) { return el('span', PGLYPH[n] + ' ' + PRI[n], 'st p' + n); };
+  var days = function (p) { return p.git && p.git.last ? Math.floor((D.generated - Date.parse(p.git.last)) / 864e5) : null; };
+  var ago = function (d) { return d == null ? '' : d < 1 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago'; };
+  var leaksOf = function (p) { return D.leaks[p.dir] || []; };
+  var GROUPS = []; D.projects.forEach(function (p) { if (GROUPS.indexOf(p.group) < 0) GROUPS.push(p.group); }); GROUPS.sort();
+  var allTasks = []; D.projects.forEach(function (p) { p.tasks.forEach(function (t) { allTasks.push({ p: p, t: t }); }); });
 
-  // ---- the detail panel (what a cell, a tile or a finding means) ----
-  function panel(title, build) {
-    $('panel').hidden = false; $('panel').querySelector('h3').textContent = title;
-    var b = $('panelBody'); b.textContent = ''; build(b);
+  // small builders shared by the tabs
+  function select(opts, value, onPick, aria) {
+    var s = el('select'); s.setAttribute('aria-label', aria);
+    opts.forEach(function (o) { var x = el('option', o[1]); x.value = o[0]; s.appendChild(x); });
+    s.value = value; s.addEventListener('change', function () { onPick(s.value); }); return s;
   }
+  function groupSelect(value, onPick) { return select([['', 'Every group']].concat(GROUPS.map(function (g) { return [g, g]; })), value, onPick, 'Group'); }
+  function searchBox(ph, onType) { var s = el('input'); s.type = 'search'; s.placeholder = ph; s.setAttribute('aria-label', ph); s.addEventListener('input', function () { onType(s.value.toLowerCase()); }); return s; }
+  function chips(list, isOn, onTap) { // list: [[id, text]]; returns { els, paint }
+    var els = {}; list.forEach(function (c) { var b = el('button', c[1], 'chip'); b.addEventListener('click', function () { onTap(c[0]); }); els[c[0]] = b; });
+    return { els: els, paint: function () { Object.keys(els).forEach(function (k) { els[k].setAttribute('aria-pressed', String(isOn(k))); }); } };
+  }
+  function stackBar(f, w, o, title) {
+    var bar = el('div', null, 'bar'), n = f + w + o || 1; bar.title = title;
+    [['f', f], ['w', w], ['o', o]].forEach(function (x) { if (x[1]) { var i = el('i', null, x[0]); i.style.width = (100 * x[1] / n) + '%'; bar.appendChild(i); } });
+    return bar;
+  }
+  function sortableTable(cols, rows, state, redraw) { // cols: [[key, heading]]; rows: [{ key: text|node, _sort: { key: value } }]
+    var t = el('table', null, 'plain'), h = el('tr');
+    cols.forEach(function (c) {
+      var th = el('th', c[1] + (state.by === c[0] ? (state.dir > 0 ? ' ▲' : ' ▼') : '')); if (state.by === c[0]) th.className = 'sorted';
+      th.title = 'Sort by ' + c[1].toLowerCase();
+      th.addEventListener('click', function () { state.dir = state.by === c[0] ? -state.dir : 1; state.by = c[0]; redraw(); }); h.appendChild(th);
+    });
+    var th0 = el('thead'); th0.appendChild(h); t.appendChild(th0);
+    var tb = el('tbody');
+    rows.slice().sort(function (a, b) { var x = a._sort[state.by], y = b._sort[state.by]; return (x < y ? -1 : x > y ? 1 : 0) * state.dir; }).forEach(function (r) {
+      var tr = el('tr'); cols.forEach(function (c) { var td = el('td'); var v = r[c[0]]; if (v && v.nodeType) td.appendChild(v); else td.textContent = v == null ? '' : v; if (r._nowrap && r._nowrap.indexOf(c[0]) >= 0) td.className = 'nowrap'; tr.appendChild(td); });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); return t;
+  }
+  function copy(text, btn) {
+    var done = function () { var o = btn.textContent; btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = o; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { fallback(); }); else fallback();
+    function fallback() { var a = el('textarea'); a.value = text; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); done(); } catch (e) { /* nothing more to try */ } a.remove(); }
+  }
+  // the text to paste into an app's own session
+  function brief(p) {
+    var lines = ['Review notes for ' + p.title + ' (' + new Date(D.generated).toLocaleDateString() + '), from the QA lead\'s review page.', ''];
+    if (!p.tasks.length) lines.push('Nothing is open against the house standards.');
+    [1, 2, 3, 4].forEach(function (n) {
+      var ts = p.tasks.filter(function (t) { return t.pri === n; }); if (!ts.length) return;
+      lines.push({ 1: 'Urgent:', 2: 'Gaps to close, in this order:', 3: 'Loose ends:', 4: 'Someday:' }[n]);
+      ts.forEach(function (t) { lines.push('- ' + t.text); }); lines.push('');
+    });
+    lines.push('Check with: node ../CoworkSyncHub/standards.mjs ' + (p.registered ? p.slug.toLowerCase() : '--dir .') + ' -v');
+    return lines.join('\n');
+  }
+
+  // ---- the detail panel ----
+  function panel(title, build) { $('panel').hidden = false; $('panel').querySelector('h3').textContent = title; var b = $('panelBody'); b.textContent = ''; build(b); }
   $('panel').querySelector('.x').addEventListener('click', function () { $('panel').hidden = true; });
   document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') $('panel').hidden = true; });
   function showCell(p, k) {
     var c = cell(p, k);
     panel(p.title + ' · ' + k, function (b) {
-      b.appendChild(el('p', label[k], 'dim'));
-      b.appendChild(st(c[0]));
+      b.appendChild(el('p', label[k], 'dim')); b.appendChild(st(c[0]));
       if (c[1]) b.appendChild(el('p', c[1]));
-      var row = el('p');
-      var a = el('button', 'Open project', 'chip'); a.addEventListener('click', function () { go('projects', p.slug); });
-      var s = el('button', 'Open standard', 'chip'); s.addEventListener('click', function () { go('standards', k); });
+      var row = el('p'), a = el('button', 'Open project', 'chip'), s = el('button', 'Open standard', 'chip');
+      a.addEventListener('click', function () { go('projects', p.slug); }); s.addEventListener('click', function () { go('standards', k); });
       row.append(a, ' ', s); b.appendChild(row);
     });
   }
 
   // ---- tabs ----
-  var TABS = [['overview', 'Overview'], ['matrix', 'Matrix'], ['projects', 'Projects'], ['standards', 'Standards'], ['leaks', 'Leaks'], ['overlaps', 'Overlaps'], ['roadmap', 'Roadmap and decisions']];
-  var built = {}, focus = null;
+  var TABS = [['overview', 'Overview'], ['todo', 'To do'], ['matrix', 'Matrix'], ['projects', 'Projects'], ['standards', 'Standards'], ['leaks', 'Leaks'], ['overlaps', 'Overlaps'], ['roadmap', 'Roadmap and decisions']];
+  var built = {}, focus = null, BUILD = {};
   function go(tab, target) {
     focus = target || null;
-    TABS.forEach(function (t) {
-      $('t-' + t[0]).hidden = t[0] !== tab;
-      $('nav').querySelector('[data-tab=' + t[0] + ']').setAttribute('aria-selected', String(t[0] === tab));
-    });
-    if (!built[tab]) { BUILD[tab]($('t-' + tab)); built[tab] = true; }
-    if (focus) { var d = document.getElementById(tab + '-' + focus); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); window.scrollBy(0, -90); } }
+    TABS.forEach(function (t) { $('t-' + t[0]).hidden = t[0] !== tab; $('nav').querySelector('[data-tab=' + t[0] + ']').setAttribute('aria-selected', String(t[0] === tab)); });
+    if (!built[tab] || focus) { $('t-' + tab).textContent = ''; BUILD[tab]($('t-' + tab)); built[tab] = true; }
+    if (focus) { var d = document.getElementById(tab + '-' + focus); if (d) { if ('open' in d) d.open = true; else if (d.parentNode && 'open' in d.parentNode) d.parentNode.open = true; d.scrollIntoView({ block: 'start' }); window.scrollBy(0, -100); } }
     try { history.replaceState(null, '', '#' + tab + (focus ? '/' + focus : '')); } catch (e) { /* file:// in some browsers */ }
     $('panel').hidden = true;
   }
   var totalFail = 0, totalWarn = 0;
   D.projects.forEach(function (p) { totalFail += count(p, 'FAIL'); totalWarn += count(p, 'warn'); });
   var leakTotal = 0; Object.keys(D.leaks).forEach(function (k) { leakTotal += D.leaks[k].length; });
-  var badge = { matrix: totalFail, projects: D.projects.length, standards: D.standards.length, leaks: leakTotal, overlaps: D.overlaps.length };
+  var doNow = allTasks.filter(function (x) { return x.t.pri <= 2; }).length;
+  var badge = { todo: doNow, matrix: totalFail, projects: D.projects.length, standards: D.standards.length, leaks: leakTotal, overlaps: D.overlaps.length };
   TABS.forEach(function (t) {
     var b = el('button', t[1]); b.dataset.tab = t[0]; b.setAttribute('role', 'tab');
     if (badge[t[0]] != null) b.appendChild(el('span', String(badge[t[0]]), 'n'));
-    b.addEventListener('click', function () { go(t[0]); });
-    $('nav').appendChild(b);
+    b.addEventListener('click', function () { go(t[0]); }); $('nav').appendChild(b);
   });
-  $('when').textContent = 'generated ' + new Date(D.generated).toLocaleString() + ' · local file, not published';
-
-  var BUILD = {};
+  $('when').textContent = 'generated ' + new Date(D.generated).toLocaleString() + (D.quick ? ' (quick: no CI, live or GitHub lookups)' : '') + ' · local file, not published';
 
   // ---- overview ----
   BUILD.overview = function (box) {
     var dirty = D.projects.filter(function (p) { return p.git && (p.git.dirty || p.git.unpushed); });
     var ciBad = D.projects.filter(function (p) { return p.ci === 'FAIL'; }), down = D.projects.filter(function (p) { return p.live && p.live !== '200' && p.live !== '-'; });
-    var tiles = el('div', null, 'tiles');
-    [[D.projects.length, 'projects', '', 'projects'], [totalFail, 'failing checks', totalFail ? 'bad' : 'ok', 'matrix'], [totalWarn, 'warnings', totalWarn ? 'mid' : 'ok', 'matrix'],
-      [leakTotal, 'leak findings', leakTotal ? 'bad' : 'ok', 'leaks'], [ciBad.length, 'repos with failing CI', ciBad.length ? 'bad' : 'ok', 'projects'],
-      [down.length, 'live sites not answering', down.length ? 'bad' : 'ok', 'projects'], [dirty.length, 'repos with uncommitted or unpushed work', dirty.length ? 'mid' : 'ok', 'projects'],
-      [D.overlaps.length, 'overlaps noted', '', 'overlaps']].forEach(function (t) {
+    var outside = allTasks.filter(function (x) { return x.t.source === 'GitHub' && x.t.pri === 2; }).length;
+    var prev = D.prev, tiles = el('div', null, 'tiles');
+    [[D.projects.length, 'projects', '', 'projects'], [doNow, 'to-dos that are urgent or a gap', doNow ? 'bad' : 'ok', 'todo', prev && prev.tasks],
+      [totalFail, 'failing checks', totalFail ? 'bad' : 'ok', 'matrix', prev && prev.fail], [totalWarn, 'warnings', totalWarn ? 'mid' : 'ok', 'matrix', prev && prev.warn],
+      [leakTotal, 'leak findings', leakTotal ? 'bad' : 'ok', 'leaks', prev && prev.leaks], [ciBad.length + down.length, 'failing CI or sites down', ciBad.length + down.length ? 'bad' : 'ok', 'projects'],
+      [dirty.length, 'repos with uncommitted or unpushed work', dirty.length ? 'mid' : 'ok', 'projects'], [outside, 'outside pull requests or issues unanswered', outside ? 'mid' : 'ok', 'todo']].forEach(function (t) {
       var b = el('button', null, 'tile ' + t[2]); b.appendChild(el('b', String(t[0]))); b.appendChild(el('span', t[1]));
+      if (t[4] != null) { var dlt = t[0] - t[4]; b.appendChild(el('span', dlt === 0 ? 'no change since the last run' : (dlt > 0 ? '▲ ' + dlt + ' more' : '▼ ' + (-dlt) + ' fewer') + ' since the last run', 'delta ' + (dlt > 0 ? 'up' : dlt < 0 ? 'down' : ''))); }
       b.addEventListener('click', function () { go(t[3]); }); tiles.appendChild(b);
     });
     box.appendChild(tiles);
     var cols = el('div', null, 'cols');
+    // next task per project
+    var c0 = el('div', null, 'card wide'); c0.appendChild(el('h3', 'Next task for each project'));
+    var state0 = { by: 'pri', dir: 1 };
+    var host0 = el('div', null, 'wrap'); host0.style.maxHeight = '330px'; c0.appendChild(host0);
+    (function draw() {
+      var rows = D.projects.map(function (p) {
+        var t = p.tasks[0], nb = el('button', p.title, 'link'); nb.addEventListener('click', function () { go('projects', p.slug); });
+        return { project: nb, pri: t ? pri(t.pri) : el('span', '✓ clear', 'st ok'), next: p.next || 'Nothing open', open: String(p.tasks.filter(function (x) { return x.pri <= 2; }).length), last: ago(days(p)),
+          _nowrap: ['project', 'pri', 'last'], _sort: { project: p.title.toLowerCase(), pri: t ? t.pri : 9, next: (p.next || '').toLowerCase(), open: -p.tasks.filter(function (x) { return x.pri <= 2; }).length, last: days(p) == null ? 1e9 : days(p) } };
+      });
+      host0.textContent = ''; host0.appendChild(sortableTable([['project', 'Project'], ['pri', 'Priority'], ['next', 'Next task'], ['open', 'Urgent + gaps'], ['last', 'Last commit']], rows, state0, draw));
+    })();
+    cols.appendChild(c0);
     var c1 = el('div', null, 'card'); c1.appendChild(el('h3', 'Projects by gaps'));
     var bars = el('div', null, 'bars');
     D.projects.slice().sort(function (a, b) { return count(b, 'FAIL') - count(a, 'FAIL') || count(b, 'warn') - count(a, 'warn'); }).forEach(function (p) {
-      var f = count(p, 'FAIL'), w = count(p, 'warn'), o = count(p, 'ok'), n = f + w + o || 1;
-      var nm = el('button', p.title); nm.addEventListener('click', function () { go('projects', p.slug); });
-      var bar = el('div', null, 'bar'); bar.title = f + ' failing, ' + w + ' warnings, ' + o + ' ok';
-      [['f', f], ['w', w], ['o', o]].forEach(function (x) { if (x[1]) { var i = el('i', null, x[0]); i.style.width = (100 * x[1] / n) + '%'; bar.appendChild(i); } });
-      bars.append(nm, bar, el('span', f + ' ✕  ' + w + ' !', 'num'));
+      var f = count(p, 'FAIL'), w = count(p, 'warn'), o = count(p, 'ok'), nm = el('button', p.title, 'link'); nm.addEventListener('click', function () { go('projects', p.slug); });
+      var was = D.prev && D.prev.per && D.prev.per[p.slug], dl = was ? f - was[0] : 0;
+      bars.append(nm, stackBar(f, w, o, f + ' failing, ' + w + ' warnings, ' + o + ' ok'), el('span', f + ' ✕  ' + w + ' !' + (dl ? (dl > 0 ? '  ▲' + dl : '  ▼' + (-dl)) : ''), 'num'));
     });
     c1.appendChild(bars); cols.appendChild(c1);
     var c2 = el('div', null, 'card'); c2.appendChild(el('h3', 'Standards by how many projects fall short'));
     var bars2 = el('div', null, 'bars');
     keys.slice().sort(function (a, b) { return colCount(b, 'FAIL') - colCount(a, 'FAIL') || colCount(b, 'warn') - colCount(a, 'warn'); }).filter(function (k) { return colCount(k, 'FAIL') + colCount(k, 'warn'); }).forEach(function (k) {
-      var f = colCount(k, 'FAIL'), w = colCount(k, 'warn'), o = colCount(k, 'ok'), n = f + w + o || 1;
-      var nm = el('button', k); nm.title = label[k]; nm.addEventListener('click', function () { go('standards', k); });
-      var bar = el('div', null, 'bar'); bar.title = label[k] + ': ' + f + ' failing, ' + w + ' warnings, ' + o + ' ok';
-      [['f', f], ['w', w], ['o', o]].forEach(function (x) { if (x[1]) { var i = el('i', null, x[0]); i.style.width = (100 * x[1] / n) + '%'; bar.appendChild(i); } });
-      bars2.append(nm, bar, el('span', f + ' ✕  ' + w + ' !', 'num'));
+      var f = colCount(k, 'FAIL'), w = colCount(k, 'warn'), o = colCount(k, 'ok'), nm = el('button', k, 'link'); nm.title = label[k]; nm.addEventListener('click', function () { go('standards', k); });
+      bars2.append(nm, stackBar(f, w, o, label[k] + ': ' + f + ' failing, ' + w + ' warnings, ' + o + ' ok'), el('span', f + ' ✕  ' + w + ' !', 'num'));
     });
     if (!bars2.children.length) bars2.appendChild(el('span', 'Every standard is met everywhere.', 'dim'));
     c2.appendChild(bars2); c2.appendChild(el('p', 'Red = fails, yellow = warning, green = ok. Hover a bar for the numbers.', 'dim small')); cols.appendChild(c2);
-    var c3 = el('div', null, 'card'); c3.appendChild(el('h3', 'Waiting on you'));
+    var c3 = el('div', null, 'card'); c3.appendChild(el('h3', 'Failing checks over time'));
+    var tr = D.trend || [];
+    if (tr.length < 2) c3.appendChild(el('p', 'The trend starts with the second run of this page.', 'dim'));
+    else {
+      var W = 300, H = 70, mx = Math.max.apply(null, tr.map(function (x) { return x.fail; })) || 1, ns = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('class', 'trend'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Failing checks at each run of this page');
+      var pt = function (x, i) { return [(8 + i * (W - 16) / (tr.length - 1)).toFixed(1), (H - 8 - (H - 18) * x.fail / mx).toFixed(1)]; };
+      var base = document.createElementNS(ns, 'line'); base.setAttribute('x1', 0); base.setAttribute('x2', W); base.setAttribute('y1', H - 8); base.setAttribute('y2', H - 8); svg.appendChild(base);
+      var pl = document.createElementNS(ns, 'polyline'); pl.setAttribute('points', tr.map(function (x, i) { return pt(x, i).join(','); }).join(' ')); svg.appendChild(pl);
+      tr.forEach(function (x, i) { var c = document.createElementNS(ns, 'circle'), q = pt(x, i); c.setAttribute('cx', q[0]); c.setAttribute('cy', q[1]); c.setAttribute('r', 4);
+        var ti = document.createElementNS(ns, 'title'); ti.textContent = new Date(x.t).toLocaleString() + ': ' + x.fail + ' failing, ' + x.warn + ' warnings'; c.appendChild(ti); svg.appendChild(c); });
+      c3.appendChild(svg);
+      c3.appendChild(el('p', tr[0].fail + ' on ' + new Date(tr[0].t).toLocaleDateString() + ' → ' + tr[tr.length - 1].fail + ' now, over ' + plural(tr.length, 'run') + '. Hover a point for its date.', 'dim small'));
+    }
+    c3.appendChild(el('h3', 'Waiting on you'));
     var ul = el('ul', null, 'todo'); (D.notes.waiting || []).forEach(function (w) { ul.appendChild(el('li', w)); });
     if (!ul.children.length) ul.appendChild(el('li', 'Nothing recorded.', 'dim'));
     c3.appendChild(ul);
-    var more = el('button', 'Roadmap and open decisions', 'chip'); more.addEventListener('click', function () { go('roadmap'); }); c3.appendChild(more);
+    var more = el('button', 'Roadmap and open decisions (' + (D.notes.decisions || []).length + ')', 'chip'); more.addEventListener('click', function () { go('roadmap'); }); c3.appendChild(more);
     cols.appendChild(c3);
     box.appendChild(cols);
   };
 
+  // ---- to do: every open item, every project ----
+  BUILD.todo = function (box) {
+    var on = { 1: mem('p1') !== '0', 2: mem('p2') !== '0', 3: mem('p3') === '1', 4: mem('p4') === '1' }, src = '', grp = '', q = '', state = { by: 'pri', dir: 1 };
+    var tools = el('div', null, 'tools');
+    var ch = chips([[1, '‼ urgent'], [2, '✕ gaps'], [3, '! loose ends'], [4, '· someday']].map(function (c) { return [c[0], c[1] + ' (' + allTasks.filter(function (x) { return x.t.pri === c[0]; }).length + ')']; }),
+      function (k) { return on[k]; }, function (k) { on[k] = !on[k]; mem('p' + k, on[k] ? '1' : '0'); draw(); });
+    Object.keys(ch.els).forEach(function (k) { tools.appendChild(ch.els[k]); });
+    var sources = []; allTasks.forEach(function (x) { if (sources.indexOf(x.t.source) < 0) sources.push(x.t.source); }); sources.sort();
+    tools.appendChild(el('span', null, 'sep'));
+    tools.appendChild(select([['', 'Every source']].concat(sources.map(function (s) { return [s, s]; })), '', function (v) { src = v; draw(); }, 'Source'));
+    tools.appendChild(groupSelect('', function (v) { grp = v; draw(); }));
+    tools.appendChild(searchBox('Filter by project or word…', function (v) { q = v; draw(); }));
+    box.appendChild(tools);
+    var info = el('p', null, 'dim small'); box.appendChild(info);
+    var w = el('div', null, 'wrap'); box.appendChild(w);
+    function draw() {
+      ch.paint();
+      var list = allTasks.filter(function (x) { return on[x.t.pri] && (!src || x.t.source === src) && (!grp || x.p.group === grp) && (!q || (x.p.title + ' ' + x.t.text + ' ' + x.t.source).toLowerCase().indexOf(q) >= 0); });
+      var rows = list.map(function (x, i) {
+        var nb = el('button', x.p.title, 'link'); nb.addEventListener('click', function () { go('projects', x.p.slug); });
+        var txt = x.t.key && label[x.t.key] ? (function () { var b = el('button', x.t.text, 'link'); b.addEventListener('click', function () { go('standards', x.t.key); }); return b; })() : x.t.text;
+        var oi = x.t.key ? D.order.indexOf(x.t.key) : -1;
+        return { pri: pri(x.t.pri), project: nb, task: txt, source: x.t.source, _nowrap: ['pri', 'project', 'source'],
+          _sort: { pri: x.t.pri * 1000 + (oi < 0 ? 99 : oi), project: x.p.title.toLowerCase() + String(1000 + i), task: x.t.text.toLowerCase(), source: x.t.source + String(1000 + i) } };
+      });
+      info.textContent = plural(list.length, 'item') + ' shown of ' + allTasks.length + '. Urgent = a leak, failing CI or a site down. Gaps = a failing standard or an unanswered outside request. Click a heading to sort; within a priority, gaps are in the order to work them.';
+      w.textContent = ''; w.appendChild(rows.length ? sortableTable([['pri', 'Priority'], ['project', 'Project'], ['task', 'What'], ['source', 'Source']], rows, state, draw) : el('p', 'Nothing matches.', 'empty'));
+    }
+    draw();
+  };
+
   // ---- matrix ----
   BUILD.matrix = function (box) {
-    var show = mem('show') || 'all', sort = mem('sort') || 'gaps', q = '', hideGreen = mem('hidegreen') === '1';
-    var tools = el('div', null, 'tools'), search = el('input'); search.type = 'search'; search.placeholder = 'Filter projects…'; search.setAttribute('aria-label', 'Filter projects');
-    var chips = {};
-    [['all', 'Everything'], ['FAIL', 'Only failing'], ['gaps', 'Failing and warnings']].forEach(function (c) {
-      var b = el('button', c[1], 'chip'); b.addEventListener('click', function () { show = c[0]; mem('show', show); draw(); }); chips[c[0]] = b; tools.appendChild(b);
-    });
+    var show = mem('show') || 'all', sort = mem('sort') || 'gaps', q = '', grp = '', hideGreen = mem('hidegreen') === '1', byCol = '';
+    var tools = el('div', null, 'tools');
+    var ch = chips([['all', 'Everything'], ['FAIL', 'Only failing'], ['gaps', 'Failing and warnings']], function (k) { return k === show; }, function (k) { show = k; mem('show', show); draw(); });
+    Object.keys(ch.els).forEach(function (k) { tools.appendChild(ch.els[k]); });
     var hg = el('button', 'Hide all-green columns', 'chip'); hg.addEventListener('click', function () { hideGreen = !hideGreen; mem('hidegreen', hideGreen ? '1' : '0'); draw(); });
-    var sel = el('select'); sel.setAttribute('aria-label', 'Sort projects'); [['gaps', 'Most gaps first'], ['name', 'A to Z']].forEach(function (o) { var x = el('option', o[1]); x.value = o[0]; sel.appendChild(x); });
-    sel.value = sort; sel.addEventListener('change', function () { sort = sel.value; mem('sort', sort); draw(); });
-    search.addEventListener('input', function () { q = search.value.toLowerCase(); draw(); });
-    tools.append(hg, sel, search); box.appendChild(tools);
-    box.appendChild(el('p', '✓ ok · ! warning · ✕ fails · ? unknown · – not applicable. Click a cell for the reason, a project name for the project, a column heading for the standard.', 'dim small'));
+    tools.append(hg, el('span', null, 'sep'),
+      select([['gaps', 'Most gaps first'], ['name', 'A to Z'], ['recent', 'Most recently changed'], ['stale', 'Longest untouched']], sort, function (v) { sort = v; byCol = ''; mem('sort', sort); draw(); }, 'Sort projects'),
+      groupSelect('', function (v) { grp = v; draw(); }), searchBox('Filter projects…', function (v) { q = v; draw(); }));
+    box.appendChild(tools);
+    box.appendChild(el('p', '✓ ok · ! warning · ✕ fails · ? unknown · – not applicable. Click a cell for the reason and a project name for the project. Click a column heading to bring its failures to the top; click it again to open the standard.', 'dim small'));
     var wrap = el('div', null, 'wrap'); box.appendChild(wrap);
+    var rank = { FAIL: 0, '?': 1, warn: 2, ok: 3, '-': 4 };
     function draw() {
-      Object.keys(chips).forEach(function (k) { chips[k].setAttribute('aria-pressed', String(k === show)); }); hg.setAttribute('aria-pressed', String(hideGreen));
+      ch.paint(); hg.setAttribute('aria-pressed', String(hideGreen));
       var cols = keys.filter(function (k) { return !hideGreen || colCount(k, 'FAIL') + colCount(k, 'warn') + colCount(k, '?') > 0; });
-      var rows = D.projects.filter(function (p) { return (!q || (p.title + ' ' + p.slug).toLowerCase().indexOf(q) >= 0) && (show === 'all' || count(p, 'FAIL') || (show === 'gaps' && count(p, 'warn'))); });
-      rows.sort(function (a, b) { return sort === 'name' ? a.title.localeCompare(b.title) : count(b, 'FAIL') - count(a, 'FAIL') || count(b, 'warn') - count(a, 'warn') || a.title.localeCompare(b.title); });
-      var t = el('table'), h = el('tr'); h.appendChild(el('th', 'Project'));
-      cols.forEach(function (k) { var th = el('th'); th.title = label[k]; th.appendChild(el('span', k)); th.addEventListener('click', function () { go('standards', k); }); h.appendChild(th); });
+      var rows = D.projects.filter(function (p) { return (!grp || p.group === grp) && (!q || (p.title + ' ' + p.slug).toLowerCase().indexOf(q) >= 0) && (show === 'all' || count(p, 'FAIL') || (show === 'gaps' && count(p, 'warn'))); });
+      rows.sort(function (a, b) {
+        if (byCol) return rank[cell(a, byCol)[0]] - rank[cell(b, byCol)[0]] || a.title.localeCompare(b.title);
+        if (sort === 'name') return a.title.localeCompare(b.title);
+        if (sort === 'recent' || sort === 'stale') { var x = days(a), y = days(b); x = x == null ? 1e9 : x; y = y == null ? 1e9 : y; return sort === 'recent' ? x - y : y - x; }
+        return count(b, 'FAIL') - count(a, 'FAIL') || count(b, 'warn') - count(a, 'warn') || a.title.localeCompare(b.title);
+      });
+      var t = el('table', null, 'matrix'), h = el('tr'); h.appendChild(el('th', 'Project'));
+      cols.forEach(function (k) {
+        var th = el('th'); th.title = label[k] + (byCol === k ? ' (click to open the standard)' : ' (click to sort by this column)'); if (byCol === k) th.className = 'sorted';
+        th.appendChild(el('span', k)); th.addEventListener('click', function () { if (byCol === k) go('standards', k); else { byCol = k; draw(); } }); h.appendChild(th);
+      });
       var th2 = el('th'); th2.appendChild(el('span', 'failing')); h.appendChild(th2);
       var thead = el('thead'); thead.appendChild(h); t.appendChild(thead);
       var tb = el('tbody');
       rows.forEach(function (p) {
-        var tr = el('tr'), th = el('th'), nb = el('button', p.title); nb.addEventListener('click', function () { go('projects', p.slug); }); th.appendChild(nb); tr.appendChild(th);
+        var tr = el('tr'), th = el('th'), nb = el('button', p.title, 'link'); nb.style.fontWeight = '600'; nb.addEventListener('click', function () { go('projects', p.slug); }); th.appendChild(nb); tr.appendChild(th);
         cols.forEach(function (k) {
           var c = cell(p, k), td = el('td');
           if (show !== 'all' && c[0] !== 'FAIL' && !(show === 'gaps' && c[0] === 'warn')) { td.appendChild(el('span', '·', 'dim')); tr.appendChild(td); return; }
@@ -251,116 +360,155 @@ table.plain thead th { position: static; height: auto }
 
   // ---- projects ----
   BUILD.projects = function (box) {
-    var q = '', tools = el('div', null, 'tools'), search = el('input'); search.type = 'search'; search.placeholder = 'Filter projects…'; search.setAttribute('aria-label', 'Filter projects');
-    search.addEventListener('input', function () { q = search.value.toLowerCase(); draw(); }); tools.appendChild(search); box.appendChild(tools);
+    var q = '', grp = '', sort = mem('psort') || 'gaps', flt = {}, openAll = null;
+    var tools = el('div', null, 'tools');
+    var tests = { failing: function (p) { return count(p, 'FAIL') > 0; }, warnings: function (p) { return count(p, 'warn') > 0; }, leaks: function (p) { return leaksOf(p).length > 0; },
+      loose: function (p) { return p.git && (p.git.dirty || p.git.unpushed); }, pub: function (p) { return p.visibility === 'PUBLIC'; }, priv: function (p) { return p.visibility === 'PRIVATE'; },
+      stale: function (p) { return days(p) != null && days(p) > 30; }, clear: function (p) { return !p.tasks.some(function (t) { return t.pri <= 2; }); } };
+    var ch = chips([['failing', 'Failing checks'], ['warnings', 'Warnings'], ['leaks', 'Leak findings'], ['loose', 'Uncommitted or unpushed'], ['stale', 'Untouched 30+ days'], ['clear', 'Nothing urgent'], ['pub', 'Public'], ['priv', 'Private']]
+      .map(function (c) { return [c[0], c[1] + ' (' + D.projects.filter(tests[c[0]]).length + ')']; }), function (k) { return !!flt[k]; }, function (k) { flt[k] = !flt[k]; draw(); });
+    Object.keys(ch.els).forEach(function (k) { tools.appendChild(ch.els[k]); });
+    var ea = el('button', 'Open all', 'chip'), ca = el('button', 'Close all', 'chip');
+    ea.addEventListener('click', function () { openAll = true; draw(); }); ca.addEventListener('click', function () { openAll = false; focus = null; draw(); });
+    tools.append(el('span', null, 'sep'), select([['gaps', 'Most gaps first'], ['urgent', 'Most urgent first'], ['name', 'A to Z'], ['recent', 'Most recently changed'], ['stale', 'Longest untouched'], ['group', 'By group']], sort, function (v) { sort = v; mem('psort', v); draw(); }, 'Sort projects'),
+      groupSelect('', function (v) { grp = v; draw(); }), searchBox('Filter projects…', function (v) { q = v; draw(); }), ea, ca);
+    box.appendChild(tools);
+    var info = el('p', null, 'dim small'); box.appendChild(info);
     var list = el('div'); box.appendChild(list);
     function draw() {
-      list.textContent = '';
-      D.projects.filter(function (p) { return !q || (p.title + ' ' + p.slug + ' ' + (p.kind || '')).toLowerCase().indexOf(q) >= 0; }).forEach(function (p) {
-        var d = el('details', null, 'proj'), s = el('summary'), f = count(p, 'FAIL'), w = count(p, 'warn'), g = p.git || {};
-        d.id = 'projects-' + p.slug;
+      ch.paint(); list.textContent = '';
+      var rows = D.projects.filter(function (p) { return (!grp || p.group === grp) && (!q || (p.title + ' ' + p.slug + ' ' + p.kind + ' ' + p.group).toLowerCase().indexOf(q) >= 0) && Object.keys(flt).every(function (k) { return !flt[k] || tests[k](p); }); });
+      var d9 = function (p) { var d = days(p); return d == null ? 1e9 : d; };
+      rows.sort(function (a, b) {
+        if (sort === 'name') return a.title.localeCompare(b.title);
+        if (sort === 'recent') return d9(a) - d9(b);
+        if (sort === 'stale') return d9(b) - d9(a);
+        if (sort === 'group') return a.group.localeCompare(b.group) || a.title.localeCompare(b.title);
+        if (sort === 'urgent') return (a.tasks[0] ? a.tasks[0].pri : 9) - (b.tasks[0] ? b.tasks[0].pri : 9) || count(b, 'FAIL') - count(a, 'FAIL');
+        return count(b, 'FAIL') - count(a, 'FAIL') || count(b, 'warn') - count(a, 'warn') || a.title.localeCompare(b.title);
+      });
+      info.textContent = plural(rows.length, 'project') + ' of ' + D.projects.length + '. Chips combine: a project must match every chip that is on.';
+      rows.forEach(function (p) {
+        var d = el('details', null, 'proj'), s = el('summary'), f = count(p, 'FAIL'), w = count(p, 'warn'), g = p.git || {}, dd = days(p);
+        d.id = 'projects-' + p.slug; d.open = openAll === true || (openAll !== false && focus === p.slug);
         s.appendChild(el('b', p.title));
         s.appendChild(el('span', f ? plural(f, 'failing check') : 'no failing checks', 'tag ' + (f ? 'bad' : 'ok')));
         if (w) s.appendChild(el('span', plural(w, 'warning'), 'tag mid'));
-        if ((D.leaks[p.dir] || []).length) s.appendChild(el('span', plural(D.leaks[p.dir].length, 'leak finding'), 'tag bad'));
+        if (leaksOf(p).length) s.appendChild(el('span', plural(leaksOf(p).length, 'leak finding'), 'tag bad'));
         if (p.ci && p.ci !== '-') s.appendChild(el('span', 'CI ' + p.ci, 'tag ' + (p.ci === 'FAIL' ? 'bad' : p.ci === 'ok' ? 'ok' : '')));
         if (p.live && p.live !== '-') s.appendChild(el('span', 'live ' + p.live, 'tag ' + (p.live === '200' ? 'ok' : 'bad')));
-        if (!p.registered) s.appendChild(el('span', 'not on the hub yet', 'tag'));
-        if (p.visibility) s.appendChild(el('span', p.visibility.toLowerCase(), 'tag'));
         if (g.dirty) s.appendChild(el('span', plural(g.dirty, 'uncommitted file'), 'tag mid'));
         if (g.unpushed) s.appendChild(el('span', plural(g.unpushed, 'unpushed commit'), 'tag mid'));
+        var out = (p.open || []).filter(function (x) { return x.outside; }).length; if (out) s.appendChild(el('span', plural(out, 'outside request'), 'tag mid'));
+        s.appendChild(el('span', p.group, 'tag'));
+        if (!p.registered && !p.hub) s.appendChild(el('span', 'not on the hub yet', 'tag'));
+        if (p.visibility) s.appendChild(el('span', p.visibility.toLowerCase(), 'tag'));
+        if (dd != null) s.appendChild(el('span', 'changed ' + ago(dd), 'tag' + (dd > 30 ? ' mid' : '')));
+        s.appendChild(el('span', 'Next: ' + (p.next || 'nothing open'), 'next'));
         d.appendChild(s);
-        var kv = el('dl', null, 'kv');
-        [['What it is', p.tagline], ['Kind', p.kind], ['Folder', p.dir], ['Live site', p.url], ['Branch', g.branch], ['Last commit', g.last ? new Date(g.last).toLocaleString() + ' · ' + (g.subject || '') : ''],
-          ['Stars and forks', p.stars != null ? p.stars + ' stars, ' + p.forks + ' forks' : ''], ['Repo visits, last 14 days', p.views ? p.views[0] + ' views by ' + plural(p.views[1], 'visitor') + '; ' + p.clones[0] + ' clones by ' + plural(p.clones[1], 'cloner') + ' (GitHub gives counts, never names)' : ''],
-          ['Standards', count(p, 'ok') + ' ok, ' + w + ' warnings, ' + f + ' failing, ' + count(p, '-') + ' not applicable']].forEach(function (r) {
-          if (!r[1]) return; kv.appendChild(el('dt', r[0]));
-          var dd = el('dd'); if (r[0] === 'Live site') { var a = el('a', r[1]); a.href = r[1]; a.target = '_blank'; a.rel = 'noopener'; dd.appendChild(a); } else dd.textContent = r[1]; kv.appendChild(dd);
-        });
-        d.appendChild(kv);
-        var gaps = keys.filter(function (k) { var x = cell(p, k)[0]; return x === 'FAIL' || x === 'warn' || x === '?'; });
-        d.appendChild(el('h3', gaps.length ? 'Gaps' : 'No gaps against the standards'));
-        var ul = el('ul', null, 'gaps');
-        gaps.sort(function (a, b) { return (cell(p, a)[0] === 'FAIL' ? 0 : 1) - (cell(p, b)[0] === 'FAIL' ? 0 : 1); }).forEach(function (k) {
-          var li = el('li'), left = el('div'), kb = el('button', k); kb.title = label[k]; kb.addEventListener('click', function () { go('standards', k); });
-          left.append(st(cell(p, k)[0]), el('br'), kb); li.append(left, el('div', cell(p, k)[1] || label[k])); ul.appendChild(li);
-        });
-        d.appendChild(ul);
-        var lk = D.leaks[p.dir] || [];
-        if (lk.length) { d.appendChild(el('h3', 'Leak findings')); var ul2 = el('ul', null, 'gaps'); lk.forEach(function (x) { var li = el('li'); li.append(el('div', x.kind, 'dim'), el('div', x.where + ' ← ' + x.what)); ul2.appendChild(li); }); d.appendChild(ul2); }
-        var ov = D.overlaps.filter(function (o) { return o.who.indexOf(p.title) >= 0 || o.who.indexOf(p.slug) >= 0 || /every app/.test(o.who); });
-        if (ov.length) { d.appendChild(el('h3', 'Overlaps that name this project')); var ul3 = el('ul', null, 'gaps'); ov.forEach(function (o) { var li = el('li'); li.append(el('div', o.state, 'dim'), el('div', o.who + ': ' + o.what)); ul3.appendChild(li); }); d.appendChild(ul3); }
+        d.addEventListener('toggle', function () { if (d.open && !d.dataset.built) { d.dataset.built = '1'; body(p, d); } });
+        if (d.open) { d.dataset.built = '1'; body(p, d); }
         list.appendChild(d);
       });
-      if (!list.children.length) list.appendChild(el('p', 'No project matches.', 'empty'));
-      if (focus) { var t = document.getElementById('projects-' + focus); if (t) t.open = true; }
+      if (!rows.length) list.appendChild(el('p', 'No project matches.', 'empty'));
+    }
+    function body(p, d) {
+      var g = p.git || {}, f = count(p, 'FAIL'), w = count(p, 'warn');
+      var row = el('p'), cb = el('button', 'Copy these tasks for its session', 'chip'); cb.addEventListener('click', function () { copy(brief(p), cb); }); row.appendChild(cb);
+      if (p.url) { var a = el('a', 'Open the live site'); a.href = p.url; a.target = '_blank'; a.rel = 'noopener'; row.append('  ', a); }
+      d.appendChild(row);
+      if (p.note) d.appendChild(el('p', p.note));
+      var kv = el('dl', null, 'kv');
+      [['What it is', p.tagline], ['Group', p.group + (p.kind ? ' · ' + p.kind : '')], ['Folder', p.dir], ['Branch', g.branch], ['Last commit', g.last ? new Date(g.last).toLocaleString() + ' · ' + (g.subject || '') : ''],
+        ['Stars and forks', p.stars != null ? p.stars + ' stars, ' + p.forks + ' forks' : ''],
+        ['Repo visits, last 14 days', p.views ? p.views[0] + ' views by ' + plural(p.views[1], 'visitor') + '; ' + p.clones[0] + ' clones by ' + plural(p.clones[1], 'cloner') + ' (counts only; clones are mostly automated builds)' : ''],
+        ['Standards', count(p, 'ok') + ' ok, ' + w + ' warnings, ' + f + ' failing, ' + count(p, '-') + ' not applicable'],
+        ['In its own notes', (p.todo.file.length ? plural(p.todo.file.length, 'open item') + ' in its to-do file; ' : '') + plural(p.todo.code.length, 'TODO comment') + '; ' + plural(p.todo.ponytail, 'marked shortcut')]].forEach(function (r) {
+        if (!r[1]) return; kv.appendChild(el('dt', r[0])); kv.appendChild(el('dd', r[1]));
+      });
+      d.appendChild(kv);
+      d.appendChild(el('h3', p.tasks.length ? 'To do, most urgent first' : 'Nothing open'));
+      var ul = el('ul', null, 'gaps');
+      p.tasks.forEach(function (t) {
+        var li = el('li'), left = el('div'); left.append(pri(t.pri), el('br'), el('span', t.source, 'dim small'));
+        var right = el('div');
+        if (t.key && label[t.key]) { var b = el('button', t.text, 'link'); b.addEventListener('click', function () { go('standards', t.key); }); right.appendChild(b); } else right.textContent = t.text;
+        li.append(left, right); ul.appendChild(li);
+      });
+      d.appendChild(ul);
+      if ((p.open || []).length) { d.appendChild(el('h3', 'Open on GitHub')); var ul4 = el('ul', null, 'gaps'); p.open.forEach(function (x) { var li = el('li'); li.append(el('div', x.kind + ' #' + x.n, 'dim'), el('div', x.title + ' — ' + x.by + ', since ' + x.since)); ul4.appendChild(li); }); d.appendChild(ul4); }
+      var ov = D.overlaps.filter(function (o) { return o.who.indexOf(p.title) >= 0 || o.who.indexOf(p.slug) >= 0 || o.source === p.title || (!p.hub && /every app/.test(o.who)); });
+      if (ov.length) { var dt = el('details'); dt.appendChild(el('summary', plural(ov.length, 'overlap') + ' that name this project')); var ul3 = el('ul', null, 'gaps'); ov.forEach(function (o) { var li = el('li'); li.append(el('div', o.state, 'dim'), el('div', o.who + ': ' + o.what)); ul3.appendChild(li); }); dt.appendChild(ul3); d.appendChild(dt); d.appendChild(el('p', '')); }
     }
     draw();
   };
 
   // ---- standards ----
   BUILD.standards = function (box) {
+    var only = mem('sonly') === '1', tools = el('div', null, 'tools'), b = el('button', 'Only standards with gaps', 'chip');
+    b.addEventListener('click', function () { only = !only; mem('sonly', only ? '1' : '0'); draw(); }); tools.appendChild(b); box.appendChild(tools);
     box.appendChild(el('p', 'Each house standard, the check columns that enforce it, and who falls short. A standard with no column is checked by hand or by its own tool.', 'dim small'));
-    D.standards.forEach(function (s) {
-      var d = el('details', null, 'std'), sum = el('summary'), f = 0, w = 0, o = 0;
-      s.checks.forEach(function (k) { f += colCount(k, 'FAIL'); w += colCount(k, 'warn'); o += colCount(k, 'ok'); });
-      sum.appendChild(el('b', String(s.n))); sum.appendChild(el('span', s.title));
-      var bar = el('div', null, 'bar'), n = f + w + o;
-      if (n) [['f', f], ['w', w], ['o', o]].forEach(function (x) { if (x[1]) { var i = el('i', null, x[0]); i.style.width = (100 * x[1] / n) + '%'; bar.appendChild(i); } });
-      bar.title = n ? f + ' failing, ' + w + ' warnings, ' + o + ' ok across ' + s.checks.join(', ') : 'no check column';
-      sum.appendChild(bar);
-      sum.appendChild(el('span', n ? (f ? f + ' ✕' : '') + (w ? '  ' + w + ' !' : '') + (!f && !w ? 'all ok' : '') : 'no column', 'num'));
-      d.appendChild(sum);
-      s.checks.forEach(function (k) {
-        var a = el('div'); a.id = 'standards-' + k;
-        d.appendChild(a);
-        d.appendChild(el('h3', k + ' — ' + label[k]));
-        var bad = D.projects.filter(function (p) { var x = cell(p, k)[0]; return x === 'FAIL' || x === 'warn' || x === '?'; });
-        if (!bad.length) { d.appendChild(el('p', 'Every project passes.', 'dim')); return; }
-        var ul = el('ul', null, 'gaps');
-        bad.forEach(function (p) { var li = el('li'), left = el('div'), pb = el('button', p.title); pb.addEventListener('click', function () { go('projects', p.slug); }); left.append(pb, el('br'), st(cell(p, k)[0])); li.append(left, el('div', cell(p, k)[1] || '')); ul.appendChild(li); });
-        d.appendChild(ul);
+    var list = el('div'); box.appendChild(list);
+    function draw() {
+      b.setAttribute('aria-pressed', String(only)); list.textContent = '';
+      D.standards.forEach(function (s) {
+        var f = 0, w = 0, o = 0; s.checks.forEach(function (k) { f += colCount(k, 'FAIL'); w += colCount(k, 'warn'); o += colCount(k, 'ok'); });
+        if (only && !f && !w) return;
+        var d = el('details', null, 'std'), sum = el('summary'), n = f + w + o;
+        sum.appendChild(el('b', String(s.n))); sum.appendChild(el('span', s.title));
+        sum.appendChild(n ? stackBar(f, w, o, f + ' failing, ' + w + ' warnings, ' + o + ' ok across ' + s.checks.join(', ')) : el('span'));
+        sum.appendChild(el('span', n ? (f ? f + ' ✕' : '') + (w ? '  ' + w + ' !' : '') + (!f && !w ? 'all ok' : '') : 'no column', 'num'));
+        d.appendChild(sum);
+        s.checks.forEach(function (k) {
+          var a = el('div'); a.id = 'standards-' + k; d.appendChild(a);
+          d.appendChild(el('h3', k + ' — ' + label[k]));
+          var bad = D.projects.filter(function (p) { var x = cell(p, k)[0]; return x === 'FAIL' || x === 'warn' || x === '?'; });
+          if (!bad.length) { d.appendChild(el('p', 'Every project passes.', 'dim')); return; }
+          var ul = el('ul', null, 'gaps');
+          bad.sort(function (x, y) { return (cell(x, k)[0] === 'FAIL' ? 0 : 1) - (cell(y, k)[0] === 'FAIL' ? 0 : 1); }).forEach(function (p) {
+            var li = el('li'), left = el('div'), pb = el('button', p.title, 'link'); pb.addEventListener('click', function () { go('projects', p.slug); }); left.append(pb, el('br'), st(cell(p, k)[0])); li.append(left, el('div', cell(p, k)[1] || '')); ul.appendChild(li);
+          });
+          d.appendChild(ul);
+        });
+        var t = el('details'); t.appendChild(el('summary', 'The standard, in full')); t.appendChild(el('pre', s.text)); d.appendChild(t); d.appendChild(el('p', ''));
+        list.appendChild(d);
       });
-      var t = el('details'); t.appendChild(el('summary', 'The standard, in full')); t.appendChild(el('pre', s.text)); d.appendChild(t);
-      d.appendChild(el('p', ''));
-      box.appendChild(d);
-    });
-    if (focus) { var a = document.getElementById('standards-' + focus); if (a) { a.parentNode.open = true; a.scrollIntoView(); window.scrollBy(0, -100); } }
+      if (!list.children.length) list.appendChild(el('p', 'Every standard is met everywhere.', 'empty'));
+    }
+    draw();
   };
 
   // ---- leaks ----
   BUILD.leaks = function (box) {
     box.appendChild(el('p', 'Personal data that git tracks, or that a repo\'s history still holds (house standard 26). Public repos matter most.', 'dim small'));
-    var t = el('table', null, 'plain'), h = el('tr'); ['Project', 'Repo', 'Kind', 'Where', 'What'].forEach(function (x) { h.appendChild(el('th', x)); });
-    var th = el('thead'); th.appendChild(h); t.appendChild(th); var tb = el('tbody');
-    Object.keys(D.leaks).forEach(function (dir) {
-      var p = D.projects.filter(function (x) { return x.dir === dir; })[0];
-      D.leaks[dir].forEach(function (x) { var tr = el('tr'); [p ? p.title : dir, p && p.visibility ? p.visibility.toLowerCase() : '', x.kind, x.where, x.what].forEach(function (v) { tr.appendChild(el('td', v)); }); tb.appendChild(tr); });
-    });
-    t.appendChild(tb);
-    var w = el('div', null, 'wrap'); w.appendChild(leakTotal ? t : el('p', 'Nothing found in any repo.', 'empty')); box.appendChild(w);
+    var state = { by: 'repo', dir: -1 }, w = el('div', null, 'wrap'); box.appendChild(w);
+    (function draw() {
+      var rows = [];
+      Object.keys(D.leaks).forEach(function (dir) {
+        var p = D.projects.filter(function (x) { return x.dir === dir; })[0], vis = p && p.visibility ? p.visibility.toLowerCase() : '';
+        D.leaks[dir].forEach(function (x) { rows.push({ project: p ? p.title : dir, repo: vis, kind: x.kind, where: x.where, what: x.what, _sort: { project: (p ? p.title : dir).toLowerCase(), repo: vis, kind: x.kind, where: x.where, what: x.what } }); });
+      });
+      w.textContent = ''; w.appendChild(rows.length ? sortableTable([['project', 'Project'], ['repo', 'Repo'], ['kind', 'Kind'], ['where', 'Where'], ['what', 'What']], rows, state, draw) : el('p', 'Nothing found in any repo.', 'empty'));
+    })();
     box.appendChild(el('p', D.neverList ? 'Your private never-publish list is in use (' + plural(D.neverList, 'string') + ').' : 'No private never-publish list yet (~/.adervec-runner/never-publish.txt).', 'dim small'));
   };
 
   // ---- overlaps ----
   BUILD.overlaps = function (box) {
-    var state = 'all', q = '', tools = el('div', null, 'tools'), chips = {};
-    ['all', 'planned', 'idea', 'done', 'dropped'].forEach(function (s) {
-      var n = s === 'all' ? D.overlaps.length : D.overlaps.filter(function (o) { return o.state === s; }).length;
-      var b = el('button', (s === 'all' ? 'Everything' : s) + ' (' + n + ')', 'chip'); b.addEventListener('click', function () { state = s; draw(); }); chips[s] = b; tools.appendChild(b);
-    });
-    var search = el('input'); search.type = 'search'; search.placeholder = 'Filter by app or word…'; search.setAttribute('aria-label', 'Filter overlaps');
-    search.addEventListener('input', function () { q = search.value.toLowerCase(); draw(); }); tools.appendChild(search); box.appendChild(tools);
+    var stt = 'all', q = '', app = '', state = { by: 'state', dir: 1 }, tools = el('div', null, 'tools');
+    var ch = chips(['all', 'planned', 'idea', 'done', 'dropped'].map(function (s) { return [s, (s === 'all' ? 'Everything' : s) + ' (' + (s === 'all' ? D.overlaps.length : D.overlaps.filter(function (o) { return o.state === s; }).length) + ')']; }),
+      function (k) { return k === stt; }, function (k) { stt = k; draw(); });
+    Object.keys(ch.els).forEach(function (k) { tools.appendChild(ch.els[k]); });
+    tools.append(el('span', null, 'sep'), select([['', 'Every project']].concat(D.projects.map(function (p) { return [p.title, p.title]; })), '', function (v) { app = v; draw(); }, 'Project'), searchBox('Filter by word…', function (v) { q = v; draw(); }));
+    box.appendChild(tools);
     box.appendChild(el('p', 'Noticed, not decided (house standard 27). Nothing here is being built unless its state is "planned".', 'dim small'));
     var w = el('div', null, 'wrap'); box.appendChild(w);
+    var order = { planned: 0, idea: 1, done: 2, dropped: 3 };
     function draw() {
-      Object.keys(chips).forEach(function (k) { chips[k].setAttribute('aria-pressed', String(k === state)); });
-      var t = el('table', null, 'plain'), h = el('tr'); ['State', 'Who', 'What overlaps, and what could be shared', 'Noted by'].forEach(function (x) { h.appendChild(el('th', x)); });
-      var th = el('thead'); th.appendChild(h); t.appendChild(th); var tb = el('tbody');
-      D.overlaps.filter(function (o) { return (state === 'all' || o.state === state) && (!q || (o.who + ' ' + o.what).toLowerCase().indexOf(q) >= 0); }).forEach(function (o) {
-        var tr = el('tr'); [o.state, o.who, o.what, o.source].forEach(function (v) { tr.appendChild(el('td', v)); }); tb.appendChild(tr);
-      });
-      t.appendChild(tb); w.textContent = ''; w.appendChild(tb.children.length ? t : el('p', 'Nothing matches.', 'empty'));
+      ch.paint();
+      var rows = D.overlaps.filter(function (o) { return (stt === 'all' || o.state === stt) && (!app || o.who.indexOf(app) >= 0 || o.source === app) && (!q || (o.who + ' ' + o.what).toLowerCase().indexOf(q) >= 0); })
+        .map(function (o, i) { return { state: o.state, who: o.who, what: o.what, by: o.source, _nowrap: ['state'], _sort: { state: order[o.state] * 1000 + i, who: o.who.toLowerCase(), what: o.what.toLowerCase(), by: o.source.toLowerCase() + String(1000 + i) } }; });
+      w.textContent = ''; w.appendChild(rows.length ? sortableTable([['state', 'State'], ['who', 'Who'], ['what', 'What overlaps, and what could be shared'], ['by', 'Noted by']], rows, state, draw) : el('p', 'Nothing matches.', 'empty'));
     }
     draw();
   };
@@ -370,10 +518,10 @@ table.plain thead th { position: static; height: auto }
     var N = D.notes;
     box.appendChild(el('h2', 'Hub roadmap'));
     var t = el('table', null, 'plain'), tb = el('tbody');
-    (N.roadmap || []).forEach(function (r) { var tr = el('tr'); tr.appendChild(el('td', r[0])); var s = el('td'); s.appendChild(el('span', r[1], 'tag ' + (r[1] === 'done' ? 'ok' : r[1] === 'blocked' ? 'bad' : r[1] === 'in progress' ? 'mid' : ''))); tr.appendChild(s); tr.appendChild(el('td', r[2])); tb.appendChild(tr); });
+    (N.roadmap || []).forEach(function (r) { var tr = el('tr'); tr.appendChild(el('td', r[0])); var s = el('td'); s.className = 'nowrap'; s.appendChild(el('span', r[1], 'tag ' + (r[1] === 'done' ? 'ok' : r[1] === 'blocked' ? 'bad' : r[1] === 'in progress' ? 'mid' : ''))); tr.appendChild(s); tr.appendChild(el('td', r[2])); tb.appendChild(tr); });
     t.appendChild(tb); var w = el('div', null, 'wrap'); w.style.maxHeight = 'none'; w.appendChild(t); box.appendChild(w);
     [['Decisions waiting on you', N.decisions], ['Waiting on you (actions)', N.waiting], ['Decided', N.decided], ['Not yet tried by a person', N.untested]].forEach(function (g) {
-      box.appendChild(el('h2', g[0])); var ul = el('ul', null, 'todo'); (g[1] || []).forEach(function (x) { ul.appendChild(el('li', x)); });
+      box.appendChild(el('h2', g[0] + ' (' + (g[1] || []).length + ')')); var ul = el('ul', null, 'todo'); (g[1] || []).forEach(function (x) { ul.appendChild(el('li', x)); });
       if (!ul.children.length) ul.appendChild(el('li', 'Nothing recorded.', 'dim')); box.appendChild(ul);
     });
     box.appendChild(el('p', 'This tab is kept by the QA lead session in _review/notes.json; the other tabs are read from the repos each time the page is generated.', 'dim small'));
