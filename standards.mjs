@@ -265,6 +265,14 @@ const CHECKS = [
     const found = leakScan(a.root);
     return found.length ? fail(found.length + ' finding(s), first: ' + found[0].where + ' <- ' + found[0].what + ' (node leak-check.mjs lists them)') : ok();
   }],
+  ['overlap', 'Overlaps with other apps written down (OVERLAPS.md)', (a) => {
+    const f = path.join(a.root, 'OVERLAPS.md');
+    if (!existsSync(f)) return fail('no OVERLAPS.md (the register of overlaps with other apps and the hub)');
+    const m = /^Reviewed:\s*(\d{4}-\d\d-\d\d)/m.exec(readFileSync(f, 'utf8'));
+    if (!m) return fail('OVERLAPS.md has no "Reviewed: YYYY-MM-DD" line');
+    const days = Math.floor((Date.now() - new Date(m[1] + 'T00:00:00').getTime()) / 864e5);
+    return days > 90 ? warn('OVERLAPS.md was last reviewed ' + days + ' days ago') : ok();
+  }],
   ['notes', 'Agent notes import the house standards', (a) => {
     const here = path.join(a.root, 'CLAUDE.md'), up = path.join(path.dirname(a.root), 'CLAUDE.md');
     const f = existsSync(here) ? here : (path.basename(a.root) === 'site' && existsSync(up) ? up : null);
@@ -356,6 +364,14 @@ function selftest() {
     eq(check('leak', { ...fake(''), root: tmp }), 'FAIL', 'a tracked backup file fails');
     writeFileSync(path.join(tmp, '.leak-ok'), 'adervec-backup-2026-01-01.json  # made-up sample\n');
     eq(check('leak', { ...fake(''), root: tmp }), 'ok', 'a file listed in .leak-ok is excused, and placeholders are not findings');
+  }
+  { // overlap: the register must exist and carry a recent Reviewed date
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'overlap-'));
+    eq(check('overlap', { ...fake(''), root: tmp }), 'FAIL', 'no OVERLAPS.md fails');
+    writeFileSync(path.join(tmp, 'OVERLAPS.md'), 'Reviewed: 2020-01-01\n- [idea] A + B: x -> y\n');
+    eq(check('overlap', { ...fake(''), root: tmp }), 'warn', 'a stale review warns');
+    writeFileSync(path.join(tmp, 'OVERLAPS.md'), 'Reviewed: ' + new Date().toISOString().slice(0, 10) + '\n');
+    eq(check('overlap', { ...fake(''), root: tmp }), 'ok', 'a fresh review passes');
   }
   eq(check('ledger', fake('appFont.logSession({ kind: "lift", minutes: 40, id: w.id })')), 'ok', 'logSession passes');
   eq(check('pfp', fake('<header><app-account></app-account></header> const G = window.appFont?.google; G.token()')), 'ok', 'the shared sign-in with the corner avatar passes');

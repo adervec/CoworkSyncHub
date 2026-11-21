@@ -253,6 +253,31 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - The standards check's `leak` column fails on any finding; the hub's deploy refuses to
       publish the site while it has one.
 
+27. **Keep looking for overlaps.** The apps grew one at a time, so the same data, the same job
+    and the same idea turn up in several of them (the fitness apps, the reading and speech apps),
+    and every app already shares one private Drive folder and one browser origin. Whenever you
+    work in an app, watch for places where it and another app, or it and the hub, hold the same
+    data, do the same job, or could feed each other. **Write them down; do not act on them.**
+    Building one is a decision for the maker, after a plan.
+    - **Where:** `OVERLAPS.md` at the repo root, one line each:
+      `- [idea] ThisApp + OtherApp: what overlaps -> what could be shared, and through what`.
+      States: `idea`, `planned` (the maker said yes), `done`, `dropped` (say why). Keep a
+      `Reviewed: YYYY-MM-DD` line and move it forward each time you look, even if nothing changed.
+      The hub's own register is `../CoworkSyncHub/OVERLAPS.md`; read it, it may already name you.
+    - **When to look:** at the start of a session, and whenever you add a kind of data, an import,
+      a store, a setting, a capture step, or an engine (a scheduler, a scorer, a reader) that
+      another app plausibly has too.
+    - **What to look for:** the reader typing the same thing into two apps; one measurement kept
+      in two places (weight, a run, a word list); one engine written twice; something one app
+      produces that another could use; a setting that should be chosen once for every app.
+    - **How sharing would work, once planned:** through the shared Drive folder, as a file named
+      `shared-<topic>.json` that exactly ONE app owns and writes and the others only read
+      (`appFont.google.read`), declared in both apps' `app-data.json`; or as a shared piece in
+      font.js when it is behaviour rather than data. Never reach into another app's own keys,
+      databases or Drive files, and never copy another app's code into yours.
+    - The standards check's `overlap` column fails without the file and warns when its Reviewed
+      date is over 90 days old. The status board lists every entry from every app.
+
 ## Working habits
 
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you. Also run `node ../CoworkSyncHub/layout-check.mjs <App>` (the live site, phone and desktop) and fix what it flags.

@@ -1542,6 +1542,21 @@ def cmd_apps(quick=False):
     print("sweep: " + sweep_summary())
 
 
+def _overlaps():
+    """Every overlap entry from the hub's OVERLAPS.md and each app's own (house standard 27): [(source, state, who, what)]."""
+    out, seen = [], set()
+    for label, root in [("hub", BASE)] + [(a["title"], BASE.parent / a["dir"]) for a in APPS]:
+        f = root / "OVERLAPS.md"
+        if not f.exists():
+            continue
+        for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
+            m = re.match(r"\s*- \[(idea|planned|done|dropped)\]\s*(.+?):\s+(.+)", line)
+            if m and (m.group(2), m.group(3)) not in seen:
+                seen.add((m.group(2), m.group(3)))
+                out.append((label, m.group(1), m.group(2), m.group(3)))
+    return out
+
+
 def cmd_status():
     """The maker's status board: every app's CI, live site, last push and house-standards columns, as one page."""
     r = subprocess.run(["node", str(BASE / "standards.mjs"), "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -1561,14 +1576,19 @@ def cmd_status():
             tds += f"<td title='{e(k + ': ' + st + (' — ' + note if note else ''))}'><i style='background:{col.get(st, '#9ca3af')}'></i></td>"
         okc = lambda v, good: f"<td class='{'g' if v in good else 'b'}'>{e(v)}</td>"
         rows.append(f"<tr><th><a href='{e(app_url(app))}'>{e(app['title'])}</a></th>{okc(ci, ('ok', 'running'))}{okc(live, ('200',))}<td>{e(pushed)}</td>{tds}</tr>")
+    overlaps = sorted(_overlaps(), key=lambda o: ("planned", "idea", "done", "dropped").index(o[1]))
+    ov_rows = "".join(f"<tr><td>{e(st)}</td><td>{e(who)}</td><td>{e(what)}</td><td>{e(src)}</td></tr>" for src, st, who, what in overlaps)
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex"><title>Status board</title><script src="/font.js"></script>
 <style>:root{{color-scheme:light dark}}body{{font-family:var(--app-font,system-ui);margin:16px;background:Canvas;color:CanvasText}}
 .wrap{{overflow-x:auto}}table{{border-collapse:collapse;font-size:14px}}td,th{{padding:4px 6px;border-bottom:1px solid color-mix(in srgb,CanvasText 15%,transparent);text-align:center;white-space:nowrap}}
 tbody th{{text-align:left;position:sticky;left:0;background:Canvas}}thead th span{{writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600}}
-td i{{display:inline-block;width:12px;height:12px;border-radius:50%}}.g{{color:#16a34a}}.b{{color:#dc2626;font-weight:700}}p{{max-width:70ch}}</style></head><body>
+td i{{display:inline-block;width:12px;height:12px;border-radius:50%}}.g{{color:#16a34a}}.b{{color:#dc2626;font-weight:700}}p{{max-width:70ch}}
+.ov td,.ov th{{text-align:left;white-space:normal;vertical-align:top}}.ov td:nth-child(3){{min-width:22em}}</style></head><body>
 <h1>Status board</h1><p>Snapshot from {time.strftime('%Y-%m-%d %H:%M')} ({bad} failing checks). Green = ok, amber = warning, red = fails, grey = not applicable. Hover or tap a dot for the reason. Refresh with <code>python portal.py status</code> then <code>deploy</code>. <a href="./">Portal</a></p>
 <div class="wrap"><table><thead><tr><th>App</th><th><span>CI</span></th><th><span>live</span></th><th><span>last push</span></th>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div><p id="why" aria-live="polite"></p>
+<h2>Overlaps and interactions</h2><p>Noticed, not decided: each row is somewhere two apps, or an app and the hub, hold the same data or could feed each other (house standard 27). {len(overlaps)} entries.</p>
+<div class="wrap"><table class="ov"><thead><tr><th>State</th><th>Who</th><th>What overlaps, and what could be shared</th><th>Noted by</th></tr></thead><tbody>{ov_rows}</tbody></table></div>
 <script>document.querySelector('table').addEventListener('click',function(ev){{var td=ev.target.closest('td[title]');if(td)document.getElementById('why').textContent=td.parentNode.querySelector('th').textContent+' · '+td.title;}});</script></body></html>"""
     PORTAL_DIR.mkdir(parents=True, exist_ok=True)
     (PORTAL_DIR / "status.html").write_text(page, encoding="utf-8")
