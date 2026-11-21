@@ -231,6 +231,28 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - The standards check's `ledger` column: ok with `logSession`, a warning for a hand-written row,
       fails when nothing is logged.
 
+26. **No personal data on GitHub.** The maker's and the readers' own data (reading history, workouts,
+    runs and routes, body measurements, recordings, photos, briefs, tasks, mail) never goes into a
+    repo: not as a file, not pasted into a test or a doc, not in a screenshot, not in a commit
+    message. A public repo's history is public for ever, so a file deleted later has still leaked.
+    - **Never commit:** hub backups (`adervec-backup-*.json`, `adervec-before-restore-*.json`), an
+      app's own export or backup, cowork hand-off files (`request.json`, `reply.json`,
+      `context.json`, `BRIEF.md`), the daily brief, `.fit` / `.gpx` / `.tcx` files, biometrics,
+      recordings or photos of a person, `.env` and token files, or anything under a home folder.
+    - **Test and demo data is made up.** Write it by hand or generate it; never copy a real log and
+      trim it. Keep it under `test/`, `fixtures/`, `samples/` or `demo/`. Never point a test at a
+      real folder (`C:\Users\...\Cowork\...`): use a temp folder or a fixture.
+    - **Screenshots** for a README or the portal are taken in a fresh browser with made-up data.
+    - **Check before every push:** `node ../CoworkSyncHub/leak-check.mjs .` It looks at tracked
+      files and at every file name the history ever held, for data-shaped names, home folder paths,
+      email addresses, GPS tracks and the maker's private never-publish list. A finding that is
+      deliberate made-up data is excused by listing its path in the repo's `.leak-ok` with a reason.
+    - **If it happens:** stop and tell the maker before pushing anything else. Removing it properly
+      means rewriting the history and, for anything secret, changing the secret; deleting the file
+      in a new commit is not enough.
+    - The standards check's `leak` column fails on any finding; the hub's deploy refuses to
+      publish the site while it has one.
+
 ## Working habits
 
 - **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you. Also run `node ../CoworkSyncHub/layout-check.mjs <App>` (the live site, phone and desktop) and fix what it flags.

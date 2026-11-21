@@ -19,7 +19,10 @@ python coworkhub.py [briefs] [--apps DIR] [--port 8791] [--no-open]
   tile's first `### ` is always visible and each `### ` is a collapsed drill-down. A tile
   titled *Needs you* is pinned first, a table makes a tile full width (the across-days
   *Outlook*), and a visible red or orange circle emoji colours the tile's edge. The exact
-  contract is `INSTRUCTIONS.md`, dropped into the folder on first run.
+  contract is `INSTRUCTIONS.md`, kept current in that folder each time the hub starts.
+  The page's *Your place & commute* form saves `settings.json` there - where you live,
+  where you commute to and how - so the agent picks local weather, traffic, transit and
+  news sources itself and no prompt has to name a city.
 - **apps folder** - one sub-folder per app, each holding the `BRIEF.md` that app keeps
   current by itself. Shown under the tiles as one line per app (its own "At a glance"),
   expandable to the app's full brief section by section, with its age; anything older than

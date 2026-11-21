@@ -10,10 +10,14 @@
 Defaults: ~/Documents/Cowork/MorningBrief and ~/Documents/Cowork/Cowork Link Folders when they
 exist, else briefs/ beside this file and no app strip. The format the agent writes to is in
 the briefs folder's INSTRUCTIONS.md (dropped there on first run). It dispatches nothing.
+The one thing it writes is settings.json in the briefs folder: the reader's location and commute,
+picked on the page, which the agent reads so the brief names no city of its own.
 """
 import argparse
 import html
 import http.server
+import json
+import os
 import re
 import sys
 import time
@@ -67,8 +71,44 @@ Rules:
   dashboard, so do not restate app numbers — write what follows from combining sources.
 - Plain markdown only: headings, one-level lists, `- [ ]` tasks, tables, bold / italic /
   code, links, fenced blocks. No HTML, no nested lists, no images.
+- `settings.json` in this folder is the reader's location and commute, set on the dashboard
+  page: `home`, `work`, `mode` (drive / transit / bike / walk), `routes`, `days`, `household`.
+  Read it and pick local sources (weather service, road and transit alerts, news) to match.
+  Never write it. If it is missing or `home` is empty, skip everything location-dependent
+  and say so under Needs you.
 - Write nothing else into this folder.
 """
+
+SETTINGS = "settings.json"
+MODES = ("", "drive", "transit", "bike", "walk")
+FIELDS = (  # key, label, placeholder — all free text: the agent reads them, nothing here geocodes
+    ("home", "Where you live", "town or neighbourhood, region, country"),
+    ("work", "Where you commute to", "leave empty if you don't commute"),
+    ("mode", "How you get there", ""),
+    ("routes", "Roads or lines you rely on", "the ones worth a warning"),
+    ("days", "Commute days", "e.g. Mon-Fri"),
+    ("household", "Household notes", "e.g. bins out Thursday night"),
+)
+
+
+def load_settings(folder):
+    try:
+        d = json.loads((Path(folder) / SETTINGS).read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_settings(folder, form):
+    """form: parse_qs output. Whitespace collapsed, 200 chars a field, mode from the fixed list."""
+    d = {k: " ".join(form.get(k, [""])[0].split())[:200] for k, _, _ in FIELDS}
+    if d["mode"] not in MODES:
+        d["mode"] = ""
+    d["updated"] = time.strftime("%Y-%m-%d")
+    tmp = Path(folder) / (SETTINGS + ".tmp")  # write-then-rename: the agent never reads half a file
+    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, Path(folder) / SETTINGS)
+    return d
 
 
 def fmt_age(t):
@@ -262,6 +302,12 @@ blockquote{margin:.5em 0;padding-left:.8em;border-left:3px solid var(--line);col
 .apps .body{padding:0 1em .3em;overflow-wrap:anywhere}
 .old{columns:2 320px;padding-left:1.2em;margin:.5em 0}.old li{margin:.15em 0;break-inside:avoid}
 @media(max-width:560px){.name{flex-basis:6.5em}}
+.set{background:var(--card);border:1px solid var(--line);border-radius:.6em;padding:.8em 1em;display:grid;
+grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:.7em 1em;align-items:end}
+.set label{display:grid;gap:.2em;font-size:.85em;color:var(--mut)}
+.set input,.set select,.set button{font:inherit;padding:.4em .6em;border:1px solid var(--line);
+border-radius:.4em;background:var(--bg);color:var(--ink);min-width:0;width:100%}
+.set button{background:var(--acc);border-color:var(--acc);color:var(--card);font-weight:600;cursor:pointer}
 """
 
 
@@ -305,8 +351,28 @@ def _app_row(a):
             f"</summary><div class='body'>{md_html(a['glance'])}{more}</div></details>")
 
 
+def _place(st):
+    e = html.escape
+    rows = []
+    for k, label, hint in FIELDS:
+        v = st.get(k, "") if isinstance(st.get(k, ""), str) else ""
+        if k == "mode":
+            opts = "".join(f"<option{' selected' if m == v else ''} value='{m}'>{m or 'no commute / varies'}</option>"
+                           for m in MODES)
+            rows.append(f"<label>{label}<select name='mode'>{opts}</select></label>")
+        else:
+            rows.append(f"<label>{label}<input name='{k}' value='{e(v)}' placeholder='{e(hint)}' maxlength='200'"
+                        f"{' required' if k == 'home' else ''}></label>")
+    return (f"<h2 id='place'>Your place &amp; commute</h2><form class='set' method='post' action='/settings'>"
+            f"{''.join(rows)}<button>Save</button></form><p class='mut'>Saved to <code>{SETTINGS}</code> in the "
+            "briefs folder. The agent reads it to choose the weather, traffic, transit and local news it checks.</p>")
+
+
 def page(briefs_dir, apps_dir=None, pick=None):
     e = html.escape
+    st = load_settings(briefs_dir)
+    unset = "" if st.get("home") else ("<div class='late'>Pick <a href='#place'>your location and commute</a> "
+                                       "— the brief's weather, traffic and local news depend on it.</div>")
     briefs = load_briefs(briefs_dir)
     brief = next((b for b in briefs if b["file"] == pick), briefs[0] if briefs else None)
     today = time.strftime("%Y-%m-%d")
@@ -329,9 +395,10 @@ def page(briefs_dir, apps_dir=None, pick=None):
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(brief['day'] if brief else 'Brief')} — CoworkSyncHub</title>
 <style>{CSS}</style></head><body>
-{top}
+{unset}{top}
 {strip}
 {earlier}
+{_place(st)}
 </body></html>"""
 
 
@@ -353,6 +420,22 @@ def make_server(briefs_dir, apps_dir, port):
             self.end_headers()
             self.wfile.write(data)
 
+        def do_POST(self):
+            # Only this page may save: a form on some other site posting here carries its own
+            # Origin, and a rebound hostname carries its own Host.
+            host = self.headers.get("Host", "")
+            mine = host in (f"127.0.0.1:{self.server.server_address[1]}", f"localhost:{self.server.server_address[1]}")
+            origin = self.headers.get("Origin")
+            n = int(self.headers.get("Content-Length") or 0)
+            if self.path != "/settings" or not mine or origin not in (None, f"http://{host}") or not 0 < n <= 8192:
+                self.send_error(403)
+                return
+            save_settings(briefs_dir, urllib.parse.parse_qs(self.rfile.read(n).decode("utf-8", "replace")))
+            self.send_response(303)
+            self.send_header("Location", "/#place")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
     return http.server.ThreadingHTTPServer(("127.0.0.1", port), H)  # loopback only: briefs are private
 
 
@@ -370,8 +453,9 @@ def main():
     args = ap.parse_args()
     folder = Path(args.briefs).resolve()
     folder.mkdir(parents=True, exist_ok=True)
-    if not (folder / "INSTRUCTIONS.md").exists():
-        (folder / "INSTRUCTIONS.md").write_text(INSTRUCTIONS, encoding="utf-8")
+    ins = folder / "INSTRUCTIONS.md"
+    if not ins.exists() or ins.read_text(encoding="utf-8") != INSTRUCTIONS:  # keep the contract current
+        ins.write_text(INSTRUCTIONS, encoding="utf-8")
     srv = make_server(folder, args.apps, args.port)
     url = f"http://127.0.0.1:{srv.server_address[1]}/"
     print(f"briefs: {folder} ({len(load_briefs(folder))})\napps:   {args.apps or '-'} ({len(load_apps(args.apps))})\n"

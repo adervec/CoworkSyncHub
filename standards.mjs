@@ -10,6 +10,7 @@
 // expected pieces are present, not that they work. Each app's own tests cover "works".
 // The standards themselves are listed in CHECKS below; COWORK is reported but its definition is
 // still open.
+import { scan as leakScan } from './leak-check.mjs';
 import { readFileSync, existsSync, readdirSync, statSync, mkdtempSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -260,6 +261,10 @@ const CHECKS = [
     if (missing.size) return fail('not declared in app-data.json: ' + [...missing].slice(0, 6).join(', ') + (missing.size > 6 ? ` (+${missing.size - 6})` : ''));
     return ok(`schema ${d.schema}`);
   }],
+  ['leak', 'No personal data in the repo or its history', (a) => {
+    const found = leakScan(a.root);
+    return found.length ? fail(found.length + ' finding(s), first: ' + found[0].where + ' <- ' + found[0].what + ' (node leak-check.mjs lists them)') : ok();
+  }],
   ['notes', 'Agent notes import the house standards', (a) => {
     const here = path.join(a.root, 'CLAUDE.md'), up = path.join(path.dirname(a.root), 'CLAUDE.md');
     const f = existsSync(here) ? here : (path.basename(a.root) === 'site' && existsSync(up) ? up : null);
@@ -299,8 +304,11 @@ function deployGated(a) {
 function run(argv) {
   OFFLINE = argv.includes('--offline');
   const verbose = argv.includes('-v') || argv.includes('--verbose');
+  // --dir <folder>: check a folder that is not in apps.json yet (a new or private app checking itself)
+  const di = argv.indexOf('--dir'), dir = di >= 0 ? path.resolve(argv[di + 1] || '.') : null;
+  if (dir) argv = argv.filter((x, i) => i !== di && i !== di + 1);
   const filters = argv.filter((x) => !x.startsWith('-')).map((x) => x.toLowerCase());
-  const apps = portalApps().filter((a) => !filters.length || filters.some((f) => a.slug.toLowerCase().startsWith(f) || a.dir.toLowerCase().startsWith(f)));
+  const apps = dir ? [{ slug: path.basename(dir), dir: path.relative(GITHUB, dir) }] : portalApps().filter((a) => !filters.length || filters.some((f) => a.slug.toLowerCase().startsWith(f) || a.dir.toLowerCase().startsWith(f)));
   const W = 15, keys = CHECKS.map((c) => c[0]);
   if (argv.includes('--json')) { // for the status board (portal.py status)
     const rows = apps.filter((app) => existsSync(path.join(GITHUB, app.dir))).map((app) => { const a = load(app); return { slug: app.slug, cells: Object.fromEntries(CHECKS.map(([k, , fn]) => { let r; try { r = fn(a); } catch (e) { r = ['?', 'check crashed: ' + e.message]; } return [k, r]; })) }; });
@@ -339,6 +347,16 @@ function selftest() {
   eq(check('3p', fake('<a href="https://www.openstreetmap.org/x">map</a> fetch("https://api.dropboxapi.com/2/files")')), 'ok', 'links and connected APIs are not page loads');
   eq(check('a11y', fake('/* house font: CoworkSyncHub/font.js, published at adervec.github.io/font.js */')), 'FAIL', 'a comment naming font.js is not loading it');
   eq(check('a11y', fake('<script src="https://adervec.github.io/font.js"></script>')), 'ok', 'a real font.js load passes');
+  { // leak: a tracked backup file fails; listing it in .leak-ok as made-up data excuses it
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'leak-'));
+    execFileSync('git', ['-C', tmp, 'init', '-q']);
+    writeFileSync(path.join(tmp, 'adervec-backup-2026-01-01.json'), '{}');
+    writeFileSync(path.join(tmp, 'notes.md'), 'see C:\\Users\\Someone\\x and mail ada@example.com');
+    execFileSync('git', ['-C', tmp, 'add', '-A']);
+    eq(check('leak', { ...fake(''), root: tmp }), 'FAIL', 'a tracked backup file fails');
+    writeFileSync(path.join(tmp, '.leak-ok'), 'adervec-backup-2026-01-01.json  # made-up sample\n');
+    eq(check('leak', { ...fake(''), root: tmp }), 'ok', 'a file listed in .leak-ok is excused, and placeholders are not findings');
+  }
   eq(check('ledger', fake('appFont.logSession({ kind: "lift", minutes: 40, id: w.id })')), 'ok', 'logSession passes');
   eq(check('pfp', fake('<header><app-account></app-account></header> const G = window.appFont?.google; G.token()')), 'ok', 'the shared sign-in with the corner avatar passes');
   eq(check('pfp', fake('const G = window.appFont?.google; G.token()')), 'FAIL', 'the shared sign-in without the avatar in the page fails');

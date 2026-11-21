@@ -89,6 +89,27 @@ with tempfile.TemporaryDirectory() as d:
         raise AssertionError("only / is served")
     except urllib.error.HTTPError as err:
         assert err.code == 404
+    # place & commute: unset -> the page asks; saving writes settings.json; only this page may save
+    assert "Pick <a href='#place'>" in hub.page(briefs, apps)
+
+    def post(body, **headers):
+        req = urllib.request.Request(base + "/settings", data=body.encode("utf-8"), headers=headers)
+        try:
+            return urllib.request.urlopen(req).status
+        except urllib.error.HTTPError as err:
+            return err.code
+
+    assert post("home=Elsewhere", Origin="http://evil.example") == 403
+    assert post("home=Elsewhere", Host="evil.example") == 403
+    assert not (briefs / "settings.json").exists()
+    assert post("home=Old+Town%2C+%22Q%22+%3Cb%3E&mode=teleport&routes=" + "x" * 500) == 200  # 303 followed
+    st = hub.load_settings(briefs)
+    assert st["home"] == 'Old Town, "Q" <b>' and st["mode"] == "" and len(st["routes"]) == 200
+    pg = hub.page(briefs, apps)
+    assert "Pick <a href='#place'>" not in pg and "Old Town, &quot;Q&quot; &lt;b&gt;" in pg and "<b>'" not in pg
+    (briefs / "settings.json").write_text("not json", encoding="utf-8")
+    assert hub.load_settings(briefs) == {}
+
     srv.shutdown()
 
     os.remove(briefs / f"{TODAY}.md")

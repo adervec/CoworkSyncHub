@@ -1467,6 +1467,10 @@ def cmd_build(offline=False):
 def cmd_deploy(offline=False):
     cmd_sweep(quiet=True)       # advisory: legal / ToS / privacy / PG across the stable
     cmd_build(offline=offline)  # includes the exposure audit; a leak aborts before git
+    # house standard 26: nothing personal is published. The site is what the world reads, so a finding stops here.
+    leak = subprocess.run(["node", str(BASE / "leak-check.mjs"), str(SITE), "--no-history"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if leak.returncode != 0:
+        sys.exit("deploy: personal data found in site/, NOT publishing:\n" + leak.stdout.strip())
     def git(*args):
         r = subprocess.run(["git", "-C", str(SITE)] + list(args), capture_output=True,
                            text=True, encoding="utf-8", errors="replace")
