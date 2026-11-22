@@ -145,7 +145,7 @@ ok('a new device starts with every app', (await slugs(p2)).includes('GymTracker3
 await p2.click('#signin');
 await p2.waitForFunction(() => document.querySelectorAll('.grid .app.nfm').length === 2, null, { timeout: 5000 }).catch(() => {});
 ok('signing in brings the hidden apps to the second device', !(await slugs(p2)).includes('GymTracker315') && !(await slugs(p2)).includes('Tachyread'));
-await p2.waitForFunction(() => /Run315/.test(localStorage.getItem('portal-activity-remote') || ''), null, { timeout: 5000 }).catch(() => {});
+await p2.waitForFunction(() => /Run315/.test(localStorage.getItem('portal-activity-remote') || '') && /Garmin and Strava/.test(document.getElementById('sheetnote').textContent), null, { timeout: 8000 }).catch(() => {});
 ok('the second device sees the first one\'s sessions, with the fitness feed', /3 activities reported by your apps and 2 from Garmin and Strava/.test(await p2.textContent('#sheetnote')) && /Run315/.test(await p2.textContent('#stats')));
 ok('the feed credits strength nobody logged in an app', /STR[\s\S]*Garmin and Strava/.test(await p2.textContent('#stats')));
 ok('and its weekly targets, without being asked again', await shown(p2, '#today') && !(await shown(p2, '#setup')) && /DEX.*done/.test(await p2.textContent('#goals')));
@@ -180,6 +180,28 @@ ok('erase clears the hub\'s notes and nothing else', await p2.evaluate(() => !Ob
 await p2.click('#out');
 ok('sign out forgets the account on this device', await shown(p2, '#in') && await p2.evaluate(() => !localStorage.getItem('maker-google-hint')));
 
+// ---- the daily brief page (runner job 3) ----
+{
+  const d = new Date(), iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  drive[`hub-brief-${iso}.md`] = [
+    `# Sat ${iso} · Dentist at 14:00`, '*Steady day.*', '',
+    '## 🗓️ Outlook', '| | Today | Tomorrow |', '|---|---|---|', '| Weather | 🟢 12° dry | 🟠 rain |', '',
+    '## 🏃 Fitness', '- Load is fine', '### Readiness', 'Sleep 7 h 40', '',
+    '## 🔔 Needs you', '- 🔴 **Pay rent** before noon', '- [ ] call the dentist', '- <img src=x onerror="window.pwned=1"> and [a trap](javascript:window.pwned=2) and [ok](https://example.com/x)', '',
+    '---', '*Made today by the runner.*'].join('\n');
+  await p2.goto(new URL('brief.html', url).href);
+  await p2.click('#show');
+  await p2.waitForSelector('#brief .tile', { timeout: 8000 }).catch(() => {});
+  const titles = await p2.$$eval('#brief .tile h2', (l) => l.map((x) => x.textContent));
+  ok('the brief shows as tiles, Needs you first', titles[0] === '🔔 Needs you' && titles.length === 3 && /Dentist at 14:00/.test(await p2.textContent('#brief h1')));
+  ok('severity colours the edge, a table makes a tile wide, drill-downs start closed', await p2.$eval('#brief .tile', (t) => t.classList.contains('red')) && await p2.$$eval('#brief .tile.wide', (l) => l.length === 1) && await p2.$eval('#brief details', (x) => !x.open));
+  ok('nothing in a brief becomes markup or a script link', await p2.evaluate(() => !window.pwned && !document.querySelector('#brief img') && ![...document.querySelectorAll('#brief a')].some((a) => /^javascript:/i.test(a.getAttribute('href')))) && /onerror/.test(await p2.textContent('#brief')) && await p2.$$eval('#brief a[href^="https://example.com"]', (l) => l.length === 1));
+  ok('the day list holds the brief', await p2.$$eval('#day option', (l) => l.length) === 1);
+  await p2.setViewportSize({ width: 390, height: 844 });
+  ok('no sideways scroll on the brief page on a phone', await p2.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1);
+  await p2.goto(url);
+  ok('the hub top bar has the brief link and stays on one line on a phone', await p2.$('a[href="brief.html"]') && await p2.evaluate(() => { const h = document.querySelector('.head'); return h.getBoundingClientRect().height < 60; }));
+}
 ok('no page or CSP errors: ' + errs.join(' | '), !errs.length);
 await b.close(); if (server) server.close();
 console.log(fails.length ? 'FAIL\n  ' + fails.join('\n  ') : 'hub-check: all ok');

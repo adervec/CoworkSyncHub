@@ -9,7 +9,12 @@ The runner is a small program on your own computer. It does two jobs, each one o
   The hub uses it for your weekly targets and character sheet, and the fitness apps can read it instead
   of each fetching the same data.
 
-It is optional: every app works without it. A third job, a daily brief ready by 06:30, is coming.
+- **The daily brief**, ready by 06:30: your calendar, tasks, weather, training and recovery, and what your
+  apps say, written into one page you read on the hub (**Brief**, top right). It follows your own recipe
+  if you have one (`Documents\Cowork\MorningBrief\TASK-PROMPT.md`), otherwise a built-in one. Your mail
+  is never read.
+
+It is optional: every app works without it.
 
 What it does, and what it never does:
 
@@ -102,6 +107,8 @@ Other commands:
 | `python runner.py consent` | change what the runner may send |
 | `python runner.py schedule remove` | stop the schedule |
 | `python runner.py run --force <app>/<channel>` | try one request again |
+| `python runner.py run --force brief` | write today's brief again now |
+| `python runner.py run --force fitness` | fetch Garmin and Strava now |
 
 ## When something is wrong
 

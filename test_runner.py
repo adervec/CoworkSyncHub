@@ -138,7 +138,7 @@ runner.save(runner.CONSENT, consent)
 runner.save(runner.SETTINGS, {"stores": [str(tmp / "empty")], "engine": {"kind": "claude-code"}})
 assert runner.run(quiet=True) == 0 and not runner.LOCK.exists()
 st = runner.load(runner.STATUS, {})
-assert st["jobs"]["replies"]["state"] == "ok" and st["consent"]["app-replies"] is True and st["jobs"]["brief"]["state"] == "not built yet", st
+assert st["jobs"]["replies"]["state"] == "ok" and st["consent"]["app-replies"] is True and st["jobs"]["brief"]["state"] == "skipped", st
 assert runner.redact("Bearer ya29.abc and a@b.com and 1//0gAAAAAAAAAAAAAAAAAAAAAA") == "Bearer [token] and [email] and [token]"
 # ---- job 2: the fitness feed ----
 from datetime import datetime, timedelta  # noqa: E402
@@ -198,4 +198,58 @@ def boom(cmd, days):
 runner.collect_garmin = boom
 r = runner.job_fitness([cs2], {"connectors": {"garmin": {"read": True}, "strava": {"read": True}}}, s0, force=True)
 assert r["state"] == "partly" and "Garmin login failed" in r["note"] and len(json.loads(g2.files["shared-activities.json"][0])["activities"]) == 3, "one source failing keeps the other, and keeps what was there"
+# ---- job 3: the daily brief ----
+s3 = dict(runner.settings(), brief_at="06:30", home={"name": "Testville", "region": "", "country": "Nowhere", "lat": 1.0, "lon": 2.0},
+          brief_recipe=str(tmp / "no-recipe.md"), brief_folders=[str(tmp / "briefs")])
+assert runner.brief_due(s3, {}, datetime(2026, 11, 21, 6, 0)) and not runner.brief_due(s3, {}, datetime(2026, 11, 21, 5, 59)), "from half an hour before brief_at"
+assert not runner.brief_due(s3, {"brief_date": "2026-11-21"}, datetime(2026, 11, 21, 9, 0)) and runner.brief_due(s3, {}, datetime(2026, 11, 21, 15, 0)), "once a day, late if the PC was off"
+assert runner.scrub({"summary": "Dentist", "description": "secret", "attendees": [{"email": "x@y.z"}], "start": {"dateTime": "t"}, "id": "1"}) == {"summary": "Dentist", "start": {"dateTime": "t"}}
+
+
+class G3(G):
+    def call(self, path, method="GET", *a, **k):
+        if method == "DELETE":
+            self.files.pop(path.split("/")[-1], None)
+        return {}
+
+
+g3 = G3()
+cs3 = runner.CloudStore(g3)
+old_day = (datetime.now() - timedelta(days=20)).strftime("%Y-%m-%d")
+yday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+g3.files[f"hub-brief-{old_day}.md"] = ("# old", 1)
+g3.files[f"hub-brief-{yday}.md"] = ("# yesterday\n## 🔔 Needs you\n- 🔴 renew passport", 2)
+g3.files["cowork-mise--BRIEF.md"] = ("## At a glance\n3 cooks this week", time.time())
+(tmp / "briefs" / "GymTracker").mkdir(parents=True)
+(tmp / "briefs" / "GymTracker" / "BRIEF.md").write_text("## At a glance\nPush day planned", encoding="utf-8")
+runner.collect_calendar = lambda exe, days=14: {"calendars": [{"summary": "Home"}], "events": [{"summary": "Dentist", "start": "14:00"}]}
+runner.collect_tasks = lambda exe, days=14: [{"tasks": [{"content": "Pay rent", "dueDate": "2026-11-21"}]}]
+runner.collect_weather = lambda home: {"place": home["name"], "daily": {"temperature_2m_max": [12]}}
+def no_sleep(cmd):
+    raise RuntimeError("Garmin sign-in ended")
+runner.collect_sleep = no_sleep
+def never(*a, **k):
+    raise AssertionError("a source without consent was collected")
+runner.collect_web = never
+v3 = runner.vendor_of(s3["engine"])
+full = {"engine": {"brief": {"allowed": True, "vendor": v3}}, "connectors": {k: {"read": True} for k in ("calendar", "todoist", "weather", "garmin")}}
+r = runner.job_brief([cs3], {"connectors": full["connectors"]}, s3, Fake([]), force=True)
+assert r["state"] == "skipped" and "no consent" in r["note"], "no brief without consent for the writer"
+eng3 = Fake(["Here it is:\n```markdown\n# Sat · Dentist at 14:00\n## 🔔 Needs you\n- 🔴 Pay rent\n## 🗓️ Outlook\n| | Today |\n|---|---|\n| Calendar | dentist 14:00 |\n```"])
+r = runner.job_brief([cs3], full, s3, eng3, force=True)
+today = datetime.now().strftime("%Y-%m-%d")
+out3 = g3.files.get(f"hub-brief-{today}.md", ("",))[0]
+assert r["state"] == "partly" and "sleep_last_night" in r["note"] and r["sources"]["calendar"] == "ok" and r["sources"]["web"].startswith("not collected"), r
+assert out3.startswith("# Sat · Dentist at 14:00") and "```" not in out3 and "Made " in out3 and "sleep_last_night FAILED" in out3, "the brief is cleaned, stamped, and names failed sources"
+p3 = eng3.prompts[0]
+assert '"Dentist"' in p3 and "Pay rent" in p3 and "Testville" in p3 and "3 cooks this week" in p3 and "Push day planned" in p3 and "renew passport" in p3, "every allowed source reaches the writer"
+assert "never invent email items" in p3 and "DEFAULT" not in p3 and "Needs you; Outlook" in p3, "no mail; the built-in recipe when the reader has none"
+assert f"hub-brief-{old_day}.md" not in g3.files and f"hub-brief-{yday}.md" in g3.files, "briefs older than two weeks are removed"
+r = runner.job_brief([cs3], full, s3, Fake([]))
+assert r.get("unchanged") and len(eng3.prompts) == 1, "once a day"
+try:
+    runner.job_brief([cs3], full, s3, Fake(["Sorry, no brief today."]), force=True)
+    raise AssertionError("a non-brief was accepted")
+except RuntimeError as e:
+    assert "tile layout" in str(e)
 print("OK")

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data: https:; object-src 'none'; base-uri 'none'">
+<meta name="app-name" content="Daily brief">
+<title>Daily brief</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<script>window.appFontBase = '/fonts/';</script>
+<script src="font.js"></script>
+<style>
+:root { color-scheme: var(--t-scheme); accent-color: var(--t-accent) }
+body { font-family: var(--app-font, system-ui); margin: 0 auto; padding: 16px; max-width: 1180px; background: var(--t-bg); color: var(--t-text); line-height: 1.5 }
+a { color: var(--t-accent) } .dim { color: var(--t-dim); font-size: .92rem }
+button, select { font: inherit; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--t-line); background: var(--t-surface); color: var(--t-text); cursor: pointer; min-height: 40px }
+button.main { background: var(--t-accent); border-color: var(--t-accent); color: var(--t-on-accent); font-weight: 600 }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 }
+h1 { font-size: 1.5rem; margin: 6px 0 2px } .epi { color: var(--t-dim); font-style: italic; margin: 0 0 14px }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px }
+.tile { background: var(--t-surface); border: 1px solid var(--t-line); border-left: 4px solid var(--t-line); border-radius: 12px; padding: 10px 14px; min-width: 0 }
+.tile.wide { grid-column: 1 / -1 } .tile.red { border-left-color: var(--t-bad) } .tile.orange { border-left-color: var(--t-warn) }
+.tile h2 { font-size: 1.05rem; margin: 2px 0 6px }
+.tile ul { margin: 4px 0; padding-left: 20px } .tile li { margin: 2px 0 }
+.tile details { border-top: 1px solid var(--t-line); margin-top: 6px; padding-top: 4px } .tile summary { cursor: pointer; font-weight: 600 }
+.tw { overflow-x: auto } table { border-collapse: collapse; font-size: .92rem; margin: 6px 0 }
+th, td { border-bottom: 1px solid var(--t-line); padding: 4px 8px; text-align: left; vertical-align: top }
+code { font-family: ui-monospace, Consolas, monospace; background: var(--t-surface2); padding: 1px 4px; border-radius: 4px }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--t-surface2); padding: 8px; border-radius: 8px; font-size: .85rem }
+.foot { margin-top: 18px } .bad { color: var(--t-bad); font-weight: 600 }
+#beta { margin: -16px -16px 12px; padding: 6px 12px; background: #b45309; color: #fff; font-weight: 600; text-align: center }
+</style></head><body>
+<p id="beta" hidden>BETA: the maker's preview</p>
+<p class="dim"><a href="./">&larr; all apps</a></p>
+<div class="row"><button id="show" class="main" type="button">Show my brief</button><select id="day" aria-label="Day" hidden></select><span id="msg" class="dim" aria-live="polite"></span></div>
+<div id="brief"><p class="dim">Your AI runner writes a brief each morning into your own cloud folder (Settings › Your AI runner). Sign in to read it here.</p></div>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, text, cls) { var x = document.createElement(tag); if (text != null) x.textContent = text; if (cls) x.className = cls; return x; };
+  if (/portal-beta/.test(location.pathname)) $('beta').hidden = false;
+
+  // ---- a small markdown renderer that never builds HTML from the text: every piece is a DOM node ----
+  // The brief is written by an AI from outside text (event titles, web results), so nothing in it may become markup.
+  function inline(parent, text) {
+    var re = /(\*\*([^*]+)\*\*|\*([^*\s][^*]*)\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\))/g, last = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
+      if (m[2] != null) parent.appendChild(el('strong', m[2]));
+      else if (m[3] != null) parent.appendChild(el('em', m[3]));
+      else if (m[4] != null) parent.appendChild(el('code', m[4]));
+      else { var u = appFont.safeUrl(m[6]); if (u) { var a = el('a', m[5]); a.href = u; a.target = '_blank'; a.rel = 'noopener noreferrer'; parent.appendChild(a); } else parent.appendChild(document.createTextNode(m[5])); }
+      last = re.lastIndex;
+    }
+    if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
+    return parent;
+  }
+  function blocks(lines, into) { // paragraphs, one-level lists, tasks, tables, fenced blocks
+    var i = 0;
+    while (i < lines.length) {
+      var l = lines[i];
+      if (/^```/.test(l)) { var buf = []; i++; while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]); i++; into.appendChild(el('pre', buf.join('\n'))); continue; }
+      if (/^\s*\|/.test(l)) {
+        var rows = []; while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+        var t = el('table'), w = el('div', null, 'tw');
+        rows.filter(function (r) { return !/^\s*\|?\s*:?-{2,}/.test(r.replace(/\|/g, '').trim() ? r : '---'); }).forEach(function (r, n) {
+          if (/^\s*\|[\s:|-]+\|\s*$/.test(r)) return; // the --- line under the header
+          var tr = el('tr'); r.trim().replace(/^\||\|$/g, '').split('|').forEach(function (c) { tr.appendChild(inline(el(n === 0 ? 'th' : 'td'), c.trim())); }); t.appendChild(tr);
+        });
+        w.appendChild(t); into.appendChild(w); continue;
+      }
+      if (/^\s*[-*] /.test(l)) {
+        var ul = el('ul'); while (i < lines.length && /^\s*[-*] /.test(lines[i])) {
+          var li = el('li'), txt = lines[i++].replace(/^\s*[-*] /, ''), task = /^\[( |x)\] /i.exec(txt);
+          if (task) { var cb = el('input'); cb.type = 'checkbox'; cb.disabled = true; cb.checked = task[1] !== ' '; li.append(cb, ' '); txt = txt.slice(4); }
+          ul.appendChild(inline(li, txt));
+        }
+        into.appendChild(ul); continue;
+      }
+      if (/^---+\s*$/.test(l)) { into.appendChild(el('hr')); i++; continue; }
+      if (!l.trim()) { i++; continue; }
+      var para = []; while (i < lines.length && lines[i].trim() && !/^(\s*[-*|] |```|\s*\||---)/.test(lines[i])) para.push(lines[i++]);
+      if (!para.length) para.push(lines[i++]);
+      into.appendChild(inline(el('p'), para.join(' ')));
+    }
+    return into;
+  }
+  function render(md) {
+    var box = $('brief'); box.textContent = '';
+    var lines = String(md).replace(/\r/g, '').split('\n'), i = 0, head = [], tiles = [], tile = null, sub = null;
+    for (; i < lines.length; i++) {
+      var l = lines[i], h;
+      if ((h = /^# (.*)/.exec(l)) && !tiles.length) { box.appendChild(inline(el('h1'), h[1])); continue; }
+      if ((h = /^## (.*)/.exec(l))) { tile = { title: h[1], top: [], subs: [] }; sub = null; tiles.push(tile); continue; }
+      if ((h = /^### (.*)/.exec(l)) && tile) { sub = { title: h[1], lines: [] }; tile.subs.push(sub); continue; }
+      if (!tile) { head.push(l); continue; }
+      (sub ? sub.lines : tile.top).push(l);
+    }
+    var foot = [];
+    head.forEach(function (l) { if (/^\*[^*].*\*$/.test(l.trim())) box.appendChild(inline(el('p', null, 'epi'), l.trim().slice(1, -1))); });
+    // the footer stamp (--- then *Made ...*) lives at the end of the last tile
+    if (tiles.length) { var last = tiles[tiles.length - 1], arr = last.subs.length ? last.subs[last.subs.length - 1].lines : last.top, k = arr.lastIndexOf('---'); if (k >= 0) { foot = arr.splice(k); } }
+    tiles.sort(function (a, b) { return (/needs you/i.test(b.title) ? 1 : 0) - (/needs you/i.test(a.title) ? 1 : 0); });
+    var grid = el('div', null, 'tiles');
+    tiles.forEach(function (t) {
+      var vis = t.top.join('\n'), c = el('section', null, 'tile' + (/🔴/.test(vis) ? ' red' : /🟠/.test(vis) ? ' orange' : '') + (/^\s*\|/m.test(vis) ? ' wide' : ''));
+      c.appendChild(inline(el('h2'), t.title));
+      blocks(t.top, c);
+      t.subs.forEach(function (s) { var d = el('details'); d.appendChild(inline(el('summary'), s.title)); blocks(s.lines, d); c.appendChild(d); });
+      grid.appendChild(c);
+    });
+    box.appendChild(grid);
+    if (foot.length) box.appendChild(blocks(foot.slice(1), el('div', null, 'foot dim')));
+  }
+
+  // ---- the files: hub-brief-YYYY-MM-DD.md in the reader's cloud, the last two weeks ----
+  var files = [];
+  function say(t, bad) { $('msg').className = bad ? 'bad' : 'dim'; $('msg').textContent = t; }
+  function open(name) {
+    say('Reading…');
+    return appFont.cloud.read(name).then(function (t) { say(''); if (t) render(t); else say('That brief is gone.', true); }, function (e) { say(e.message || String(e), true); });
+  }
+  function load() {
+    say('Signing in…');
+    return appFont.cloud.signIn().then(function () { return appFont.cloud.list('hub-brief-'); }).then(function (list) {
+      files = list.map(function (f) { return f.name; }).filter(function (n) { return /^hub-brief-\d{4}-\d\d-\d\d\.md$/.test(n); }).sort().reverse();
+      var sel = $('day'); sel.textContent = '';
+      files.forEach(function (n) { var o = el('option', appFont.fmt.date(n.slice(10, 20) + 'T00:00:00', 'full')); o.value = n; sel.appendChild(o); });
+      sel.hidden = !files.length; $('show').textContent = 'Refresh';
+      if (!files.length) { say(''); $('brief').textContent = ''; $('brief').appendChild(el('p', 'No brief yet. Your AI runner writes one each morning once you allow it (python runner.py consent).', 'dim')); return; }
+      var today = 'hub-brief-' + appFont.fmt.isoDate(new Date()) + '.md';
+      if (files[0] !== today) say('No brief for today yet: showing the latest.');
+      return open(files[0]).then(function () { if (files[0] !== today) say('No brief for today yet: showing ' + appFont.fmt.date(files[0].slice(10, 20) + 'T00:00:00', 'full') + '.'); });
+    }, function (e) { say(e.message || String(e), true); });
+  }
+  $('show').addEventListener('click', load);
+  $('day').addEventListener('change', function () { open(this.value); });
+  if (appFont.cloud.signedIn()) load();
+  window.briefRender = render; // for the tests
+})();
+</script>
+</body></html>

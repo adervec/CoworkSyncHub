@@ -152,8 +152,8 @@ main{max-width:1140px;margin:0 auto;padding:28px 20px 60px}
 a{color:var(--acc)}
 h1{font:700 30px/1.15 var(--mono);letter-spacing:-.5px;margin:6px 0 10px}
 .head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-#bk{margin-left:auto}
-@media (max-width:430px){.head{gap:8px}.bk{padding:0 10px}}
+.head .bk:first-of-type{margin-left:auto}
+@media (max-width:430px){.head{gap:8px}.bk{padding:0 10px}.head .wordmark{display:none}}
 #suggest{font:14px var(--mono);margin:14px 0 8px}
 #setupask{margin:0;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font:13px var(--mono)}
 #setupask span{color:var(--mut);flex:1 1 200px}
@@ -1201,7 +1201,7 @@ def write_site(data):
 <script>window.appFontBase="/fonts/"</script><script src="font.js"></script><script src="hub.js"></script>
 <style>{PORTAL_CSS}</style></head><body><main>
 <div class="head"><div class="wordmark">{USER}.github.io</div>
-<a id="bk" class="bk" href="backup.html">Backup</a>
+<a class="bk" href="brief.html" title="Your morning brief, written by your AI runner">Brief</a><a id="bk" class="bk" href="backup.html">Backup</a>
 <button id="signin" class="bk" type="button">Sign in</button><app-account id="me" size="32"></app-account>
 <button id="install" class="install" type="button" hidden>Install</button>
 <button id="theme" class="toggle" type="button" aria-label="theme">◐</button></div>
@@ -1273,7 +1273,7 @@ This portal installs the same way.</p>
                             "BETA: the maker's preview. <a style='color:#fff' href='/portal/'>Live portal</a></p><main", 1)
         page = page.replace("<head>", "<head><meta name='robots' content='noindex'>", 1)
     (PORTAL_DIR / "index.html").write_text(page, encoding="utf-8")
-    for f in ("backup.html", "settings.html", "themes.html", "hub.js", "font.js"):  # the Backup page, with its own font.js so the beta can run ahead of the live one
+    for f in ("backup.html", "settings.html", "themes.html", "brief.html", "hub.js", "font.js"):  # the Backup page, with its own font.js so the beta can run ahead of the live one
         shutil.copy(BASE / f, PORTAL_DIR / f)
     write_feed(data)
     write_pwa(stamp)
