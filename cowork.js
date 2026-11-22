@@ -43,7 +43,7 @@
 (function () {
   "use strict";
   var PORTAL = "https://adervec.github.io/";
-  var VERSION = 3; // 3: request files may be Blobs (images); apps check cowork.version >= 3 before sending one
+  var VERSION = 4; // 3: request files may be Blobs (images). 4: the reader's cloud can be the cowork folder
 
   // ---------- small helpers ----------
   function rel(sec) {
@@ -170,6 +170,72 @@
       return { at: best, name: bestName };
     } catch (err) { return { at: 0, name: null }; }
   }
+
+
+  // ---------- the reader's cloud as the cowork folder (v4) ----------
+  // Instead of a folder on this computer, an app can keep its cowork files in the reader's own cloud folder
+  // (font.js appFont.cloud: Google Drive today). Nothing needs a desktop browser or an open tab: the runner on
+  // the reader's PC (CoworkSyncHub/runner.py), or any agent, answers there, and every device sees the reply.
+  // This is a stand-in for a FileSystemDirectoryHandle, so the engine below drives it unchanged. The cloud
+  // folder is flat: path a/b.json of app X is the file cowork-X--a--b.json (runner.py uses the same names).
+  // ponytail: a file name containing "--" would read as a sub-folder; no manifest uses one.
+  var cloudApi = function () { return window.appFont && window.appFont.cloud; };
+  function cloudRoot(app) {
+    var C = cloudApi(), base = "cowork-" + app + "--", cache = null;
+    var all = async function () { // one listing per few seconds, not one per file
+      if (cache && Date.now() - cache.at < 4000) return cache.files;
+      var files = {};
+      (await C.list(base)).forEach(function (f) { files[f.name] = f; });
+      cache = { at: Date.now(), files: files };
+      return files;
+    };
+    var nf = function (n) { return new DOMException("no " + n, "NotFoundError"); };
+    function file(full, name) {
+      return {
+        kind: "file", name: name,
+        getFile: async function () {
+          var f = (await all())[full];
+          if (!f) throw nf(name);
+          return { lastModified: Date.parse(f.modified) || Date.now(), text: async function () { return (await C.read(full)) || ""; } };
+        },
+        createWritable: async function () {
+          var parts = [];
+          return {
+            write: async function (x) { parts.push(x); },
+            close: async function () {
+              var one = parts.length === 1 ? parts[0] : new Blob(parts);
+              var mime = typeof Blob !== "undefined" && one instanceof Blob ? (one.type || "application/octet-stream") : /\.json$/.test(name) ? "application/json" : "text/plain";
+              await C.write(full, one, mime);
+              cache = null;
+            },
+          };
+        },
+      };
+    }
+    function dir(prefix, name) {
+      return {
+        kind: "directory", name: name, cloud: true,
+        getDirectoryHandle: async function (n) { return dir(prefix + n + "--", n); },
+        getFileHandle: async function (n, o) {
+          if (!(o && o.create) && !(await all())[prefix + n]) throw nf(n);
+          return file(prefix + n, n);
+        },
+        removeEntry: async function (n) { cache = null; if (!(await C.remove(prefix + n))) throw nf(n); },
+        values: async function* () {
+          var files = await all();
+          for (var full in files) {
+            var rest = full.slice(prefix.length);
+            if (full.indexOf(prefix) === 0 && rest.indexOf("--") < 0) yield file(full, rest);
+          }
+        },
+        queryPermission: async function () { return "granted"; },
+      };
+    }
+    var root = dir(base, "");
+    root.name = "your cloud (" + C.label() + ")";
+    return root;
+  }
+  var TRANSPORT = function (app) { return "cowork-transport:" + app; };
 
   // ---------- styles ----------
   var CSS = [
@@ -324,6 +390,11 @@
     get channels() { return this._chs; }
 
     async _restore() {
+      if (localStorage.getItem(TRANSPORT(this._cfg.app)) === "cloud" && cloudApi()) {
+        this._root = cloudRoot(this._cfg.app);
+        if (await this._cloudReady(false)) { await this._readClaim(); this.refresh(); }
+        return;
+      }
       var h = await loadDir(this._cfg.app).catch(function () { return null; });
       if (!h) return;
       var ok = await h.queryPermission({ mode: "readwrite" }).catch(function () { return "denied"; });
@@ -333,6 +404,24 @@
       this.refresh();
     }
     _note(m, isErr) { this._msg = m; this._err = !!isErr; }
+    // the cloud needs a signed-in reader; a browser shows the sign-in window only after a tap
+    async _cloudReady(tap) {
+      if (!this._root || !this._root.cloud) return true;
+      if (cloudApi().signedIn()) return true;
+      if (tap) {
+        try { await cloudApi().signIn(); return true; } catch (err) { this._note(String(err.message || err), true); this.render(); return false; }
+      }
+      this._note("sign in to your cloud to see replies: press Check for replies");
+      this.render();
+      return false;
+    }
+    /* keep the cowork files in the reader's cloud instead of a folder on this computer */
+    async useCloud() {
+      if (!cloudApi()) { this._note("the cloud is not available on this page", true); return this.render(); }
+      try { await cloudApi().signIn(); } catch (err) { this._note(String(err.message || err), true); return this.render(); }
+      localStorage.setItem(TRANSPORT(this._cfg.app), "cloud");
+      await this.useFolder(cloudRoot(this._cfg.app));
+    }
 
     // ---- the one sync device: a claim file in the folder, so it holds on every device that opens it ----
     async _readClaim() {
@@ -363,14 +452,16 @@
     }
     /* connect a given folder handle (connect() asks the user for one) */
     async useFolder(h) {
+      if (!h.cloud) localStorage.removeItem(TRANSPORT(this._cfg.app));
       this._root = h;
-      await saveDir(this._cfg.app, h).catch(function () {});
+      if (!h.cloud) await saveDir(this._cfg.app, h).catch(function () {}); // the cloud is remembered by its own key
       this._note("");
       if (!(await this._readClaim())) await this.claim(); // the first device to connect runs the schedules
       await this.push();            // a fresh folder starts with a manifest + requests
     }
     async forget() {
       this._root = null;
+      localStorage.removeItem(TRANSPORT(this._cfg.app));
       await dropDir(this._cfg.app).catch(function () {});
       this._chs.forEach(function (c) { c.pending = c.answered = c.stale = false; c.review = null; c.request_mtime = c.reply_mtime = 0; });
       this._note("folder disconnected — nothing was deleted");
@@ -380,6 +471,7 @@
     /* write the manifest + the request files of every channel (or one); auto = a scheduled run */
     async push(only, auto) {
       if (!this._root || this._busy) return;
+      if (!(await this._cloudReady(!auto))) return;
       this._busy = true; if (!auto) { this._note("writing…"); this.render(); }
       try {
         await writeFile(this._root, "cowork.json", JSON.stringify(this._cfg.manifest, null, 2));
@@ -443,8 +535,9 @@
     }
 
     /* stat the folder, and take in any reply not handled yet */
-    async refresh() {
+    async refresh(tap) {
       if (!this._root) return this.render();
+      if (!(await this._cloudReady(tap))) return;
       var st = this._st;
       for (var i = 0; i < this._chs.length; i++) {
         var ch = this._chs[i], spec = ch.spec || {}, reqs = spec.request || [];
@@ -585,19 +678,26 @@
       var head = el("header");
       head.appendChild(el("h2", null, "AI cowork sync"));
       if (fs) {
-        var conn = el("button", this._root ? "" : "primary", this._root ? "Change folder" : "Connect folder");
+        var inCloud = !!(this._root && this._root.cloud);
+        var conn = el("button", this._root ? "" : "primary", this._root && !inCloud ? "Change folder" : "Connect folder");
         conn.onclick = function () { self.connect(); };
         head.appendChild(conn);
+        if (cloudApi() && !inCloud) {
+          var cl = el("button", this._root ? "" : "primary", "Use my cloud");
+          cl.title = "Keep requests and replies in your own " + cloudApi().label() + " folder, answered by the AI runner on your computer (no folder or open tab needed)";
+          cl.onclick = function () { self.useCloud(); };
+          head.appendChild(cl);
+        }
         if (this._root) {
           var send = el("button", "primary", "Send requests");
           send.onclick = function () { self.push(); };
           head.appendChild(send);
           var chk = el("button", null, "Check for replies");
-          chk.onclick = function () { self.refresh(); };
+          chk.onclick = function () { self.refresh(true); };
           head.appendChild(chk);
         }
         var label = this._st && this._st.pathLabel;
-        head.appendChild(el("span", "folder", this._root ? (label || this._root.name) : "no folder connected"));
+        head.appendChild(el("span", "folder", this._root ? (this._root.cloud ? this._root.name : (label || this._root.name)) : "no folder connected"));
       } else {
         (this._actions || []).forEach(function (ac) {
           var b = el("button", ac.primary ? "primary" : "", ac.label);
@@ -696,7 +796,8 @@
 
       var foot = el("footer");
       foot.appendChild(el("span", null, fs
-        ? "Point this at a folder, then let an agent answer in it. Nothing is uploaded."
+        ? (this._root && this._root.cloud ? "Requests and replies stay in your own cloud folder. The AI runner on your computer answers them."
+          : "Point this at a folder, or use your cloud, then let an agent answer in it. Nothing goes to the maker.")
         : "Served by CoworkSyncHub."));
       var a = el("a", null, "how cowork sync works");
       a.href = PORTAL + "cowork"; a.target = "_blank"; a.rel = "noopener";

@@ -996,7 +996,7 @@
   // for every app and the hub (key maker-cloud); mixing vendors between apps is not supported.
   //   appFont.cloud.signIn({ silent })   -> a promise; silent never shows the vendor's window
   //   .read(name) -> text | null   .readBytes(nameOrEntry, signal) -> ArrayBuffer | null
-  //   .write(name, textOrBlob, mime)   .list(prefix) -> [{ name, size, modified, mime, id }]
+  //   .write(name, textOrBlob, mime)   .list(prefix) -> [{ name, size, modified, mime, id }]   .remove(name) -> bool
   //   .signedIn()  .signOut()  .provider() -> 'google'  .label() -> 'Google Drive'
   //   .providers() -> [{ id, label, current }]  .use(id)  .register(provider)
   // A vendor is one object with those same methods (plus id and label). Google Drive ships here; Dropbox,
@@ -1083,6 +1083,9 @@
       };
       return page();
     },
+    remove: function (name) {
+      return gFind(name).then(function (id) { return id ? gApi('drive/v3/files/' + id, { method: 'DELETE' }).then(function () { return true; }) : false; });
+    },
     // body: text, or a Blob for a binary file; mime defaults to JSON
     write: function (name, body, mime) {
       mime = mime || 'application/json';
@@ -1116,12 +1119,12 @@
       document.dispatchEvent(new CustomEvent('app-cloud-change', { detail: id }));
     },
     register: function (p) {
-      var need = ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list'];
+      var need = ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list', 'remove'];
       if (!p || !/^[a-z][a-z0-9-]{1,20}$/.test(p.id || '') || !p.label || !need.every(function (m) { return typeof p[m] === 'function'; })) throw new Error('A cloud needs an id, a label and: ' + need.join(', '));
       CLOUDS[p.id] = p;
     },
   };
-  ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list'].forEach(function (m) { cloud[m] = function () { var c = cloudNow(); return c[m].apply(c, arguments); }; });
+  ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list', 'remove'].forEach(function (m) { cloud[m] = function () { var c = cloudNow(); return c[m].apply(c, arguments); }; });
   cloud.token = cloud.signIn; // the old name (appFont.google.token), kept for notes that still say it
 
   // ---- Cold backup (hub roadmap chunk 2a) ------------------------------------------------------------

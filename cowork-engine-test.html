@@ -27,7 +27,7 @@ async function get(root, path) { try { var p = path.split('/'), d = root; for (v
   var fails = [], log = [];
   function ok(c, m) { (c ? log : fails).push(m); }
   ['cowork-state:enginetest', 'cowork-state:v1test'].forEach(function (k) { localStorage.removeItem(k); });
-  ok(cowork.version === 3, 'version 3');
+  ok(cowork.version === 4, 'version 4');
   ok(cowork.isDue('5m', Date.now() - 6 * 60e3, Date.now()) && !cowork.isDue('5m', Date.now() - 60e3, Date.now()) && !cowork.isDue('off', 0, Date.now()) && cowork.isDue('hourly', 0, Date.now()), 'schedules: due after the interval, a never-run channel is due, manual never');
 
   var applied = [], undone = [], coachSeen = [];
@@ -122,6 +122,45 @@ async function get(root, path) { try { var p = path.split('/'), d = root; for (v
   ok(q.shadowRoot.querySelector('.rvcard pre').textContent.indexOf('hello') >= 0, 'v1 review shows the reply');
   await q.approve('coach');
   ok(v1.join() === 'coach:hello', 'v1 setup: approving calls the old apply(channel, reply)');
+
+  // v4: the reader's cloud as the cowork folder (a pretend cloud stands in for font.js appFont.cloud)
+  var box = {}, tick = Date.UTC(2026, 10, 21, 9), signed = false, cloudSeen = [];
+  var put2 = function (n, t) { box[n] = { text: t, modified: new Date(tick += 60e3).toISOString() }; };
+  window.appFont = { cloud: { label: function () { return 'Test cloud'; }, signedIn: function () { return signed; }, signIn: async function () { signed = true; },
+    list: async function (pre) { return Object.keys(box).filter(function (n) { return n.indexOf(pre) === 0; }).map(function (n) { return { name: n, modified: box[n].modified }; }); },
+    read: async function (n) { return n in box ? (box[n].text instanceof Blob ? await box[n].text.text() : box[n].text) : null; },
+    write: async function (n, b) { put2(n, b); }, remove: async function (n) { var had = n in box; delete box[n]; return had; } } };
+  localStorage.removeItem('cowork-state:cloudtest'); localStorage.removeItem('cowork-transport:cloudtest');
+  var cman = { protocol: 'cowork-manifest', protocolVersion: 1, app: 'cloudtest', channels: [
+    { name: 'coach', request: ['coach/request.json'], instructions: 'coach/INSTRUCTIONS.md', replyPath: 'coach/reply.json' },
+    { name: 'plan', request: ['plan/context.json'], replyDir: 'plan/inbox' }] };
+  var ccfg = { app: 'cloudtest', manifest: cman,
+    files: function (ch) { return ch === 'coach' ? { 'coach/request.json': { requestHash: 'c1', payload: {} }, 'coach/INSTRUCTIONS.md': '# coach' } : { 'plan/context.json': { requestHash: 'p1' } }; },
+    channels: { coach: { review: false, apply: function (r) { cloudSeen.push(r.say); return {}; } }, plan: { review: false, apply: function (r) { cloudSeen.push('plan:' + r.n); return {}; } } } };
+  var host2 = document.createElement('div'); document.body.appendChild(host2);
+  var c = cowork.mount(host2, ccfg);
+  ok(/Use my cloud/.test(c.shadowRoot.textContent), 'v4: the panel offers the cloud when the page has one');
+  await c.useCloud();
+  ok(signed && localStorage.getItem('cowork-transport:cloudtest') === 'cloud', 'v4: choosing the cloud signs in and is remembered');
+  ok(!!box['cowork-cloudtest--cowork.json'] && JSON.parse(box['cowork-cloudtest--coach--request.json'].text).requestHash === 'c1' && box['cowork-cloudtest--coach--INSTRUCTIONS.md'].text === '# coach' && !!box['cowork-cloudtest--cowork-machine.json'],
+    'v4: the manifest, requests and claim go to the cloud as flat names (the runner reads the same names)');
+  ok(c.channels[0].pending && /your cloud \(Test cloud\)/.test(c.shadowRoot.textContent), 'v4: the request shows as pending, and the panel says where it is');
+  put2('cowork-cloudtest--coach--reply.json', JSON.stringify({ requestHash: 'c1', say: 'from the runner' }));
+  put2('cowork-cloudtest--plan--inbox--output-2026-11-21T091500.json', JSON.stringify({ requestHash: 'p1', n: 2 }));
+  await new Promise(function (r) { setTimeout(r, 4100); }); // past the listing cache
+  await c.refresh();
+  ok(cloudSeen.join() === 'from the runner,plan:2', 'v4: replies written in the cloud are applied (fixed path and dir style)');
+  ok(!box['cowork-cloudtest--plan--inbox--output-2026-11-21T091500.json'] && !!box['cowork-cloudtest--plan--processed--output-2026-11-21T091500.json'], 'v4: a handled dir reply moves to processed/ in the cloud');
+  signed = false;
+  var host3 = document.createElement('div'); document.body.appendChild(host3);
+  var c2 = cowork.mount(host3, ccfg);
+  await new Promise(function (r) { setTimeout(r, 50); });
+  ok(/sign in to your cloud/.test(c2.shadowRoot.textContent), 'v4: reopened while signed out, it asks for a tap instead of failing quietly');
+  await c2.refresh(true);
+  ok(signed, 'v4: Check for replies signs in');
+  await c2.forget();
+  ok(!localStorage.getItem('cowork-transport:cloudtest') && !!box['cowork-cloudtest--cowork.json'], 'v4: disconnecting forgets the choice and deletes nothing');
+  delete window.appFont; localStorage.removeItem('cowork-state:cloudtest');
 
   document.getElementById('r').textContent = fails.length ? 'FAIL ' + fails.length : 'SELFTEST PASS ' + log.length + ' checks';
   document.getElementById('log').textContent = (fails.length ? 'FAILED:\n' + fails.join('\n') + '\n\n' : '') + 'passed:\n' + log.join('\n');

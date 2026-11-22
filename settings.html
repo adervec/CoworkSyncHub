@@ -41,6 +41,11 @@ h3 { font-size: 1rem; margin: 18px 0 4px }
 <div id="clouds"></div>
 <p class="dim">One choice covers every app and the hub: they cannot be mixed. Changing it later means a backup, the switch, then a restore.</p>
 
+<h2>Your AI runner</h2>
+<p class="dim">Optional. A small program on your own computer that answers your apps' AI requests through your cloud folder, so no browser tab has to stay open. <a href="https://github.com/adervec/CoworkSyncHub/blob/main/RUNNER.md" target="_blank" rel="noopener">How to set it up</a>.</p>
+<div id="runner"><p class="dim">Sign in above to see what your runner last did.</p></div>
+<div class="row"><button id="runnerCheck" type="button" hidden>Check again</button></div>
+
 <h2>Look</h2>
 <app-theme-picker></app-theme-picker>
 <p class="dim">Every app has at least this list of themes, and each remembers its own choice. This one is the hub's. <a href="themes.html">See them all</a>.</p>
@@ -119,6 +124,38 @@ h3 { font-size: 1rem; margin: 18px 0 4px }
     if (p.soon) l.style.opacity = '.6';
     $('clouds').appendChild(l);
   });
+  // the runner's report (hub-runner-status.json, written by runner.py after every run): read-only here
+  var WORD = { ok: 'working', partly: 'working, with errors', skipped: 'waiting for your consent', failed: 'failed', 'not built yet': 'not built yet' };
+  function paintRunner(st) {
+    var box = $('runner'); box.textContent = '';
+    if (!st) { box.appendChild(el('p', 'No runner has reported yet.', 'dim')); return; }
+    var age = (Date.now() - Date.parse(st.at)) / 60000, late = age > (st.every_minutes || 30) * 2 + 10;
+    box.appendChild(el('p', 'Last run ' + appFont.fmt.dateTime(st.at) + ' (' + appFont.fmt.relative(st.at) + ') on ' + st.host + '. Engine: ' + st.engine + '.', late ? 'bad' : ''));
+    if (late) box.appendChild(el('p', 'It has not run for a while: is that computer on and logged in? Its own check says more: python runner.py check', 'dim'));
+    var ul = el('ul');
+    Object.keys(st.jobs || {}).forEach(function (k) {
+      var j = st.jobs[k], name = { replies: 'Answering app requests', fitness: 'Fitness feed', brief: 'Daily brief' }[k] || k;
+      var li = el('li', name + ': ' + (WORD[j.state] || j.state) + (j.answered != null ? ' · answered ' + j.answered + ', errors ' + j.errors : '') + (j.note ? ' · ' + j.note : ''), j.state === 'failed' ? 'bad' : '');
+      var apps = j.apps || {}, lines = [];
+      Object.keys(apps).forEach(function (a) { Object.keys(apps[a]).forEach(function (c) { lines.push(a + ' / ' + c + ': ' + apps[a][c]); }); });
+      if (lines.length) { var sub = el('ul'); lines.slice(0, 30).forEach(function (t) { sub.appendChild(el('li', t, 'dim')); }); li.appendChild(sub); }
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+    var c = st.consent || {}, on = Object.keys(c.connectors || {}).filter(function (k) { return c.connectors[k]; });
+    box.appendChild(el('p', 'Allowed on that computer: ' + (c['app-replies'] ? 'sending app requests to ' + st.engine : 'nothing sent to an AI yet') + (on.length ? '; reading ' + on.join(', ') : '; no outside services') + '. Change it there: python runner.py consent', 'dim'));
+  }
+  function readRunner() {
+    if (!appFont.getAccount()) return;
+    $('runnerCheck').hidden = false;
+    appFont.cloud.read('hub-runner-status.json').then(function (t) {
+      var st = null; try { st = t ? appFont.parseJSON(t, 2e5) : null; } catch (e) { /* unreadable */ }
+      paintRunner(st);
+    }, function () { $('runner').textContent = ''; $('runner').appendChild(el('p', 'Tap Check again to sign in and read it.', 'dim')); });
+  }
+  $('runnerCheck').addEventListener('click', function () { appFont.cloud.signIn().then(readRunner, function (e) { say(e.message || String(e), true); }); });
+  document.addEventListener('app-account-change', readRunner);
+  readRunner();
   paintAccount();
   window.settingsReady = fetch('/apps.json').then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
     .then(function (list) { apps = list; paintPrefs(); });

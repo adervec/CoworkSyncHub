@@ -35,6 +35,13 @@ into the same folder; the app imports them. Scope: local disk, single user, poll
 Flat layouts are equally valid — a channel may declare a single fixed
 `replyPath` instead of a reply dir (Tachyread style).
 
+### In the reader's cloud (v4)
+
+An app may keep its cowork folder in the reader's private cloud folder instead (cowork.js "Use my
+cloud"; font.js `appFont.cloud`). That folder is flat, so path `a/b.json` of app `X` is the file
+`cowork-X--a--b.json`; everything else in this document is unchanged. The AI runner
+(`CoworkSyncHub/runner.py`, see RUNNER.md) answers there.
+
 ## Manifest (`cowork.json` at the app folder root)
 
 All paths root-relative, forward slashes.

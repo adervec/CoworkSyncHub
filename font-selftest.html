@@ -150,7 +150,7 @@
   C.register({ id: 'memory', label: 'Test cloud',
     signIn: function () { signed = true; return Promise.resolve('pass'); }, signedIn: function () { return signed; }, signOut: function () { signed = false; },
     read: function (n) { return Promise.resolve(n in box ? box[n] : null); }, readBytes: function (n) { n = n.name || n; return Promise.resolve(n in box ? new TextEncoder().encode(box[n]).buffer : null); },
-    write: function (n, b) { box[n] = String(b); return Promise.resolve(); },
+    write: function (n, b) { box[n] = String(b); return Promise.resolve(); }, remove: function (n) { var had = n in box; delete box[n]; return Promise.resolve(had); },
     list: function (p) { return Promise.resolve(Object.keys(box).filter(function (n) { return n.indexOf(p || '') === 0; }).map(function (n) { return { name: n, size: box[n].length, modified: '', mime: '', id: n }; })); } });
   var heardCloud = null; document.addEventListener('app-cloud-change', function (ev) { heardCloud = ev.detail; });
   C.use('memory');

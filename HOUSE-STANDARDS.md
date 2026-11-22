@@ -56,6 +56,10 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
    `label`, `schedule`, `review`, `preview(reply)` (rows to tick), `apply(reply, acceptedIds)` (return
    `{ summary, undo }`) and `undo(data)`, plus an optional `brief()` for BRIEF.md. An app with its own
    engine (GymTracker, Tachyread) must provide the same guarantees.
+   - The shared panel (v4) can keep the cowork folder in the reader's cloud ("Use my cloud"), where
+     the AI runner on their computer answers it (`CoworkSyncHub/runner.py`, RUNNER.md): no desktop
+     browser or open tab needed. An app with its own engine should offer the same, using the same
+     flat file names (COWORK-PROTOCOL.md).
 4. **Licence and legal**: a `LICENSE` (MIT unless there is a reason); `THIRD-PARTY-NOTICES.md` for any
    bundled third-party code or fonts; an in-app note on where the data lives.
 5. **CI on every push** that runs the app's checks.
