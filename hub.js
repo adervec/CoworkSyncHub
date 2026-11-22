@@ -91,9 +91,24 @@ window.hubPrefs = (function () {
       }, Promise.resolve()).then(function () {
         out.sort(function (a, b) { return a[0] - b[0]; });
         localStorage.setItem('portal-activity-remote', JSON.stringify(out.slice(-6000)));
+      }).then(function () { return syncFeed(); }).then(function () {
         document.dispatchEvent(new CustomEvent('hub-ledger'));
       });
     });
+  }
+  // The runner's fitness feed (shared-activities.json): every real workout, run and ride from Garmin and Strava,
+  // each counted once. Kept compact as [startMs, kind, minutes, sources] for the landing page, which gives
+  // STR / END / VIT by what each one WAS, and drops an app's own row for the same workout (no double credit).
+  function syncFeed() {
+    return appFont.cloud.read('shared-activities.json').then(function (text) {
+      if (!text) { localStorage.removeItem('portal-activity-feed'); return; }
+      var j = appFont.parseJSON(text, 5e6), rows = [];
+      (Array.isArray(j.activities) ? j.activities : []).forEach(function (a) {
+        var t = Date.parse(a.start);
+        if (isFinite(t) && typeof a.kind === 'string') rows.push([t, a.kind.slice(0, 12), Math.max(0, Math.min(1440, +a.minutes || 0)), (a.sources || []).join('+').slice(0, 30)]);
+      });
+      localStorage.setItem('portal-activity-feed', JSON.stringify({ at: j.updated || '', rows: rows.slice(-3000) }));
+    }).catch(function () { /* no feed yet: the apps' own rows still count */ });
   }
   // the reader asked to sign in: Google's window may show
   function signIn() { return appFont.cloud.signIn().then(function () { return sync(false); }); }

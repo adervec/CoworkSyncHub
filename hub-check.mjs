@@ -131,6 +131,14 @@ ok('this device\'s sessions go to its own Drive file', ledgers().length === 1 &&
 ok('the token is not kept in storage', await p1.evaluate(t => !JSON.stringify(Object.entries(localStorage)).includes(t), TOKEN));
 
 // ---- device 2: a desktop, fresh browser ----
+// the runner's fitness feed: Run315's run from yesterday is also in the feed (it must count once), and a
+// strength session no app logged comes only from the feed
+{
+  const iso = (ms) => new Date(ms).toISOString();
+  drive['shared-activities.json'] = JSON.stringify({ schema: 1, owner: 'runner', updated: iso(Date.now()), activities: [
+    { ids: ['garmin:1', 'strava:1'], start: iso(Date.now() - 864e5 - 20 * 60e3), kind: 'run', minutes: 30, sources: ['Garmin', 'Strava'] },
+    { ids: ['garmin:2'], start: iso(Date.now() - 2 * 864e5 - 5 * 3600e3), kind: 'strength', minutes: 80, sources: ['Garmin'] }] });
+}
 const p2 = await device({ width: 1280, height: 800 });
 await p2.goto(url);
 ok('a new device starts with every app', (await slugs(p2)).includes('GymTracker315'));
@@ -138,7 +146,8 @@ await p2.click('#signin');
 await p2.waitForFunction(() => document.querySelectorAll('.grid .app.nfm').length === 2, null, { timeout: 5000 }).catch(() => {});
 ok('signing in brings the hidden apps to the second device', !(await slugs(p2)).includes('GymTracker315') && !(await slugs(p2)).includes('Tachyread'));
 await p2.waitForFunction(() => /Run315/.test(localStorage.getItem('portal-activity-remote') || ''), null, { timeout: 5000 }).catch(() => {});
-ok('the second device sees the first one\'s sessions', /4 activities reported/.test(await p2.textContent('#sheetnote')) && /Run315/.test(await p2.textContent('#stats')));
+ok('the second device sees the first one\'s sessions, with the fitness feed', /3 activities reported by your apps and 2 from Garmin and Strava/.test(await p2.textContent('#sheetnote')) && /Run315/.test(await p2.textContent('#stats')));
+ok('the feed credits strength nobody logged in an app', /STR[\s\S]*Garmin and Strava/.test(await p2.textContent('#stats')));
 ok('and its weekly targets, without being asked again', await shown(p2, '#today') && !(await shown(p2, '#setup')) && /DEX.*done/.test(await p2.textContent('#goals')));
 ok('a device with no sessions writes no file', ledgers().length === 1);
 // both devices now change something without seeing the other: the merge keeps both

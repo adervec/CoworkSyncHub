@@ -47,6 +47,7 @@ the code: an app's session should correct anything here that is wrong.
 
 ## Across every app
 
+- [done] runner + hub: shared-activities.json and shared-body.json exist (runner job 2); the hub credits STR / END / VIT from them and drops an app's duplicate row. Left for the app sessions: reading the files instead of fetching Garmin and Strava themselves
 - [planned] GymTracker + Run315 + CelebrityCrusher + BlackMirrorBikeRide + BodybuildingProgressCoach + hub: the fitness apps see the same activity in different ways (plus hand-entered detail such as sets), so the hub must not assume "opened app X" means "trained attribute Y" -> the hub compiles ONE de-duplicated list of real activities from the shared feed and the apps' own entries, and gives STR / END / VIT by what each activity was; part of the Garmin and Strava feed project (shared-activities, shared-body)
 
 - [done] every app + hub: sessions reported once for habits and the character sheet -> `appFont.logSession` (standard 25)

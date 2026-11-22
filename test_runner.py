@@ -140,4 +140,62 @@ assert runner.run(quiet=True) == 0 and not runner.LOCK.exists()
 st = runner.load(runner.STATUS, {})
 assert st["jobs"]["replies"]["state"] == "ok" and st["consent"]["app-replies"] is True and st["jobs"]["brief"]["state"] == "not built yet", st
 assert runner.redact("Bearer ya29.abc and a@b.com and 1//0gAAAAAAAAAAAAAAAAAAAAAA") == "Bearer [token] and [email] and [token]"
+# ---- job 2: the fitness feed ----
+from datetime import datetime, timedelta  # noqa: E402
+day = lambda n: (datetime.now() - timedelta(days=n)).strftime("%Y-%m-%d")
+ga = [{"id": 1, "type": "strength_training", "start_time": day(1) + " 14:09:31", "duration_seconds": 5641.6, "distance_meters": 0.0, "calories": 465.0, "avg_hr_bpm": 93.0, "max_hr_bpm": 193.0},
+      {"id": 2, "type": "running", "start_time": day(2) + " 07:30:00", "duration_seconds": 1800, "distance_meters": 5000.0, "calories": None, "avg_hr_bpm": 150.0, "max_hr_bpm": 170.0}]
+sa = [{"id": "s1", "sport_type": "WeightTraining", "start_local": day(1) + "T14:09:31", "summary": {"moving_time": 5600, "distance": 0}},
+      {"id": "s2", "sport_type": "Run", "start_local": day(2) + "T07:31:10", "summary": {"moving_time": 1790, "distance": 5010, "calories": 410}},
+      {"id": "s3", "sport_type": "Ride", "start_local": day(3) + "T17:00:00", "summary": {"elapsed_time": 3600, "distance": 25000}}]
+g_acts, s_acts = [runner.from_garmin(x) for x in ga], [runner.from_strava(x) for x in sa]
+assert g_acts[0]["kind"] == "strength" and g_acts[1]["kind"] == "run" and s_acts[2]["kind"] == "ride" and g_acts[1]["km"] == 5.0 and s_acts[2]["minutes"] == 60.0
+assert "+" in g_acts[0]["start"] or "-" in g_acts[0]["start"][10:], "starts carry this PC's offset (ISO 8601)"
+m = runner.merge_activities(g_acts, s_acts)
+assert len(m) == 3, "the same workout from Garmin and Strava counts once"
+run_ = next(x for x in m if x["kind"] == "run")
+assert run_["ids"] == ["garmin:2", "strava:s2"] and run_["sources"] == ["Garmin", "Strava"] and run_["km"] == 5.0 and run_["kcal"] == 410, "Garmin's numbers first, gaps filled from Strava"
+assert runner.merge_activities(g_acts, [dict(g_acts[0], ids=["garmin:9"])]) and len(runner.merge_activities(g_acts + [dict(g_acts[0], ids=["garmin:9"])])) == 3, "two entries from ONE source are never merged"
+old = [{"start": day(500) + "T08:00:00"}, {"start": day(100) + "T08:00:00"}, {"start": day(5) + "T08:00:00"}]
+kept = runner.keep_window(old, [{"start": day(1) + "T08:00:00"}], 14, "start")
+assert [x["start"][:10] for x in kept] == [day(100), day(1)], "older entries kept, the fetched window replaced, anything past 400 days dropped"
+body = runner.from_garmin_body({"calendarDate": day(1), "weight": 84540.0, "bodyFat": 20.8, "muscleMass": 34869, "boneMass": 5579, "bodyWater": 57.8, "bmi": 25.2000007})
+assert body == {"date": day(1), "weight_kg": 84.54, "body_fat_pct": 20.8, "muscle_kg": 34.87, "bone_kg": 5.58, "water_pct": 57.8, "bmi": 25.2, "source": "Garmin"}
+
+# the MCP client calls only the tools it was given (a tiny pretend server)
+srv_py = tmp / "fake_mcp.py"
+srv_py.write_text("import sys, json\nfor line in sys.stdin:\n    m = json.loads(line)\n    if 'id' not in m: continue\n"
+                  "    r = {'tools': []} if m['method'] != 'tools/call' else {'content': [{'type': 'text', 'text': json.dumps({'called': m['params']['name']})}]}\n"
+                  "    print(json.dumps({'jsonrpc': '2.0', 'id': m['id'], 'result': r}), flush=True)\n", encoding="utf-8")
+import sys  # noqa: E402
+srv = runner.MCPServer([sys.executable, str(srv_py)], {"get_activities_by_date"})
+assert srv.call("get_activities_by_date", {}) == {"called": "get_activities_by_date"}
+try:
+    srv.call("delete_activity", {"id": 1})
+    raise AssertionError("a write tool was called")
+except PermissionError:
+    pass
+srv.close()
+
+# the whole job, with pretend collectors and a pretend cloud
+runner.collect_garmin = lambda cmd, days: (g_acts, [body])
+runner.collect_strava = lambda exe, days: s_acts
+g2 = G()
+cs2 = runner.CloudStore(g2)
+s0 = runner.settings()
+r = runner.job_fitness([cs2], {"connectors": {}}, s0)
+assert r["state"] == "skipped" and "no consent" in r["note"]
+r = runner.job_fitness([store], {"connectors": {"garmin": {"read": True}}}, s0)
+assert r["state"] == "skipped" and "needs your cloud" in r["note"]
+r = runner.job_fitness([cs2], {"connectors": {"garmin": {"read": True}, "strava": {"read": True}}}, s0, force=True)
+sh = json.loads(g2.files["shared-activities.json"][0])
+assert r["state"] == "ok" and r["activities"] == 3 and sh["owner"] == "runner" and len(sh["activities"]) == 3 and sh["sources"]["Garmin"]["ok"], r
+assert json.loads(g2.files["shared-body.json"][0])["days"][0]["weight_kg"] == 84.54
+r = runner.job_fitness([cs2], {"connectors": {"garmin": {"read": True}}}, s0)
+assert r.get("unchanged"), "at most about hourly"
+def boom(cmd, days):
+    raise RuntimeError("Garmin login failed")
+runner.collect_garmin = boom
+r = runner.job_fitness([cs2], {"connectors": {"garmin": {"read": True}, "strava": {"read": True}}}, s0, force=True)
+assert r["state"] == "partly" and "Garmin login failed" in r["note"] and len(json.loads(g2.files["shared-activities.json"][0])["activities"]) == 3, "one source failing keeps the other, and keeps what was there"
 print("OK")

@@ -481,6 +481,15 @@ function activity(){var ev=[];try{ev=JSON.parse(localStorage.getItem(AKEY)||"[]"
   // rows from the reader's other devices, fetched by hub.js when signed in
   try{var rem=JSON.parse(localStorage.getItem("portal-activity-remote")||"[]");if(Array.isArray(rem))ev=ev.concat(rem)}catch(err){}
   ev=ev.filter(function(x){return Array.isArray(x)&&x.length>=3&&APPKIND[x[1]]&&!HID[x[1]]});
+  // the runner's fitness feed (Garmin + Strava, each workout once) is the record for training: credit goes by
+  // what the activity WAS, and an app's own row for that same workout is dropped, so nothing counts twice
+  var feed=[],FK={run:"cardio",walk:"cardio",swim:"cardio",ride:"ride",strength:"lift"};
+  try{var fj=JSON.parse(localStorage.getItem("portal-activity-feed")||"null");if(fj&&Array.isArray(fj.rows))feed=fj.rows.filter(function(r){return FK[r[1]]})}catch(err){}
+  if(feed.length){
+    var TRAIN={lift:"strength",cardio:"endurance",ride:"endurance"},kindOf={run:"endurance",walk:"endurance",swim:"endurance",ride:"endurance",strength:"strength"};
+    ev=ev.filter(function(x){var t=(+x[0]>2e10?+x[0]:x[0]*1000),k=TRAIN[x[2]||APPKIND[x[1]]];if(!k)return true;
+      return !feed.some(function(r){return kindOf[r[1]]===k&&t>=r[0]-18e5&&t<=r[0]+(r[2]+60)*6e4})});
+    feed.forEach(function(r){ev.push([Math.round(r[0]/1000),"feed",FK[r[1]],Math.max(.5,Math.round(r[2]/10*10)/10)])});}
   // the same session logged by two apps (a run in GymTracker and in Run315) counts once: same kind,
   // different app, within 45 minutes; the larger one is kept. ponytail: time only, no route matching.
   var sec=function(x){return +x[0]>2e10?x[0]/1000:+x[0]},once=[];
@@ -664,7 +673,8 @@ function sheet(){var a=activity(),now=Date.now()/1000,score={},by={},rate7={},ra
     journal:rows.map(function(r){return r.replace(/<[^>]+>/g,"")}),
     installed:Object.keys(installed()),launchesByApp:usage()};
   askCoach();
-  d.getElementById("sheetnote").textContent=(a.real?a.events.length+" activities reported by your apps":
+  var nf=a.events.filter(function(x){return x[1]==="feed"}).length;
+  d.getElementById("sheetnote").textContent=(a.real?(a.events.length-nf)+" activities reported by your apps"+(nf?" and "+nf+" from Garmin and Strava":""):
     "based on launches only so far \u2014 apps report real activity as they're updated")
     +" \u00b7 last 2 weeks count double \u00b7 kept in this browser, and in your own Drive if you sign in";}
 sheet();
@@ -1257,7 +1267,7 @@ This portal installs the same way.</p>
 <span><a href="settings.html">Settings &amp; privacy</a></span>
 <span><a href="feed.xml">RSS</a></span>
 <span><a href="https://github.com/{USER}">github.com/{USER}</a></span></footer>
-</main><script>const GEN={now:.0f};const FLEET={json.dumps(fleet)};const CHANGES={json.dumps(recent)};const APPKIND={json.dumps({a['slug']: a['kind'] for a in APPS})};const HUES={json.dumps({a['slug']: a['hue'] for a in APPS})};const TITLES={json.dumps({a['slug']: a['title'] for a in APPS})};{PORTAL_JS}</script></body></html>"""
+</main><script>const GEN={now:.0f};const FLEET={json.dumps(fleet)};const CHANGES={json.dumps(recent)};const APPKIND={json.dumps(dict({a['slug']: a['kind'] for a in APPS}, feed="cardio"))};const HUES={json.dumps(dict({a['slug']: a['hue'] for a in APPS}, feed=200))};const TITLES={json.dumps(dict({a['slug']: a['title'] for a in APPS}, feed="Garmin and Strava"))};{PORTAL_JS}</script></body></html>"""
     if BETA:
         page = page.replace("<main", "<p style='margin:0;padding:6px 12px;background:#b45309;color:#fff;font:600 14px system-ui;text-align:center'>"
                             "BETA: the maker's preview. <a style='color:#fff' href='/portal/'>Live portal</a></p><main", 1)

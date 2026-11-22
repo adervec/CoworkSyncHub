@@ -293,6 +293,17 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
       (`appFont.cloud.read`), declared in both apps' `app-data.json`; or as a shared piece in
       font.js when it is behaviour rather than data. Never reach into another app's own keys,
       databases or Drive files, and never copy another app's code into yours.
+    - **Shared files that exist** (read them, never write them):
+      - `shared-activities.json`, owned by the AI runner (job 2): every workout, run and ride from
+        Garmin and Strava, each counted once. `{ schema: 1, owner, updated, sources: { Garmin: { ok,
+        at }, Strava: … }, activities: [{ ids: ["garmin:…", "strava:…"], start (ISO 8601 with
+        offset), kind: run | ride | walk | swim | strength | other, type, minutes, km, avg_hr,
+        max_hr, kcal, sources }] }`, the last 400 days.
+      - `shared-body.json`, same owner: `{ …, days: [{ date, weight_kg, body_fat_pct, muscle_kg,
+        bone_kg, water_pct, bmi, source }] }`.
+      Read them with `appFont.cloud.read(name)` once the reader is signed in. An app that only
+      analyses these activities (Run315, Celebrity Crusher) reads them instead of fetching Garmin or
+      Strava itself, and does not log them as sessions of its own (standard 25).
     - The standards check's `overlap` column fails without the file and warns when its Reviewed
       date is over 90 days old. The status board lists every entry from every app.
 

@@ -1,8 +1,15 @@
 # The AI runner: setup, step by step
 
-The runner is a small program on your own computer. It answers your apps' AI requests (a coach review of
-your week, a practice plan) through your private cloud folder, so no browser tab has to stay open and
-replies reach every device. It is optional: every app works without it.
+The runner is a small program on your own computer. It does two jobs, each one only if you say yes:
+
+- **Answers your apps' AI requests** (a coach review of your week, a practice plan) through your private
+  cloud folder, so no browser tab has to stay open and replies reach every device.
+- **The fitness feed**: reads your Garmin and Strava activities and weigh-ins about once an hour and saves
+  ONE combined list in your cloud folder, each workout counted once even when both services have it.
+  The hub uses it for your weekly targets and character sheet, and the fitness apps can read it instead
+  of each fetching the same data.
+
+It is optional: every app works without it. A third job, a daily brief ready by 06:30, is coming.
 
 What it does, and what it never does:
 
@@ -11,7 +18,8 @@ What it does, and what it never does:
 - The AI it uses has **no tools**: it cannot open files, run anything or reach the internet. It only reads
   the request and writes an answer.
 - It sends a request to an AI only after you say yes (step 3), and only to the AI you chose.
-- It never reads your mail and never writes to any outside service.
+- It never reads your mail and never writes to any outside service. Garmin's connector can also change
+  things in your Garmin account; the runner only ever calls two named read tools and refuses anything else.
 - Everything it keeps (your choices, your sign-in, a log) stays in a folder in your home folder,
   `.adervec-runner`. Nothing goes to the maker.
 
@@ -52,9 +60,24 @@ It walks through five steps; you can skip any of them:
    choose *Advanced*, then continue. It asks only for the app folder, not your Drive files.
    Optionally, also folders on this computer that apps already use for cowork.
 3. **Consent**: it tells you which AI service will receive your apps' requests, and asks if that is
-   all right. Without a yes, nothing is ever sent.
+   all right. Then it asks, separately, whether to read Garmin and Strava. Without a yes, nothing is
+   ever sent or read.
 4. **The schedule**: every 30 minutes while you are logged in.
 5. **A check** of everything (below).
+
+### For the fitness feed
+
+- **Garmin**: the runner uses a free Garmin connector on your computer. Install `uv` (from astral.sh),
+  then sign in once in a terminal (it asks for your Garmin email, password and, if you use one, a code):
+
+  ```
+  uvx --python 3.12 --from git+https://github.com/Taxuspt/garmin_mcp garmin-mcp-auth
+  ```
+
+  This is a community project, not Garmin's own, and it can break when Garmin changes their sign-in.
+  Your password is not stored; a sign-in pass is kept in `.garminconnect` in your home folder.
+- **Strava**: read through your Claude Strava connector (claude.ai > Settings > Connectors), so it needs
+  Claude Code as the engine. The AI only makes the call; the runner keeps Strava's own numbers.
 
 ## 4. In each app
 
@@ -90,5 +113,7 @@ Other commands:
 | The hub says it has not run for a while | the computer is off or logged out, or the schedule is gone | `python runner.py check` on that computer |
 | An app shows "agent reported: ..." | the AI could not answer that request; the reason is in the message | press **Send requests** in the app to ask again |
 | `Engine: Claude Code answers` FAIL | Claude Code is signed out | open Claude Code once and sign in |
+| The hub shows the fitness feed as "partly", Garmin failing | Garmin ended the sign-in, or changed it | run the Garmin sign-in command above again |
+| Strava failing: "not connected in Claude" | the Strava connector is off in claude.ai | connect it in claude.ai > Settings > Connectors |
 
 The log is in `.adervec-runner\runner.log` in your home folder. It never holds keys, tokens or email addresses.

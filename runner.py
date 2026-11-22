@@ -34,7 +34,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 VERSION = 1
@@ -531,6 +531,223 @@ def job_replies(stores, engine, consent, force=None):
     return res
 
 
+# ---------------------------------------------------------------- job 2: the fitness feed
+# Garmin and Strava are fetched ONCE for every app, merged into one list with each real activity counted once,
+# and written to the cloud folder as shared-activities.json and shared-body.json (house standard 27: the runner
+# owns them, apps only read them). Read-only: the runner names the few read tools it calls and refuses any other.
+GARMIN_TOOLS = {"get_activities_by_date", "get_body_composition"}   # the Garmin connector also has ~38 write tools: never these
+STRAVA_TOOL = "mcp__claude_ai_Strava__list_activities"
+GARMIN_KIND = {"running": "run", "trail_running": "run", "treadmill_running": "run", "track_running": "run", "virtual_run": "run",
+               "cycling": "ride", "indoor_cycling": "ride", "virtual_ride": "ride", "road_biking": "ride", "mountain_biking": "ride", "gravel_cycling": "ride",
+               "walking": "walk", "hiking": "walk", "lap_swimming": "swim", "open_water_swimming": "swim", "strength_training": "strength"}
+STRAVA_KIND = {"Run": "run", "TrailRun": "run", "VirtualRun": "run", "Ride": "ride", "VirtualRide": "ride", "MountainBikeRide": "ride", "GravelRide": "ride",
+               "EBikeRide": "ride", "Walk": "walk", "Hike": "walk", "Swim": "swim", "WeightTraining": "strength", "Workout": "strength", "Crossfit": "strength"}
+FEED_EVERY = 55 * 60          # Garmin rate-limits frequent logins: at most about hourly
+KEEP_DAYS = 400
+
+
+class MCPServer:
+    """A local MCP server spoken to directly over stdio, with no model in between."""
+
+    def __init__(self, cmd, allowed):
+        self.allowed, self.n = set(allowed), 0
+        self.p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8")
+        self._rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "adervec-runner", "version": str(VERSION)}})
+        self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+
+    def _send(self, msg):
+        self.p.stdin.write(json.dumps(msg) + "\n")
+        self.p.stdin.flush()
+
+    def _rpc(self, method, params):
+        self.n += 1
+        self._send({"jsonrpc": "2.0", "id": self.n, "method": method, "params": params})
+        while True:
+            line = self.p.stdout.readline()
+            if not line:
+                raise RuntimeError("the connector stopped (run its sign-in again?)")
+            m = json.loads(line)
+            if m.get("id") == self.n:
+                if "error" in m:
+                    raise RuntimeError(str(m["error"].get("message", m["error"]))[:200])
+                return m["result"]
+
+    def call(self, name, args):
+        if name not in self.allowed:
+            raise PermissionError(f"the runner never calls {name}")
+        r = self._rpc("tools/call", {"name": name, "arguments": args})
+        text = "".join(c.get("text", "") for c in r.get("content", []) if c.get("type") == "text")
+        if r.get("isError"):
+            raise RuntimeError(text[:200] or name + " failed")
+        return json.loads(text)
+
+    def close(self):
+        try:
+            self.p.stdin.close()
+            self.p.terminate()
+        except OSError:
+            pass
+
+
+def local_iso(naive):
+    """'2026-11-21 14:09:31' (the device's local time, no zone) -> ISO 8601 with this PC's offset."""
+    return datetime.fromisoformat(naive.replace(" ", "T")[:19]).astimezone().isoformat(timespec="seconds")
+
+
+def from_garmin(a):
+    return {"ids": [f"garmin:{a['id']}"], "start": local_iso(a["start_time"]), "kind": GARMIN_KIND.get(a.get("type"), "other"), "type": a.get("type"),
+            "minutes": round((a.get("duration_seconds") or 0) / 60, 1), "km": round((a.get("distance_meters") or 0) / 1000, 2),
+            "avg_hr": a.get("avg_hr_bpm"), "max_hr": a.get("max_hr_bpm"), "kcal": a.get("calories"), "sources": ["Garmin"]}
+
+
+def from_strava(a):
+    s = a.get("summary") or {}
+    secs = s.get("moving_time") or s.get("elapsed_time") or 0
+    return {"ids": [f"strava:{a['id']}"], "start": local_iso(a["start_local"]), "kind": STRAVA_KIND.get(a.get("sport_type"), "other"), "type": a.get("sport_type"),
+            "minutes": round(secs / 60, 1), "km": round((s.get("distance") or 0) / 1000, 2), "avg_hr": s.get("average_heartrate"),
+            "max_hr": s.get("max_heartrate"), "kcal": s.get("calories"), "sources": ["Strava"]}
+
+
+def merge_activities(*lists):
+    """One entry per real activity: the same workout from two sources (starts within two minutes) is merged,
+    Garmin's numbers first, gaps filled from the other."""
+    out = []
+    for lst in lists:
+        for a in lst:
+            t = datetime.fromisoformat(a["start"]).timestamp()
+            twin = next((b for b in out if abs(datetime.fromisoformat(b["start"]).timestamp() - t) <= 120 and not set(a["sources"]) & set(b["sources"])), None)
+            if twin:
+                for k, v in a.items():
+                    if k in ("ids", "sources"):
+                        twin[k] = sorted(set(twin[k]) | set(v))
+                    elif twin.get(k) in (None, 0, 0.0, "other") and v not in (None, 0, 0.0):
+                        twin[k] = v
+            else:
+                out.append(dict(a))
+    return sorted(out, key=lambda a: a["start"])
+
+
+def from_garmin_body(w):
+    g = lambda k, d=1000: round(w[k] / d, 2) if w.get(k) is not None else None
+    return {"date": w["calendarDate"], "weight_kg": g("weight"), "body_fat_pct": w.get("bodyFat"), "muscle_kg": g("muscleMass"),
+            "bone_kg": g("boneMass"), "water_pct": w.get("bodyWater"), "bmi": round(w["bmi"], 1) if w.get("bmi") else None, "source": "Garmin"}
+
+
+def collect_garmin(cmd, days):
+    srv = MCPServer(cmd, GARMIN_TOOLS)
+    try:
+        start, end = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d"), datetime.now().strftime("%Y-%m-%d")
+        acts, page = [], 0   # pages count from 0
+        while page < 50:
+            j = srv.call("get_activities_by_date", {"start_date": start, "end_date": end, "page": page, "page_size": 100})
+            acts += j.get("activities") or []
+            if not j.get("has_more"):
+                break
+            page += 1
+        body = srv.call("get_body_composition", {"start_date": start, "end_date": end}).get("dateWeightList") or []
+        return [from_garmin(a) for a in acts], [from_garmin_body(w) for w in body if w.get("weight")]
+    finally:
+        srv.close()
+
+
+def collect_strava(exe, days):
+    """Through the reader's own Claude Strava connector. The model only makes the one call; the runner takes the
+    connector's raw answer from the output stream, so no number passes through the model's own words."""
+    start, end = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00"), datetime.now().strftime("%Y-%m-%dT23:59:59")
+    prompt = (f'Call ToolSearch with query "select:{STRAVA_TOOL}". Then call {STRAVA_TOOL} exactly once with range_start "{start}", '
+              f'range_end "{end}", first 100. Then reply DONE. If the tool is missing, reply CONNECTOR-MISSING.')
+    # ponytail: one page of up to 100 (Strava's limit); a 14-day window never comes close. Follow end_cursor if a first fetch ever needs more.
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDECODE", "CLAUDE_CODE_"))}
+    r = subprocess.run([exe, "-p", prompt, "--restricted", "--permission-prompts", "none", "--model", "haiku", "--no-session-persistence",
+                        "--allowedTools", STRAVA_TOOL, "--output-format", "stream-json", "--verbose"],
+                       stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, env=env)
+    calls, found, final, tool_err = {}, None, "", ""
+    for line in r.stdout.splitlines():
+        try:
+            m = json.loads(line)
+        except ValueError:
+            continue
+        msg = m.get("message") or {}
+        for c in msg.get("content") or [] if isinstance(msg.get("content"), list) else []:
+            if c.get("type") == "tool_use":
+                calls[c["id"]] = c["name"]
+            elif c.get("type") == "tool_result" and calls.get(c.get("tool_use_id")) == STRAVA_TOOL:
+                t = c["content"] if isinstance(c["content"], str) else "".join(x.get("text", "") for x in c["content"] if isinstance(x, dict))
+                if c.get("is_error"):
+                    tool_err = t[:160]
+                else:
+                    found = json.loads(t)
+        if m.get("type") == "result":
+            final = str(m.get("result") or "")[:160]
+    if found is None:
+        if "CONNECTOR-MISSING" in final:
+            raise RuntimeError("the Strava connector is not connected in Claude (claude.ai > Settings > Connectors)")
+        raise RuntimeError("Strava gave no answer (" + (("the connector said: " + tool_err) if tool_err else ("calls made: " + (", ".join(calls.values()) or "none") + "; " + (final or r.stderr[:120] or "no output"))) + ")")
+    return [from_strava(a) for a in found.get("activities") or []]
+
+
+def keep_window(old, new, days, key):
+    """Replace what the window covered, keep older entries, drop anything older than KEEP_DAYS."""
+    cut_new = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    cut_old = (datetime.now() - timedelta(days=KEEP_DAYS)).strftime("%Y-%m-%d")
+    kept = [x for x in old if cut_old <= x[key][:10] < cut_new]
+    return sorted(kept + new, key=lambda x: x[key])
+
+
+def job_fitness(stores, consent, s, force=False):
+    c = consent.get("connectors", {})
+    want = [k for k in ("garmin", "strava") if (c.get(k) or {}).get("read")]
+    if not want:
+        return {"state": "skipped", "note": "no consent to read Garmin or Strava (python runner.py consent)"}
+    cloud = next((st for st in stores if isinstance(st, CloudStore)), None)
+    if not cloud:
+        return {"state": "skipped", "note": "the fitness feed needs your cloud (it is where the apps read it)"}
+    led = load(LEDGER, {})
+    if not force and time.time() - led.get("fitness_at", 0) < FEED_EVERY:
+        return {"state": "ok", "note": "fetched less than an hour ago", "unchanged": True}
+    g = cloud.g
+    have = g.list("shared-")
+    old_a = json.loads(g.read(have["shared-activities.json"]["id"])) if "shared-activities.json" in have else {}
+    old_b = json.loads(g.read(have["shared-body.json"]["id"])) if "shared-body.json" in have else {}
+    days = 14 if old_a.get("activities") else 90   # the first fetch looks further back
+    res, lists, body, sources = {"state": "ok", "notes": []}, [], [], {}
+    if "garmin" in want:
+        try:
+            acts, body = collect_garmin(s.get("garmin_cmd") or [shutil.which("uvx") or "uvx", "--python", "3.12", "--from", "git+https://github.com/Taxuspt/garmin_mcp", "garmin-mcp"], days)
+            lists.append(acts)
+            sources["Garmin"] = {"ok": True, "at": now_iso(), "activities": len(acts), "weigh_ins": len(body)}
+        except Exception as e:  # noqa: BLE001  one source failing must not stop the other
+            sources["Garmin"] = {"ok": False, "at": now_iso(), "error": str(e)[:200]}
+            res["notes"].append("Garmin: " + str(e)[:160])
+    if "strava" in want:
+        try:
+            exe = s["engine"].get("path") or shutil.which("claude") or "claude"
+            acts = collect_strava(exe, days)
+            lists.append(acts)
+            sources["Strava"] = {"ok": True, "at": now_iso(), "activities": len(acts)}
+        except Exception as e:  # noqa: BLE001
+            sources["Strava"] = {"ok": False, "at": now_iso(), "error": str(e)[:200]}
+            res["notes"].append("Strava: " + str(e)[:160])
+    if not lists:
+        return {"state": "failed", "note": "; ".join(res["notes"]), "sources": sources}
+    acts = keep_window(old_a.get("activities") or [], merge_activities(*lists), days, "start")
+    meta = {"schema": 1, "owner": "runner", "updated": now_iso(), "sources": dict(old_a.get("sources") or {}, **sources)}
+    cloud.put_status("shared-activities.json", json.dumps(dict(meta, activities=acts), ensure_ascii=False))
+    if body or old_b:
+        byday = {x["date"]: x for x in (old_b.get("days") or [])}
+        byday.update({x["date"]: x for x in body})
+        cut = (datetime.now() - timedelta(days=KEEP_DAYS)).strftime("%Y-%m-%d")
+        cloud.put_status("shared-body.json", json.dumps(dict(meta, days=sorted((v for k, v in byday.items() if k >= cut), key=lambda x: x["date"])), ensure_ascii=False))
+    led["fitness_at"] = time.time()
+    save(LEDGER, led)
+    res.update(activities=len(acts), new=sum(len(x) for x in lists), body_days=len(body), sources={k: v["ok"] for k, v in sources.items()})
+    if res["notes"]:
+        res["state"] = "partly"
+        res["note"] = "; ".join(res["notes"])
+    log(f"fitness: {res['state']} {len(acts)} activities kept, sources {res['sources']}")
+    return res
+
+
 # ---------------------------------------------------------------- run, status, check
 def run(force=None, quiet=False):
     HOME.mkdir(parents=True, exist_ok=True)
@@ -552,7 +769,14 @@ def run(force=None, quiet=False):
             status["jobs"]["replies"] = job_replies(stores, engine, consent, force)
         except Exception as e:  # noqa: BLE001  the status file must say what broke
             status["jobs"]["replies"] = {"state": "failed", "note": str(e)}
-        status["jobs"]["fitness"] = {"state": "not built yet"}
+        try:
+            status["jobs"]["fitness"] = job_fitness(stores, consent, s, force=bool(force))
+        except Exception as e:  # noqa: BLE001
+            status["jobs"]["fitness"] = {"state": "failed", "note": str(e)[:200]}
+        if status["jobs"]["fitness"].get("unchanged"):  # keep last hour's numbers on the status page
+            prev = load(STATUS, {}).get("jobs", {}).get("fitness")
+            if prev and prev.get("state") not in (None, "skipped"):
+                status["jobs"]["fitness"] = dict(prev, note="fetched less than an hour ago")
         status["jobs"]["brief"] = {"state": "not built yet"}
         save(STATUS, status)
         for st in stores:  # the hub reads this (Settings > AI runner)
@@ -579,6 +803,8 @@ def print_status(st=None):
         line = f"  {name:8} {j.get('state')}"
         if "answered" in j:
             line += f" · answered {j['answered']}, errors {j['errors']}, waiting {j['waiting']}"
+        if "activities" in j:
+            line += f" · {j['activities']} activities kept ({j.get('new', 0)} fetched), {j.get('body_days', 0)} weigh-in day(s), sources {j.get('sources')}"
         if j.get("note"):
             line += f" · {j['note']}"
         print(line)
@@ -624,6 +850,14 @@ def check(quick=False):
         else:
             fs = FolderStore(x)
             row(f"Storage: folder {x}", fs.root.is_dir(), f"{len(fs.apps())} app folder(s)" if fs.root.is_dir() else "missing", "fix the path in setup")
+    cc = consent.get("connectors", {})
+    if (cc.get("garmin") or {}).get("read"):
+        tok = Path.home() / ".garminconnect"
+        row("Connector: Garmin", tok.exists() and bool(shutil.which("uvx")), "signed in, uv found" if tok.exists() and shutil.which("uvx") else "not signed in, or uv missing",
+            "install uv, then: uvx --python 3.12 --from git+https://github.com/Taxuspt/garmin_mcp garmin-mcp-auth")
+    if (cc.get("strava") or {}).get("read"):
+        row("Connector: Strava", e.get("kind", "claude-code") == "claude-code", "through Claude Code" if e.get("kind", "claude-code") == "claude-code" else "needs Claude Code as the engine",
+            "connect Strava in claude.ai > Settings > Connectors")
     q = subprocess.run(["schtasks", "/Query", "/TN", TASK], capture_output=True, text=True) if os.name == "nt" else None
     row("Schedule", bool(q and q.returncode == 0), f"every {s['every_minutes']} minutes while you are logged on" if q and q.returncode == 0 else "not installed",
         "python runner.py schedule install")
@@ -653,9 +887,18 @@ def consent_cmd():
     print(f"Now: {'allowed' if cur.get('allowed') and cur.get('vendor') == v else 'not allowed'}.")
     allowed = ask(f"Allow sending app requests to {v}?", "y" if cur.get("allowed") else "n")
     c.setdefault("engine", {})["app-replies"] = {"allowed": allowed, "vendor": v, "at": now_iso()}
-    c.setdefault("connectors", {k: {"read": False} for k in ("garmin", "strava", "todoist", "calendar")})  # jobs 2 and 3: all off
+    c.setdefault("connectors", {})
+    for k in ("garmin", "strava", "todoist", "calendar"):
+        c["connectors"].setdefault(k, {"read": False})
+    print("\nThe fitness feed reads your activities and weigh-ins ONCE for every app, and saves one combined list in\n"
+          "your own cloud folder (shared-activities.json, shared-body.json). It only reads: it never changes anything.")
+    print("  Garmin: read by the runner directly, through the Garmin connector on this PC. No AI sees it.")
+    c["connectors"]["garmin"] = {"read": ask("  Read Garmin?", "y" if c["connectors"]["garmin"].get("read") else "n"), "at": now_iso()}
+    print(f"  Strava: read through your Claude Strava connector, so the request passes through {vendor_of({'kind': 'claude-code'})}.\n"
+          "  The runner takes Strava's own answer; the AI only makes the call.")
+    c["connectors"]["strava"] = {"read": ask("  Read Strava?", "y" if c["connectors"]["strava"].get("read") else "n"), "at": now_iso()}
     save(CONSENT, c)
-    print("Saved. Connectors (Garmin, Strava, Todoist, calendar) stay off until the jobs that use them exist.")
+    print("Saved. Todoist and your calendar stay off until the daily brief exists.")
 
 
 def schedule(action):
