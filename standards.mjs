@@ -196,8 +196,12 @@ const CHECKS = [
   ['iso', 'ISO dates and times (through appFont.fmt)', (a) => {
     // a date the reader sees goes through appFont.fmt, which shows ISO 8601 unless the reader chose Regional;
     // formatting it directly skips that choice. Month and weekday NAMES are fine through fmt.custom / weekdays / months.
-    const direct = a.count(/\.toLocale(Date|Time)String\(|new Intl\.DateTimeFormat\(/) - a.count(/\/\/ iso-ok\b/);
-    const slash = a.count(/get(Month|Date)\(\)[^\n;]{0,40}['"`]\/['"`]\s*\+[^\n;]{0,40}get(Date|Month|FullYear)\(\)/);
+    // a single-file app inlines font.js verbatim (<script data-house="font.js">); appFont.fmt itself is built on
+    // Intl.DateTimeFormat, so that copy is the house's own formatter, not the app formatting dates around it
+    const own = a.all.replace(/<script[^>]*\sdata-house\s*=\s*["']font\.js["'][^>]*>[\s\S]*?<\/script>/g, '');
+    const n = (re) => (own.match(new RegExp(re, 'g')) || []).length;
+    const direct = n(/\.toLocale(Date|Time)String\(|new Intl\.DateTimeFormat\(/) - n(/\/\/ iso-ok\b/);
+    const slash = n(/get(Month|Date)\(\)[^\n;]{0,40}['"`]\/['"`]\s*\+[^\n;]{0,40}get(Date|Month|FullYear)\(\)/);
     if (direct + slash <= 0) return ok();
     return fail((direct > 0 ? direct + ' date(s) formatted outside appFont.fmt' : '') + (direct > 0 && slash ? ', ' : '') + (slash ? slash + ' hand-built day/month string(s)' : '') + ' (use appFont.fmt.date / time / dateTime; mark a deliberate one with // iso-ok)');
   }],
@@ -387,6 +391,8 @@ function selftest() {
   eq(check('iso', fake('el.textContent = new Date(s.at).toLocaleDateString()')), 'FAIL', 'a date formatted directly fails');
   eq(check('iso', fake('const s = (d.getMonth() + 1) + "/" + d.getDate()')), 'FAIL', 'a hand-built month/day string fails');
   eq(check('iso', fake('const f = new Intl.DateTimeFormat(loc, { month: "long" }) // iso-ok: month name only')), 'ok', 'a marked exception passes');
+  eq(check('iso', fake('<script data-house="font.js">var f = new Intl.DateTimeFormat(locale(), o);</script> el.textContent = appFont.fmt.date(d)')), 'ok', "an inlined font.js's own formatter does not count");
+  eq(check('iso', fake('<script data-house="font.js">var f = 1;</script> el.textContent = d.toLocaleDateString()')), 'FAIL', 'the app around an inlined font.js still counts');
   eq(check('ledger', fake('appFont.logSession({ kind: "lift", minutes: 40, id: w.id })')), 'ok', 'logSession passes');
   eq(check('pfp', fake('<header><app-account></app-account></header> const G = window.appFont?.google; G.token()')), 'ok', 'the shared sign-in with the corner avatar passes');
   eq(check('pfp', fake('const G = window.appFont?.google; G.token()')), 'FAIL', 'the shared sign-in without the avatar in the page fails');
