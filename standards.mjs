@@ -248,7 +248,7 @@ const CHECKS = [
     if (!csp) bad.push('no Content-Security-Policy meta tag');
     else if (/'unsafe-eval'/.test(csp[1])) bad.push("CSP allows 'unsafe-eval'");
     if (bad.length) return fail(bad.join('; '));
-    const risky = (code.match(/(innerHTML|outerHTML)\s*\+?=\s*[^;\n]*\$\{(?![^}]*\b(esc|escape\w*|escHtml|appFont\.esc)\()|insertAdjacentHTML\([^;\n]*\$\{(?![^}]*\besc)|dangerouslySetInnerHTML/g) || []).length;
+    const risky = (code.match(/(innerHTML|outerHTML)\s*\+?=\s*(?!\s|(String\()?(appFont\.)?html`)[^;\n]*\$\{(?![^}]*\b(esc|escape\w*|escHtml|appFont\.esc)\()|insertAdjacentHTML\([^;\n]*\$\{(?![^}]*\besc)|dangerouslySetInnerHTML/g) || []).length;
     return risky ? warn(`${risky} spot(s) put \${…} into HTML without esc(): check each shows no outside text, or use appFont.html\`\``) : ok();
   }],
   ['supply', 'Supply chain: audited deps, locked-down CI', (a) => {
@@ -445,6 +445,7 @@ function selftest() {
   eq(check('sec', fake(CSP + '<script src="https://cdn.jsdelivr.net/npm/x@1/x.js" integrity="sha384-x" crossorigin></script>')), 'ok', 'a CDN script with integrity passes');
   eq(check('sec', fake(CSP + 'el.innerHTML = `<b>${item.name}</b>`;')), 'warn', 'unescaped ${} into innerHTML warns');
   eq(check('sec', fake(CSP + 'el.innerHTML = `<b>${esc(item.name)}</b>`;')), 'ok', 'escaped ${} into innerHTML passes');
+  eq(check('sec', fake(CSP + 'el.innerHTML = String(html`<b>${item.name}</b>`);')), 'ok', 'an escaping html`` tag passes');
   eq(check('supply', fake('', ['LICENSE'], [{ f: 'ci.yml', t: 'on: push\npermissions:\n  contents: read\njobs:\n  t:\n    steps:\n      - uses: actions/checkout@v4' }])), 'ok', 'locked-down CI passes');
   eq(check('supply', fake('', ['LICENSE'], [{ f: 'ci.yml', t: 'on: push\njobs:\n  t:\n    steps:\n      - uses: actions/checkout@v4' }])), 'FAIL', 'CI without permissions fails');
   {
