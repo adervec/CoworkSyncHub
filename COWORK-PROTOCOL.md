@@ -1,9 +1,11 @@
 # Cowork Protocol — house standard, v1
 
-The folder handshake between an **app** (request side) and an **AI agent**
-(reply side). The app writes machine-readable requests plus human/agent
-instructions into a folder it owns; an agent answers by writing reply files
-into the same folder; the app imports them. Scope: local disk, single user, polling — not a network protocol.
+The handshake between an **app** (request side) and an **AI agent** (reply side). The app writes
+machine-readable requests plus instructions into its cowork folder; the agent answers by writing reply
+files beside them; the app imports them. **The cowork folder lives in the reader's private cloud folder**
+(see "In the reader's cloud" below) and the agent is the reader's **AI runner**
+(`CoworkSyncHub/runner.py`, RUNNER.md). A folder on the reader's disk, driven from a desktop browser, was
+the first transport; it is retired (archive/). Single reader, polling, no server of ours.
 
 ## Terminology
 
@@ -35,12 +37,16 @@ into the same folder; the app imports them. Scope: local disk, single user, poll
 Flat layouts are equally valid — a channel may declare a single fixed
 `replyPath` instead of a reply dir (Tachyread style).
 
-### In the reader's cloud (v4)
+### In the reader's cloud (the only transport since v5)
 
-An app may keep its cowork folder in the reader's private cloud folder instead (cowork.js "Use my
-cloud"; font.js `appFont.cloud`). That folder is flat, so path `a/b.json` of app `X` is the file
-`cowork-X--a--b.json`; everything else in this document is unchanged. The AI runner
-(`CoworkSyncHub/runner.py`, see RUNNER.md) answers there.
+An app keeps its cowork folder in the reader's private cloud folder (cowork.js "Use my cloud";
+font.js `appFont.cloud`). That folder is flat, so path `a/b.json` of app `X` is the file
+`cowork-X--a--b.json`; everything else in this document is unchanged. The AI runner answers there.
+
+`applied.json` at the folder root lists the replies already applied or discarded on ANY device
+(`{ "protocol": "cowork-applied", "protocolVersion": 1, "applied": [hash, …] }`, the last 500), so a
+phone that was offline never applies a reply the desktop already applied. Apps with their own engine
+keep the same list.
 
 ## Manifest (`cowork.json` at the app folder root)
 

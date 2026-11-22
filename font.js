@@ -997,6 +997,7 @@
   //   appFont.cloud.signIn({ silent })   -> a promise; silent never shows the vendor's window
   //   .read(name) -> text | null   .readBytes(nameOrEntry, signal) -> ArrayBuffer | null
   //   .write(name, textOrBlob, mime)   .list(prefix) -> [{ name, size, modified, mime, id }]   .remove(name) -> bool
+  //   .stat(name) -> { version, modified, size } | null   .syncDoc(name, { load, save, merge })   .mergeRecords(a, b, opts)
   //   .signedIn()  .signOut()  .provider() -> 'google'  .label() -> 'Google Drive'
   //   .providers() -> [{ id, label, current }]  .use(id)  .register(provider)
   // A vendor is one object with those same methods (plus id and label). Google Drive ships here; Dropbox,
@@ -1083,6 +1084,13 @@
       };
       return page();
     },
+    // -> { version, modified, size } of one file, or null; the version changes on every write (safe sync uses it)
+    stat: function (name) {
+      var q = "name='" + String(name).replace(/['\\]/g, '\\$&') + "' and trashed=false";
+      return gApi('drive/v3/files?spaces=appDataFolder&fields=files(id,version,modifiedTime,size)&q=' + encodeURIComponent(q))
+        .then(function (r) { return r.json(); })
+        .then(function (j) { var f = (j.files || [])[0]; return f ? { version: String(f.version), modified: f.modifiedTime || '', size: +f.size || 0 } : null; });
+    },
     remove: function (name) {
       return gFind(name).then(function (id) { return id ? gApi('drive/v3/files/' + id, { method: 'DELETE' }).then(function () { return true; }) : false; });
     },
@@ -1119,13 +1127,78 @@
       document.dispatchEvent(new CustomEvent('app-cloud-change', { detail: id }));
     },
     register: function (p) {
-      var need = ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list', 'remove'];
+      var need = ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list', 'remove', 'stat'];
       if (!p || !/^[a-z][a-z0-9-]{1,20}$/.test(p.id || '') || !p.label || !need.every(function (m) { return typeof p[m] === 'function'; })) throw new Error('A cloud needs an id, a label and: ' + need.join(', '));
       CLOUDS[p.id] = p;
     },
   };
-  ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list', 'remove'].forEach(function (m) { cloud[m] = function () { var c = cloudNow(); return c[m].apply(c, arguments); }; });
+  ['signIn', 'signedIn', 'signOut', 'read', 'readBytes', 'write', 'list', 'remove', 'stat'].forEach(function (m) { cloud[m] = function () { var c = cloudNow(); return c[m].apply(c, arguments); }; });
   cloud.token = cloud.signIn; // the old name (appFont.google.token), kept for notes that still say it
+
+  // ---- Safe sync (house standard 30): no device ever overwrites newer data in the cloud ----------------
+  // appFont.cloud.syncDoc(name, { load, save, merge }) keeps ONE document in step between this device and the
+  // reader's cloud (a phone that was offline for a week, the desktop, the runner):
+  //   load()                -> this device's copy (any JSON value), or null when it has none
+  //   save(doc)             -> keep a copy on this device; called only when the merge changed it
+  //   merge(local, remote)  -> the two combined; appFont.cloud.mergeRecords() does the usual case
+  // Whenever the cloud changed since this device last saw it, the cloud copy is read and merged FIRST; the
+  // result is written only if it differs from the cloud's, and only after checking nobody wrote meanwhile.
+  // -> { pulled, pushed }. Call it on start, on focus, and after a change (a short delay batches typing).
+  // ponytail: two devices writing in the same instant can still race; the next sync of either merges it in.
+  var SYNC_KEY = function (name) { return 'maker-sync:' + appKey() + ':' + name; };
+  function stableJSON(v) {
+    return JSON.stringify(v, function (k, x) {
+      return x && typeof x === 'object' && !Array.isArray(x) ? Object.keys(x).sort().reduce(function (o, k2) { o[k2] = x[k2]; return o; }, {}) : x;
+    });
+  }
+  function textHash(t) { var h = 5381; for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) >>> 0; return h.toString(36) + ':' + t.length; }
+  function syncDoc(name, h, depth) {
+    var key = SYNC_KEY(name), seen = {}, local, st, remote = null, pulled = false;
+    try { seen = JSON.parse(store.get(key) || '{}'); } catch (e) { /* first sync */ }
+    var remember = function (s, hsh) { store.set(key, JSON.stringify({ version: s ? String(s.version) : '', hash: hsh })); };
+    return Promise.resolve(h.load()).then(function (l) { local = l; return cloud.stat(name); }).then(function (s) {
+      st = s;
+      if (st && String(st.version) !== seen.version) return cloud.read(name).then(function (t) { remote = t ? parseJSON(t) : null; });
+    }).then(function () {
+      var doc = local;
+      if (remote != null) {
+        doc = local == null ? remote : h.merge(local, remote);
+        if (stableJSON(doc) !== stableJSON(local)) { pulled = true; return Promise.resolve(h.save(doc)).then(function () { return doc; }); }
+      }
+      return doc;
+    }).then(function (doc) {
+      var mine = doc == null ? '' : textHash(stableJSON(doc)), theirs = remote != null ? textHash(stableJSON(remote)) : seen.hash;
+      if (doc == null || (st && mine === theirs)) { if (st) remember(st, theirs); return { pulled: pulled, pushed: false }; }
+      return cloud.stat(name).then(function (s2) { // look once more right before writing: did another device write meanwhile?
+        if (st && s2 && String(s2.version) !== String(st.version) && (depth || 0) < 3) return syncDoc(name, h, (depth || 0) + 1).then(function (r) { r.pulled = r.pulled || pulled; return r; });
+        if (!st && s2 && (depth || 0) < 3) return syncDoc(name, h, (depth || 0) + 1); // it appeared meanwhile: merge it in first
+        return cloud.write(name, JSON.stringify(doc)).then(function () { return cloud.stat(name); }).then(function (s3) {
+          remember(s3, mine);
+          return { pulled: pulled, pushed: true };
+        });
+      });
+    });
+  }
+  // Two lists of records with ids, combined. For each id the most recently changed copy wins (equal times are
+  // settled the same way on every device). A deletion is kept as a record with deleted: true (a "tombstone"), so
+  // it beats an older copy instead of the record coming back. opts: { id: 'id', updated: 'updatedAt' } (ms or ISO).
+  // Call it as mergeRecords(local, cloud): the result keeps the cloud's order, with this device's new records after.
+  function mergeRecords(a, b, opts) {
+    opts = opts || {};
+    var id = opts.id || 'id', up = opts.updated || 'updatedAt', out = {}, order = [];
+    var t = function (r) { var v = r[up]; return typeof v === 'number' ? v : Date.parse(v) || 0; };
+    [].concat(b || [], a || []).forEach(function (r) { // b's order first (the cloud's), then a's new records: every device ends in the same order
+      if (!r || r[id] == null) return;
+      var k = String(r[id]);
+      if (!(k in out)) { order.push(k); out[k] = r; return; }
+      var o = out[k], d = t(r) - t(o);
+      if (d > 0 || (d === 0 && stableJSON(r) > stableJSON(o))) out[k] = r;
+    });
+    return order.map(function (k) { return out[k]; });
+  }
+
+  cloud.syncDoc = function (name, h) { return syncDoc(name, h, 0); };
+  cloud.mergeRecords = mergeRecords;
 
   // ---- Cold backup (hub roadmap chunk 2a) ------------------------------------------------------------
   // Every app shares the origin, so one page can read all of their settings and databases into one

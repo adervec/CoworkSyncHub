@@ -25,7 +25,17 @@ from datetime import datetime
 from email.utils import formatdate
 from pathlib import Path
 
-from coworkhub import fmt_age
+
+
+def fmt_age(t):
+    """'5m ago' for a unix time; '-' for none. (Was in coworkhub.py, now archived.)"""
+    if not t:
+        return "-"
+    s = max(0.0, time.time() - t)
+    for limit, div, unit in ((60, 1, "s"), (3600, 60, "m"), (86400, 3600, "h")):
+        if s < limit:
+            return f"{int(s / div)}{unit} ago"
+    return f"{int(s / 86400)}d ago"
 
 BASE = Path(__file__).resolve().parent
 SITE = BASE / "site"
@@ -1015,10 +1025,12 @@ location.replace("/portal/"+location.search+location.hash);
 
 COWORK_DOC = """<section class="doc">
 <h2 class="eyebrow">// what it is</h2>
-<p>Every app here can hand its data to an AI agent and take the answer back, through a plain folder on
-your disk: the app writes a <code>cowork.json</code> manifest plus request files, an agent (Claude
-Cowork or Claude Code pointed at the folder, or a person) writes reply files beside them, the app
-imports the reply. Nothing goes through a server you don't run.</p>
+<p>Every app here can hand its data to an AI and take the answer back. The app writes a request into your own
+private cloud folder; the <b>AI runner</b> on your computer (a small program you run yourself, with your own AI
+account) answers it there; the app shows you the answer before anything changes, on whichever device you
+open it next. Nothing goes through a server the maker runs, and no browser tab has to stay open.
+Setting up the runner: <a href="https://github.com/adervec/CoworkSyncHub/blob/main/RUNNER.md">RUNNER.md</a>.
+(The earlier method, a folder on your computer kept open in a desktop browser, is retired.)</p>
 <h2 class="eyebrow">// one panel, every app</h2>
 <p>The panel below is the exact same component every app shows — same words, same states, same buttons —
 no matter what the app around it looks like.</p>
@@ -1026,11 +1038,7 @@ no matter what the app around it looks like.</p>
 <h2 class="eyebrow">// states</h2>
 <ul class="feat"><li><b>idle</b> — nothing asked yet.</li><li><b>PENDING</b> — a request is newer than any reply.</li>
 <li><b>answered</b> — a reply landed after the latest request.</li><li><b>STALE</b> — pending for over 7 days.</li>
-<li><b>note</b> — something's wrong with the folder; the text says what.</li></ul>
-<h2 class="eyebrow">// try it</h2>
-<p>Pick any scratch folder. The panel writes a tiny manifest and request into it; drop a
-<code>reply.json</code> in there (any JSON) and press <i>Check for replies</i>.</p>
-<div id="try"></div>
+<li><b>note</b> — something needs you (signing in, or the runner reported a problem); the text says what.</li></ul>
 <h2 class="eyebrow">// for app authors</h2>
 <pre><code>&lt;script src="https://adervec.github.io/cowork.js"&gt;&lt;/script&gt;
 &lt;script&gt;
@@ -1043,12 +1051,11 @@ cowork.mount(document.getElementById("sync"), {
   apply: (ch, reply) =&gt; importCoachReply(reply)
 });
 &lt;/script&gt;</code></pre>
-<p>Apps that already drive their own folder keep that logic and use <code>mode="data"</code>: feed the
-panel <code>{app, channels, actions}</code> and listen for <code>cowork-action</code>. Theme it only
+<p>An app with its own cowork engine uses <code>mode="data"</code>: feed the panel <code>{app, channels, actions}</code>
+and listen for <code>cowork-action</code>; its engine must use the same cloud files. Theme it only
 through <code>--cowork-*</code> custom properties; the rest is shadow DOM on purpose. Protocol details:
 <a href="https://github.com/adervec/CoworkSyncHub">CoworkSyncHub / COWORK-PROTOCOL.md</a>.
-Step-by-step setup and troubleshooting for every app, the briefs folder, and the data sources (Garmin, Strava,
-Drive, Bluetooth): <a href="https://github.com/adervec/CoworkSyncHub/blob/main/SETUP.md">SETUP.md</a>.</p>
+Setup and troubleshooting: <a href="https://github.com/adervec/CoworkSyncHub/blob/main/RUNNER.md">RUNNER.md</a>.</p>
 <h2 class="eyebrow">// the other two contracts</h2>
 <p>Because every app lives on this origin, they share two small localStorage notes with the portal:
 <code>portal-installed</code> (an app marks itself when it runs installed, so the portal can launch that
@@ -1065,7 +1072,7 @@ COWORK_SELFTEST = """<!doctype html><meta charset="utf-8"><title>cowork.js self-
 <script>
 (async function(){
   var fails=[],log=[];function ok(c,m){(c?log:fails).push(m);}
-  ok(window.cowork&&cowork.version===3,"global + version");
+  ok(window.cowork&&cowork.version===5,"global + version");
   ok(cowork.stateOf({review:{}})==="REVIEW","stateOf review");
   ok(cowork.stateOf({pending:true})==="PENDING","stateOf pending");
   ok(cowork.stateOf({pending:true,answered:true})==="answered","stateOf answered");
@@ -1089,7 +1096,7 @@ COWORK_SELFTEST = """<!doctype html><meta charset="utf-8"><title>cowork.js self-
   document.getElementById("b").appendChild(q);
   q.configure({app:"selftest",manifest:{protocol:"cowork-manifest",protocolVersion:1,app:"selftest",
     channels:[{name:"one",request:["one/request.json"],replyPath:"one/reply.json"}]}});
-  ok(q.shadowRoot.querySelector("header button.primary").textContent==="Connect folder","fs mode starts disconnected");
+  ok(!/Connect folder|Change folder/.test(q.shadowRoot.textContent)&&/not connected|font\\.js/.test(q.shadowRoot.textContent),"fs mode starts disconnected, with no folder to pick (v5: cloud only)");
   ok(q.shadowRoot.querySelector(".pill").textContent==="idle","fs mode idle");
   ok(getComputedStyle(q.shadowRoot.querySelector(".wrap")).borderTopLeftRadius==="12px","shadow css applied");
   document.getElementById("r").textContent=fails.length?"FAIL "+fails.length:"OK "+log.length+" checks";
@@ -1116,7 +1123,7 @@ def write_cowork():
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI cowork sync — how it works</title>
-<meta name="description" content="How the apps at adervec.github.io hand work to an AI agent through a folder on your disk, and the one shared panel that drives it.">
+<meta name="description" content="How the apps at adervec.github.io hand work to your own AI runner through your private cloud folder, and the one shared panel that drives it.">
 <link rel="icon" href="/portal/icon.svg" type="image/svg+xml">
 <style>{PORTAL_CSS}
 .doc p,.doc ul{{max-width:720px;font-size:14.5px}}
@@ -1147,13 +1154,6 @@ demo.data={{app:"example app",folder:"example app",channels:[
 demo.addEventListener("cowork-action",function(ev){{demo.data=Object.assign({{}},demo._cfg,{{channels:demo.channels,
   actions:[{{id:"push",label:"Send requests",primary:true}},{{id:"poll",label:"Check for replies"}}],
   message:"demo: would "+ev.detail.action+(ev.detail.channel?" "+ev.detail.channel:"")}});}});
-cowork.mount(document.getElementById("try"),{{app:"portal-try",
-  manifest:{{protocol:"cowork-manifest",protocolVersion:1,app:"portal-try",
-    channels:[{{name:"hello",request:["hello/request.json"],instructions:"hello/INSTRUCTIONS.md",replyPath:"hello/reply.json"}}]}},
-  files:function(){{return {{"hello/request.json":{{protocol:"portal-try",protocolVersion:1,kind:"hello",
-      generatedAt:new Date().toISOString(),payload:{{say:"hi"}}}},
-    "hello/INSTRUCTIONS.md":"# hello\\n\\nWrite any JSON to hello/reply.json."}}}},
-  apply:function(ch,reply){{alert("reply imported: "+JSON.stringify(reply).slice(0,120));}}}});
 </script></body></html>"""
     (SITE / "cowork" / "index.html").write_text(page, encoding="utf-8")
     (SITE / "cowork-selftest.html").write_text(COWORK_SELFTEST, encoding="utf-8")
@@ -1240,8 +1240,8 @@ and holding opens that copy · keys <kbd>1</kbd>–<kbd>0</kbd> launch too</p>
 </section>
 <section class="you" id="ask" hidden>
 <h2 class="eyebrow">// ask your coach</h2>
-<p class="caption">Hand your whole week — every app — to an agent through a folder: CoworkSyncHub, Claude Desktop,
-or a person. It writes a review back and it shows here. Nothing is uploaded.</p>
+<p class="caption">Hand your whole week, every app, to your AI runner through your own cloud folder. It writes a review
+back and it shows here. Nothing goes to the maker.</p>
 <div id="askhost"></div>
 <pre id="askreply" class="reply" hidden></pre>
 </section>

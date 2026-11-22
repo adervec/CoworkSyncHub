@@ -2,62 +2,29 @@
 
 Three things that tie my apps together:
 
-- **`coworkhub.py`** — a passive morning dashboard: an agent's daily brief on top, each app's own brief below.
-- **`cowork.js`** + `COWORK-PROTOCOL.md` — the shared folder hand-off every app speaks.
+- **`runner.py`** — the AI runner on the reader's own computer: answers the apps' AI cowork requests,
+  feeds Garmin and Strava to every app once, and writes the daily brief the hub shows. Setup: [RUNNER.md](RUNNER.md).
+- **`cowork.js`** + `COWORK-PROTOCOL.md` — the shared AI cowork panel every app shows, and its protocol.
+  Requests and replies live in the reader's own cloud folder.
+- **`font.js`** — the house font and everything every app shares: themes, languages, the About panel,
+  backup, the reader's cloud (`appFont.cloud`, with safe sync), the session ledger.
 - **`portal.py`** — the generator for the app portal at <https://adervec.github.io/portal/>.
 
-## The morning dashboard (`coworkhub.py`)
-
-A passive page over two folders. It dispatches nothing and writes nothing into an app folder.
-
-```
-python coworkhub.py [briefs] [--apps DIR] [--port 8791] [--no-open]
-```
-
-- **briefs folder** - one markdown file a day (`YYYY-MM-DD.md`), written by an agent on a
-  schedule (Claude Cowork here). Every `## ` section becomes a tile; what sits before the
-  tile's first `### ` is always visible and each `### ` is a collapsed drill-down. A tile
-  titled *Needs you* is pinned first, a table makes a tile full width (the across-days
-  *Outlook*), and a visible red or orange circle emoji colours the tile's edge. The exact
-  contract is `INSTRUCTIONS.md`, kept current in that folder each time the hub starts.
-  The page's *Your place & commute* form saves `settings.json` there - where you live,
-  where you commute to and how - so the agent picks local weather, traffic, transit and
-  news sources itself and no prompt has to name a city.
-- **apps folder** - one sub-folder per app, each holding the `BRIEF.md` that app keeps
-  current by itself. Shown under the tiles as one line per app (its own "At a glance"),
-  expandable to the app's full brief section by section, with its age; anything older than
-  36 hours is marked stale, and a folder an app has never written to says so.
-
-Earlier days are a list of links at the bottom. Reload to re-read; loopback only, since
-briefs are private. Defaults are `~/Documents/Cowork/MorningBrief` and
-`~/Documents/Cowork/Cowork Link Folders` when they exist, otherwise `briefs/` beside the
-script and no app strip.
-
-The split is deliberate: the agent writes what only it can (weather, traffic, calendar,
-news, the cross-source reading and a recommendation), the apps speak for themselves, and
-nothing is said twice. To really drill down, open the app.
-
-Needs Python 3.9+, no dependencies. `python test_coworkhub.py` prints `OK`.
-
-This used to be a dispatcher that scanned registered folders and spawned headless Claude on
-each pending request (`run` / `watch` / `serve` / shared sources / sync log). The agent does
-that walk itself now; the old hub is in git history if it is ever wanted.
-
-Setup and troubleshooting for the apps' cowork panels and data sources: [SETUP.md](SETUP.md).
+The local morning dashboard (`coworkhub.py`) and the folder method are retired: see [archive/](archive/).
 
 ## The shared cowork UI (`cowork.js`)
 
 One implementation of the AI cowork sync panel, published at
 <https://adervec.github.io/cowork.js> and loaded by every app, so the panel looks and
 behaves the same no matter what the app around it looks like (shadow DOM; theme only
-through `--cowork-*` custom properties). Two modes: `fs` drives a real folder through the
-File System Access API (`cowork.mount(host, {app, manifest, files, apply})` is the whole
-adoption for a new app); `mode="data"` is for apps that already drive their own folder — feed it `{app, channels, actions}` and listen for `cowork-action`. The state
+through `--cowork-*` custom properties). Two modes: `fs` drives the app's cowork files in the
+reader's cloud folder, answered by the AI runner (`cowork.mount(host, {app, manifest, files, apply})` is the
+whole adoption for a new app; the old folder-on-disk transport is retired); `mode="data"` is for apps with their own engine — feed it `{app, channels, actions}` and listen for `cowork-action`. The state
 words are the hub's own (idle / PENDING / answered / STALE). Docs + live demo:
 <https://adervec.github.io/cowork>; browser self-test: `/cowork-selftest.html`.
 
 Sixteen apps wear it: GymTracker, Tachyread and SpeechImprover in data mode around their own
-folder logic; ChessRetabled, GuitarPicker, Mise, Handwriting Helper, MicroMiniger, Black Mirror
+engines (moving those engines from a folder to the cloud is on each app's list); ChessRetabled, GuitarPicker, Mise, Handwriting Helper, MicroMiniger, Black Mirror
 Bike Ride, Bodybuilding Progress Coach, Marksman, Run315, Learning Pit, Music Studio, The Long
 Gallery and The Classical Journey in fs mode with a single `coach` channel — the data they
 already have (a brief, a report, a cook log, scores, a paint queue, rides, body-comp + pose

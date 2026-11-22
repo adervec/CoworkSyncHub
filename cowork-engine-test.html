@@ -27,7 +27,7 @@ async function get(root, path) { try { var p = path.split('/'), d = root; for (v
   var fails = [], log = [];
   function ok(c, m) { (c ? log : fails).push(m); }
   ['cowork-state:enginetest', 'cowork-state:v1test'].forEach(function (k) { localStorage.removeItem(k); });
-  ok(cowork.version === 4, 'version 4');
+  ok(cowork.version === 5, 'version 5');
   ok(cowork.isDue('5m', Date.now() - 6 * 60e3, Date.now()) && !cowork.isDue('5m', Date.now() - 60e3, Date.now()) && !cowork.isDue('off', 0, Date.now()) && cowork.isDue('hourly', 0, Date.now()), 'schedules: due after the interval, a never-run channel is due, manual never');
 
   var applied = [], undone = [], coachSeen = [];
@@ -139,7 +139,7 @@ async function get(root, path) { try { var p = path.split('/'), d = root; for (v
     channels: { coach: { review: false, apply: function (r) { cloudSeen.push(r.say); return {}; } }, plan: { review: false, apply: function (r) { cloudSeen.push('plan:' + r.n); return {}; } } } };
   var host2 = document.createElement('div'); document.body.appendChild(host2);
   var c = cowork.mount(host2, ccfg);
-  ok(/Use my cloud/.test(c.shadowRoot.textContent), 'v4: the panel offers the cloud when the page has one');
+  ok(/Use my cloud/.test(c.shadowRoot.textContent) && !/Connect folder|Change folder/.test(c.shadowRoot.textContent), 'v5: the panel offers the cloud, and no folder any more');
   await c.useCloud();
   ok(signed && localStorage.getItem('cowork-transport:cloudtest') === 'cloud', 'v4: choosing the cloud signs in and is remembered');
   ok(!!box['cowork-cloudtest--cowork.json'] && JSON.parse(box['cowork-cloudtest--coach--request.json'].text).requestHash === 'c1' && box['cowork-cloudtest--coach--INSTRUCTIONS.md'].text === '# coach' && !!box['cowork-cloudtest--cowork-machine.json'],
@@ -151,6 +151,22 @@ async function get(root, path) { try { var p = path.split('/'), d = root; for (v
   await c.refresh();
   ok(cloudSeen.join() === 'from the runner,plan:2', 'v4: replies written in the cloud are applied (fixed path and dir style)');
   ok(!box['cowork-cloudtest--plan--inbox--output-2026-11-21T091500.json'] && !!box['cowork-cloudtest--plan--processed--output-2026-11-21T091500.json'], 'v4: a handled dir reply moves to processed/ in the cloud');
+  // v5: another device (its own empty ledger) never applies a reply this device already applied
+  ok(!!box['cowork-cloudtest--applied.json'] && JSON.parse(box['cowork-cloudtest--applied.json'].text).applied.length === 2, 'v5: applied replies are listed in the cloud for every device');
+  var keepState = localStorage.getItem('cowork-state:cloudtest');
+  localStorage.removeItem('cowork-state:cloudtest'); // a phone that has never seen these replies
+  var hostB = document.createElement('div'); document.body.appendChild(hostB);
+  var cB = cowork.mount(hostB, ccfg);
+  await new Promise(function (r) { setTimeout(r, 4100); });
+  await cB.refresh(true);
+  ok(cloudSeen.join() === 'from the runner,plan:2', 'v5: a second device does not apply the same reply again');
+  put2('cowork-cloudtest--coach--request.json', JSON.stringify({ requestHash: 'c2' }));
+  put2('cowork-cloudtest--coach--reply.json', JSON.stringify({ requestHash: 'c2', say: 'new advice' }));
+  cB._st.reqHash.coach = 'c2';
+  await new Promise(function (r) { setTimeout(r, 4100); });
+  await cB.refresh(true);
+  ok(cloudSeen.join() === 'from the runner,plan:2,new advice', 'v5: a new reply still applies on that device');
+  if (keepState) localStorage.setItem('cowork-state:cloudtest', keepState);
   signed = false;
   var host3 = document.createElement('div'); document.body.appendChild(host3);
   var c2 = cowork.mount(host3, ccfg);

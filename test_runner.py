@@ -8,6 +8,56 @@ from pathlib import Path
 tmp = Path(tempfile.mkdtemp(prefix="runner-test-"))
 os.environ["ADERVEC_RUNNER_HOME"] = str(tmp / "home")
 import runner  # noqa: E402  (HOME is read at import)
+from pathlib import Path as _P  # noqa: E402
+
+
+# A disk-backed store with CloudStore's shape: the runner's old FolderStore, kept here as a test stand-in.
+class FolderStore:  # noqa: D101
+    """Cowork folders on this PC: each sub-folder holding a cowork.json is one app (today's folder method)."""
+
+    def __init__(self, root):
+        self.root, self.label, self._map = _P(root), str(root), None
+
+    def _apps(self):
+        if self._map is None:
+            self._map = {}
+            for d in sorted(self.root.iterdir()) if self.root.is_dir() else []:
+                m = runner.load(d / "cowork.json", None) if d.is_dir() else None
+                if isinstance(m, dict):
+                    self._map[str(m.get("app") or d.name)] = d
+        return self._map
+
+    def apps(self):
+        return list(self._apps())
+
+    def _p(self, app, path):
+        p = (self._apps()[app] / path).resolve()
+        if self._apps()[app].resolve() not in p.parents:
+            raise RuntimeError(f"path leaves the app folder: {path}")
+        return p
+
+    def mtime(self, app, path):
+        p = self._p(app, path)
+        return p.stat().st_mtime if p.is_file() else 0
+
+    def read(self, app, path):
+        p = self._p(app, path)
+        return p.read_bytes() if p.is_file() else None
+
+    def listdir(self, app, d):
+        p = self._p(app, d)
+        return [(x.name, x.stat().st_mtime) for x in p.iterdir() if x.is_file()] if p.is_dir() else []
+
+    def write(self, app, path, text):
+        p = self._p(app, path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_name(p.name + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, p)  # atomic: the app never reads half a reply
+
+    def put_status(self, name, text):
+        pass
+
 
 apps = tmp / "apps"
 
@@ -47,7 +97,7 @@ class Fake:
         return a, {"engine": "fake", "model": "fake-1"}
 
 
-store = runner.FolderStore(apps)
+store = FolderStore(apps)
 runner.save(runner.SETTINGS, {"stores": [str(apps)], "engine": {"kind": "claude-code", "model": "sonnet"}})
 v = runner.vendor_of(runner.settings()["engine"])
 consent = {"engine": {"app-replies": {"allowed": True, "vendor": v}}}
@@ -135,7 +185,8 @@ assert cs.listdir("run", "coach") and all("--" not in n for n, _ in cs.listdir("
 
 # the status file, with the lock released
 runner.save(runner.CONSENT, consent)
-runner.save(runner.SETTINGS, {"stores": [str(tmp / "empty")], "engine": {"kind": "claude-code"}})
+runner.save(runner.SETTINGS, {"stores": ["cloud"], "engine": {"kind": "claude-code"}})
+runner.Google = lambda: G()  # the status run uses a pretend cloud
 assert runner.run(quiet=True) == 0 and not runner.LOCK.exists()
 st = runner.load(runner.STATUS, {})
 assert st["jobs"]["replies"]["state"] == "ok" and st["consent"]["app-replies"] is True and st["jobs"]["brief"]["state"] == "skipped", st
@@ -220,8 +271,6 @@ yday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 g3.files[f"hub-brief-{old_day}.md"] = ("# old", 1)
 g3.files[f"hub-brief-{yday}.md"] = ("# yesterday\n## 🔔 Needs you\n- 🔴 renew passport", 2)
 g3.files["cowork-mise--BRIEF.md"] = ("## At a glance\n3 cooks this week", time.time())
-(tmp / "briefs" / "GymTracker").mkdir(parents=True)
-(tmp / "briefs" / "GymTracker" / "BRIEF.md").write_text("## At a glance\nPush day planned", encoding="utf-8")
 runner.collect_calendar = lambda exe, days=14: {"calendars": [{"summary": "Home"}], "events": [{"summary": "Dentist", "start": "14:00"}]}
 runner.collect_tasks = lambda exe, days=14: [{"tasks": [{"content": "Pay rent", "dueDate": "2026-11-21"}]}]
 runner.collect_weather = lambda home: {"place": home["name"], "daily": {"temperature_2m_max": [12]}}
@@ -242,7 +291,7 @@ out3 = g3.files.get(f"hub-brief-{today}.md", ("",))[0]
 assert r["state"] == "partly" and "sleep_last_night" in r["note"] and r["sources"]["calendar"] == "ok" and r["sources"]["web"].startswith("not collected"), r
 assert out3.startswith("# Sat · Dentist at 14:00") and "```" not in out3 and "Made " in out3 and "sleep_last_night FAILED" in out3, "the brief is cleaned, stamped, and names failed sources"
 p3 = eng3.prompts[0]
-assert '"Dentist"' in p3 and "Pay rent" in p3 and "Testville" in p3 and "3 cooks this week" in p3 and "Push day planned" in p3 and "renew passport" in p3, "every allowed source reaches the writer"
+assert '"Dentist"' in p3 and "Pay rent" in p3 and "Testville" in p3 and "3 cooks this week" in p3 and "renew passport" in p3, "every allowed source reaches the writer"
 assert "never invent email items" in p3 and "DEFAULT" not in p3 and "Needs you; Outlook" in p3, "no mail; the built-in recipe when the reader has none"
 assert f"hub-brief-{old_day}.md" not in g3.files and f"hub-brief-{yday}.md" in g3.files, "briefs older than two weeks are removed"
 r = runner.job_brief([cs3], full, s3, Fake([]))

@@ -7,14 +7,14 @@
   python runner.py consent               show or change what the runner may do
   python runner.py schedule install|remove
 
-Job 1 (this file): app replies. Apps write cowork requests (the protocol in COWORK-PROTOCOL.md) into the
-reader's private cloud folder, or into folders on this PC; the runner finds the pending ones, hands each to
+Job 1: app replies. Apps write cowork requests (the protocol in COWORK-PROTOCOL.md) into the reader's
+private cloud folder; the runner finds the pending ones, hands each to
 an ENGINE as plain text (the engine has no tools: it only writes JSON), checks the reply (fingerprint, shape,
 size) and writes it back where the app looks. Apps still review and apply replies themselves.
-Jobs 2 and 3 (the fitness feed and the daily brief) come later.
+Job 2: the fitness feed (Garmin and Strava, merged, in the cloud). Job 3: the daily brief, ready by brief_at.
 
 Three seams, one real implementation each plus a cheap second one:
-  storage   the reader's Google Drive app folder      | folders on this PC
+  storage   the reader's Google Drive app folder      (Dropbox and OneDrive coming; the old folders on this PC are retired)
   engine    Claude Code (the reader's subscription)    | any OpenAI-style API (key kept on this PC)
   collector (jobs 2 and 3)
 Everything the runner keeps (settings, consent, sign-in, ledger, log) lives in ~/.adervec-runner, never in a repo.
@@ -93,7 +93,7 @@ def redact(s):
 def settings():
     s = load(SETTINGS, {})
     s.setdefault("schema", 1)
-    s.setdefault("stores", ["cloud"])          # "cloud", and/or folder paths on this PC
+    s.setdefault("stores", ["cloud"])          # the reader's cloud (folders on this PC are retired)
     s.setdefault("engine", {"kind": "claude-code", "model": "sonnet"})
     s.setdefault("every_minutes", 30)
     s.setdefault("brief_at", "06:30")          # job 3: the daily brief is ready by then
@@ -254,53 +254,6 @@ class CloudStore:
         self.g.write(name, text, hit["id"] if hit else None)
 
 
-class FolderStore:
-    """Cowork folders on this PC: each sub-folder holding a cowork.json is one app (today's folder method)."""
-
-    def __init__(self, root):
-        self.root, self.label, self._map = Path(root), str(root), None
-
-    def _apps(self):
-        if self._map is None:
-            self._map = {}
-            for d in sorted(self.root.iterdir()) if self.root.is_dir() else []:
-                m = load(d / "cowork.json", None) if d.is_dir() else None
-                if isinstance(m, dict):
-                    self._map[str(m.get("app") or d.name)] = d
-        return self._map
-
-    def apps(self):
-        return list(self._apps())
-
-    def _p(self, app, path):
-        p = (self._apps()[app] / path).resolve()
-        if self._apps()[app].resolve() not in p.parents:
-            raise RuntimeError(f"path leaves the app folder: {path}")
-        return p
-
-    def mtime(self, app, path):
-        p = self._p(app, path)
-        return p.stat().st_mtime if p.is_file() else 0
-
-    def read(self, app, path):
-        p = self._p(app, path)
-        return p.read_bytes() if p.is_file() else None
-
-    def listdir(self, app, d):
-        p = self._p(app, d)
-        return [(x.name, x.stat().st_mtime) for x in p.iterdir() if x.is_file()] if p.is_dir() else []
-
-    def write(self, app, path, text):
-        p = self._p(app, path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_name(p.name + ".tmp")
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, p)  # atomic: the app never reads half a reply
-
-    def put_status(self, name, text):
-        pass
-
-
 # ---------------------------------------------------------------- engines: who writes the reply
 class ClaudeCode:
     """The reader's own Claude Code, with no tools at all: it reads the request as text and writes JSON."""
@@ -355,10 +308,10 @@ def make_engine(cfg):
 
 
 def make_stores(s):
-    out = []
-    for x in s["stores"]:
-        out.append(CloudStore(Google()) if x == "cloud" else FolderStore(x))
-    return out
+    # the reader's cloud only: answering cowork folders on this PC (the old folder method) is retired
+    if any(x != "cloud" for x in s["stores"]):
+        log("folder stores in settings are ignored: the folder method is retired")
+    return [CloudStore(Google())]
 
 
 # ---------------------------------------------------------------- job 1: app replies
@@ -896,8 +849,8 @@ def collect_web(exe, home):
     return extract_json(out.get("result") or "")
 
 
-def app_briefs(stores, folders):
-    """Each app's own brief (BRIEF.md written by its cowork panel), from the cloud and from folders on this PC."""
+def app_briefs(stores):
+    """Each app's own brief (BRIEF.md, written by its cowork panel into the reader's cloud)."""
     out = {}
     for st in stores:
         if isinstance(st, CloudStore):
@@ -905,12 +858,6 @@ def app_briefs(stores, folders):
                 m = re.match(r"^cowork-(.+?)--BRIEF\.md$", n)
                 if m:
                     out[m.group(1)] = {"age_hours": round((time.time() - f["mtime"]) / 3600, 1), "text": st.g.read(f["id"]).decode("utf-8", "replace")[:4000]}
-    for root in folders:
-        for d in sorted(Path(root).iterdir()) if Path(root).is_dir() else []:
-            for name in ("BRIEF.md", "snapshot/activity-log.md"):
-                p = d / name
-                if p.is_file() and d.name not in out:
-                    out[d.name] = {"age_hours": round((time.time() - p.stat().st_mtime) / 3600, 1), "text": p.read_text(encoding="utf-8", errors="replace")[:4000]}
     return out
 
 
@@ -969,7 +916,7 @@ def job_brief(stores, consent, s, engine, force=False):
         return {"activities_last_28_days": [x for x in a.get("activities", []) if x["start"][:10] >= cut], "feed_sources": a.get("sources"),
                 "body_last_60_days": [x for x in b.get("days", []) if x["date"] >= (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d")]}
     take("fitness", fitness)
-    take("app_briefs", lambda: app_briefs(stores, s.get("brief_folders") or [p for p in [Path.home() / "Documents" / "Cowork" / "Cowork Link Folders"] if p.is_dir()]))
+    take("app_briefs", lambda: app_briefs(stores))
     old = cloud.g.list("hub-brief-")
     y = sorted(n for n in old if n < f"hub-brief-{today}")
     take("yesterdays_brief", lambda: cloud.g.read(old[y[-1]]["id"]).decode("utf-8", "replace")[:30000] if y else None)
@@ -1104,17 +1051,12 @@ def check(quick=False):
     c = consent.get("engine", {}).get("app-replies") or {}
     row("Consent: app replies", bool(c.get("allowed")) and c.get("vendor") == vendor_of(e), f"to {c.get('vendor', 'nobody')}" if c.get("allowed") else "not given",
         "python runner.py consent")
-    for x in s["stores"]:
-        if x == "cloud":
-            g = Google()
-            try:
-                n = len(g.list("cowork-"))
-                row("Storage: your cloud (Google Drive)", True, f"signed in; {n} cowork file(s); {len(CloudStore(g).apps())} app(s) sending requests")
-            except Exception as ex:  # noqa: BLE001
-                row("Storage: your cloud (Google Drive)", False, str(ex)[:140], "python runner.py setup (signs in again)")
-        else:
-            fs = FolderStore(x)
-            row(f"Storage: folder {x}", fs.root.is_dir(), f"{len(fs.apps())} app folder(s)" if fs.root.is_dir() else "missing", "fix the path in setup")
+    g = Google()
+    try:
+        n = len(g.list("cowork-"))
+        row("Storage: your cloud (Google Drive)", True, f"signed in; {n} cowork file(s); {len(CloudStore(g).apps())} app(s) sending requests")
+    except Exception as ex:  # noqa: BLE001
+        row("Storage: your cloud (Google Drive)", False, str(ex)[:140], "python runner.py setup (signs in again)")
     cc = consent.get("connectors", {})
     if (cc.get("garmin") or {}).get("read"):
         tok = Path.home() / ".garminconnect"
@@ -1226,10 +1168,6 @@ def setup():
         elif ask("   Sign in to your cloud now (opens your browser once)?", "y" if not (HOME / "desktop-token.json").exists() else "n"):
             g.sign_in()
             print("   signed in")
-    folder = input("   Also answer cowork folders on this PC? Path, or Enter to skip: ").strip().strip('"')
-    if folder:
-        s["stores"] = sorted(set(s["stores"] + [folder]))
-        save(SETTINGS, s)
     print("\n   For the daily brief: your home town (for the weather and local news).")
     town = input(f"   Town [{(s.get('home') or {}).get('name', 'skip')}]: ").strip()
     if town:

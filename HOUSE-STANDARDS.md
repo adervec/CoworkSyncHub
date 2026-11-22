@@ -46,20 +46,26 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
    - File names are the app's own (list them in `app-data.json` under `drive`, which now means
      "cloud files"). Hub settings live in `hub-prefs.json` (hub.js); an app never writes that file.
 2. **House font**: Atkinson Hyperlegible by default, reader-changeable (font.js).
-3. **Cowork** (the GymTracker / Tachyread style): named channels, each with fixed request files,
-   instructions and a reply format, declared in a `cowork.json` manifest; a schedule per channel
-   that runs only on the ONE sync device; replies checked automatically; a run history; and replies
-   that can never do more than asked: a fingerprint (`requestHash`) the reply must echo, never
-   applied twice, archived to `processed/`, and an error file when the agent cannot do the job.
-   **Review before applying is the default**, and can be switched off per channel. A reviewed
-   change should be undoable. The shared `cowork.js` (v2) does all of this: pass `channels` with
-   `label`, `schedule`, `review`, `preview(reply)` (rows to tick), `apply(reply, acceptedIds)` (return
-   `{ summary, undo }`) and `undo(data)`, plus an optional `brief()` for BRIEF.md. An app with its own
-   engine (GymTracker, Tachyread) must provide the same guarantees.
-   - The shared panel (v4) can keep the cowork folder in the reader's cloud ("Use my cloud"), where
-     the AI runner on their computer answers it (`CoworkSyncHub/runner.py`, RUNNER.md): no desktop
-     browser or open tab needed. An app with its own engine should offer the same, using the same
-     flat file names (COWORK-PROTOCOL.md).
+3. **Cowork, through the reader's cloud and the AI runner only.** An app hands work to an AI through
+   cowork files in the reader's own cloud folder (`appFont.cloud`), and the reader's AI runner
+   (`CoworkSyncHub/runner.py`, RUNNER.md) answers there. **The folder method is retired**: no
+   "Connect folder", no File System Access folder for cowork, no cowork engine that needs a desktop
+   browser tab kept open. An app works the same on a phone as on the desktop where the runner lives.
+   - The guarantees, all kept by the shared `cowork.js` (v5): named channels with fixed request
+     files, instructions and a reply format, declared in a `cowork.json` manifest; a schedule per
+     channel, run only on the ONE sync device; replies checked automatically; a run history; a
+     fingerprint (`requestHash`) the reply must echo; **review before applying by default**
+     (switchable per channel) and undo for a reviewed change; handled replies archived to
+     `processed/`; the agent's error file shown with its reason; and **a reply applied on one device
+     is never applied on another** (`applied.json` beside the requests, COWORK-PROTOCOL.md).
+   - Adopting it: `cowork.mount(host, { app, manifest, files, channels })`, with `channels` giving
+     `label`, `schedule`, `review`, `preview(reply)` (rows to tick), `apply(reply, acceptedIds)`
+     (return `{ summary, undo }`) and `undo(data)`, plus an optional `brief()` for BRIEF.md (the
+     daily brief reads it).
+   - An app with its own engine (GymTracker, Tachyread, SpeechImprover) moves it onto the same cloud
+     files and the same guarantees, or onto `cowork.mount`; then deletes its folder code. Archive
+     nothing in the app: git history is the archive.
+   - The standards check's `cowork` column fails while the app still has folder-method cowork code.
 4. **Licence and legal**: a `LICENSE` (MIT unless there is a reason); `THIRD-PARTY-NOTICES.md` for any
    bundled third-party code or fonts; an in-app note on where the data lives.
 5. **CI on every push** that runs the app's checks.
@@ -355,10 +361,32 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - There is no status-board column yet: this cannot be read from source. The scan's results are
       on the maker's local review page.
 
-## Working habits
+30. **Sync without overwrites.** A reader uses the same app on a phone and on a desktop (where the
+    runner lives), sometimes offline. No device may ever replace newer data in the cloud with an
+    older copy: an old phone session must never wipe a week of desktop workouts or cowork replies.
+    - **Use `appFont.cloud.syncDoc(name, { load, save, merge })`** for every file the app syncs. It
+      reads the cloud copy first whenever the cloud changed since this device last saw it, merges,
+      and writes only when the result differs, checking just before writing that nobody wrote
+      meanwhile. Sync on start, on focus, when the network returns, and shortly after a change.
+    - **Merge record by record, never file by file.** Keep data as records with an `id` and an
+      `updatedAt` (set on every change), and merge with `appFont.cloud.mergeRecords(local, cloud)`:
+      for each record the latest change wins. **A deletion is a record** (`{ id, deleted: true,
+      updatedAt }`, a tombstone), so a stale device cannot bring a deleted item back. Tombstones may
+      be dropped after 90 days.
+    - **Settings** are records too (one per setting, with `updatedAt`), so changing the theme on the
+      phone does not undo a goal changed on the desktop.
+    - **Never** upload a whole snapshot without reading the cloud first, never compare by the
+      device's clock alone, and never "last write wins" for a whole file.
+    - **Only through `appFont.cloud`.** The old "sync to a folder on this computer" options (pick a
+      Drive or Dropbox desktop folder) are retired with the folder method: they cannot read before
+      writing and they skip the phone. A folder picked to EXPORT something (an album, a print) is fine.
+    - **Moving over:** an app's current whole-file sync becomes a syncDoc. The first sync on each
+      device merges what the device holds with what the cloud holds (records without `updatedAt` count
+      as old), so nothing is lost in the change. Add a `schema` bump in `app-data.json` (standard 23).
+    - **Test it:** a two-device test (two copies of the app's state against one pretend cloud): edit on
+      device A, sync; edit something else on stale device B, sync; both edits survive; a deletion on
+      A stays deleted after B syncs. font-selftest.html shows the pattern.
+    - The standards check's `syncsafe` column fails when the app writes to the cloud without
+      syncDoc or a merge of its own, and warns on an own merge (prefer syncDoc).
 
-- **Start every session by running the standards check for this app** and fix any FAIL before other work; the house standards change over time, and the check is how new ones reach you. Also run `node ../CoworkSyncHub/layout-check.mjs <App>` (the live site, phone and desktop) and fix what it flags.
-- Run the app's own tests and `standards.mjs` before pushing; never push red.
-- Commit and push your own work when it passes; do not leave a pile of uncommitted files.
-- Temporary files (test logs, commit-message drafts, server notes) go in your repo's git-ignored folder or the system temp folder, never loose in the shared GitHub folder.
-- Keep the shared files (font.js, cowork.js, standards.mjs) in CoworkSyncHub; an app never edits a copy.
+## Working habits

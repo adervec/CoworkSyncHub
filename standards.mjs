@@ -96,8 +96,14 @@ const CHECKS = [
     if (a.has(FONTJS)) return a.has(/var\(--app-font/) ? (a.has(/app-font-picker|appFont\.(set|options)/) ? ok() : fail('no font picker')) : fail('loads font.js but nothing uses --app-font');
     return a.has(/Atkinson Hyperlegible/) && a.has(/fontFamily|font-family:\s*var\(--/) ? warn('own font system (not font.js)') : fail('no house font');
   }],
-  ['cowork', 'Cowork: shared engine (or own) + manifest', (a) => {
+  ['cowork', 'Cowork through the cloud + runner (no folder method)', (a) => {
     if (!a.has(/cowork-manifest|cowork\.json/)) return fail('no cowork manifest');
+    // the retired folder method: cowork code that picks or drives a folder on disk
+    // (a folder picked for something else, an album export or a backup folder, is not cowork)
+    const folderCowork = a.text.some((x) => x.t.split('\n').some((l) =>
+      /showDirectoryPicker\(\s*\{[^}]*id\s*:\s*['"][^'"]*(cw|cowork)/i.test(l) || /cowork-machine\.json|coworkFolder|pushCoworkFolder/i.test(l)
+      || (/cowork/i.test(x.f) && /showDirectoryPicker|getDirectoryHandle\(/.test(l))));
+    if (folderCowork) return fail('still uses the retired folder method for cowork (move to cowork.mount in the cloud, standard 3)');
     if (!a.has(/github\.io\/cowork\.js/)) return warn('own cowork, no shared panel');
     // fs-mode apps should describe their channels (label, preview rows, undo); data-mode apps run their own engine
     const fsMount = a.has(/\b(cowork|cw)\.mount\(/), described = a.has(/\bpreview\s*[:(]/) && a.has(/\bchannels\s*:\s*\{/);
@@ -285,6 +291,16 @@ const CHECKS = [
     const days = Math.floor((Date.now() - new Date(m[1] + 'T00:00:00').getTime()) / 864e5);
     return days > 90 ? warn('OVERLAPS.md was last reviewed ' + days + ' days ago') : ok();
   }],
+  ['syncsafe', 'Sync without overwrites (syncDoc, record merge)', (a) => {
+    // a Drive upload of its own, or the shared cloud door (apps alias it: const G = appFont.cloud; G.write(...))
+    const writes = a.has(/upload\/drive\/v3\/files|uploadType=(media|multipart)/) || (a.has(/appFont\??\.(cloud|google)\b/) && a.has(/\b\w+(\.cloud)?\.write\(\s*[\w'"`]/));
+    if (a.has(/\.syncDoc\(/)) return ok();
+    if (!writes) return ['-', 'does not write to the cloud'];
+    const checks = a.has(/modifiedTime|headRevisionId|\bversion\b[^\n]{0,40}(drive|remote|cloud)|remote(Newer|Version|Mtime)/);
+    const merges = a.has(/mergeRecords\(|\bmerge\w*\([^)]*(remote|cloud|local)/i) && a.has(/updatedAt|tombstone|deleted\s*:\s*true/);
+    if (checks && merges) return warn('own version check and merge: prefer appFont.cloud.syncDoc');
+    return fail('writes to the cloud without reading and merging it first: an old device can overwrite newer data (standard 30)');
+  }],
   ['notes', 'Agent notes import the house standards', (a) => {
     const here = path.join(a.root, 'CLAUDE.md'), up = path.join(path.dirname(a.root), 'CLAUDE.md');
     const f = existsSync(here) ? here : (path.basename(a.root) === 'site' && existsSync(up) ? up : null);
@@ -372,7 +388,7 @@ function selftest() {
     execFileSync('git', ['-C', tmp, 'init', '-q']);
     writeFileSync(path.join(tmp, 'adervec-backup-2026-01-01.json'), '{}');
     writeFileSync(path.join(tmp, 'notes.md'), 'see C:\\Users\\Someone\\x and mail ada@example.com');
-    execFileSync('git', ['-C', tmp, 'add', '-A']);
+    execFileSync('git', ['-C', tmp, 'add', '-A', '-f']); // -f: the machine-wide ignore list would hide the made-up backup
     eq(check('leak', { ...fake(''), root: tmp }), 'FAIL', 'a tracked backup file fails');
     writeFileSync(path.join(tmp, '.leak-ok'), 'adervec-backup-2026-01-01.json  # made-up sample\n');
     eq(check('leak', { ...fake(''), root: tmp }), 'ok', 'a file listed in .leak-ok is excused, and placeholders are not findings');
@@ -393,6 +409,13 @@ function selftest() {
   eq(check('iso', fake('const f = new Intl.DateTimeFormat(loc, { month: "long" }) // iso-ok: month name only')), 'ok', 'a marked exception passes');
   eq(check('iso', fake('<script data-house="font.js">var f = new Intl.DateTimeFormat(locale(), o);</script> el.textContent = appFont.fmt.date(d)')), 'ok', "an inlined font.js's own formatter does not count");
   eq(check('iso', fake('<script data-house="font.js">var f = 1;</script> el.textContent = d.toLocaleDateString()')), 'FAIL', 'the app around an inlined font.js still counts');
+  eq(check('syncsafe', fake('localStorage.setItem("x", s)')), '-', 'an app without cloud sync is not judged');
+  eq(check('syncsafe', fake('fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=media", { method: "PATCH", body })')), 'FAIL', 'a blind upload fails');
+  eq(check('syncsafe', fake('await appFont.cloud.syncDoc("x.json", { load, save, merge })')), 'ok', 'syncDoc passes');
+  eq(check('syncsafe', fake('uploadType=media ... if (remoteMtime > last) local = mergeState(local, remote) ... updatedAt')), 'warn', 'an own check and merge warns');
+  eq(check('cowork', { ...fake('cowork-manifest; <script src="https://adervec.github.io/cowork.js"></script> cowork.mount(h, { channels: {}, preview(r) {} })'), text: [{ f: 'a.js', t: 'const h = await showDirectoryPicker({ id: "app-cowork", mode: "readwrite" })' }] }), 'FAIL', 'folder-method cowork fails');
+  eq(check('cowork', { ...fake('cowork-manifest; <script src="https://adervec.github.io/cowork.js"></script> cowork.mount(h, { channels: { coach: { preview(r) {} } } })'), text: [{ f: 'backup.js', t: 'const h = await showDirectoryPicker({ id: "albums", mode: "readwrite" })' }] }), 'ok', 'a folder picked for an export is not cowork');
+  eq(check('cowork', fake('cowork-manifest; <script src="https://adervec.github.io/cowork.js"></script> cowork.mount(h, { channels: { coach: { preview(r) {} } } })')), 'ok', 'cloud cowork passes');
   eq(check('ledger', fake('appFont.logSession({ kind: "lift", minutes: 40, id: w.id })')), 'ok', 'logSession passes');
   eq(check('pfp', fake('<header><app-account></app-account></header> const G = window.appFont?.google; G.token()')), 'ok', 'the shared sign-in with the corner avatar passes');
   eq(check('pfp', fake('const G = window.appFont?.google; G.token()')), 'FAIL', 'the shared sign-in without the avatar in the page fails');

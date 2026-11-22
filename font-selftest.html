@@ -141,7 +141,7 @@
   ok('an unknown theme falls back to System', F.theme() === 'system' && tsel.value === 'system' && !localStorage.getItem('maker-theme:font-selftest.html'));
   tp.remove();
   // the cloud door (house standard 1): Google by default, and any vendor that fits the same shape
-  var C = F.cloud, box = {}, signed = false;
+  var C = F.cloud, box = {}, ver = {}, writes = 0, signed = false;
   ok('Google Drive is the cloud until another is chosen', C.provider() === 'google' && C.label() === 'Google Drive' && C.providers().filter(function (p) { return !p.soon; }).length === 1 && C.providers()[0].current && C.providers().filter(function (p) { return p.soon; }).map(function (p) { return p.id; }).join() === 'dropbox,onedrive' && F.google === C);
   var soonOk = false; try { C.use('dropbox'); } catch (e) { soonOk = /coming soon/.test(e.message); }
   ok('a cloud that is only coming soon cannot be chosen', soonOk && C.provider() === 'google');
@@ -150,7 +150,8 @@
   C.register({ id: 'memory', label: 'Test cloud',
     signIn: function () { signed = true; return Promise.resolve('pass'); }, signedIn: function () { return signed; }, signOut: function () { signed = false; },
     read: function (n) { return Promise.resolve(n in box ? box[n] : null); }, readBytes: function (n) { n = n.name || n; return Promise.resolve(n in box ? new TextEncoder().encode(box[n]).buffer : null); },
-    write: function (n, b) { box[n] = String(b); return Promise.resolve(); }, remove: function (n) { var had = n in box; delete box[n]; return Promise.resolve(had); },
+    write: function (n, b) { box[n] = String(b); ver[n] = (ver[n] || 0) + 1; writes++; return Promise.resolve(); },
+    stat: function (n) { return Promise.resolve(n in box ? { version: String(ver[n]), modified: '', size: box[n].length } : null); }, remove: function (n) { var had = n in box; delete box[n]; return Promise.resolve(had); },
     list: function (p) { return Promise.resolve(Object.keys(box).filter(function (n) { return n.indexOf(p || '') === 0; }).map(function (n) { return { name: n, size: box[n].length, modified: '', mime: '', id: n }; })); } });
   var heardCloud = null; document.addEventListener('app-cloud-change', function (ev) { heardCloud = ev.detail; });
   C.use('memory');
@@ -158,6 +159,30 @@
   await C.signIn(); await C.write('hub-a.json', '{"a":1}'); await C.write('other.json', 'x');
   var listed = await C.list('hub-');
   ok('read, write and list go to the chosen cloud', C.signedIn() && (await C.read('hub-a.json')) === '{"a":1}' && (await C.read('nope')) === null && listed.length === 1 && listed[0].name === 'hub-a.json' && new Uint8Array(await C.readBytes(listed[0])).length === 7);
+  // safe sync (house standard 30): devices merge instead of overwriting, deletions stay deleted
+  var SK = 'maker-sync:font-selftest.html:doc.json', merge = function (l, r) { return { items: C.mergeRecords(l.items, r.items) }; };
+  var dev = { A: { doc: { items: [{ id: 1, what: 'squat 100', updatedAt: 100 }] } }, B: { doc: { items: [{ id: 2, what: 'run 5 km', updatedAt: 150 }] } },
+    C: { doc: { items: [{ id: 1, what: 'squat 90 (an old edit)', updatedAt: 50 }] } } };
+  var on = function (name) { // switch to one pretend device: its own copy and its own memory of the cloud
+    Object.keys(dev).forEach(function (k) { if (dev[k].active) { dev[k].seen = localStorage.getItem(SK); dev[k].active = false; } });
+    dev[name].active = true; if (dev[name].seen) localStorage.setItem(SK, dev[name].seen); else localStorage.removeItem(SK);
+    return { load: function () { return dev[name].doc; }, save: function (d) { dev[name].doc = d; }, merge: merge };
+  };
+  var ids = function (d) { return d.items.map(function (r) { return r.id + ':' + (r.deleted ? 'deleted' : r.what); }).sort().join(' | '); };
+  var r1 = await C.syncDoc('doc.json', on('A'));
+  ok('safe sync: the first device writes the cloud copy', r1.pushed && !r1.pulled && JSON.parse(box['doc.json']).items.length === 1);
+  var r2 = await C.syncDoc('doc.json', on('B'));
+  ok('safe sync: a second device merges the cloud in before writing', r2.pulled && r2.pushed && ids(dev.B.doc) === '1:squat 100 | 2:run 5 km' && ids(JSON.parse(box['doc.json'])) === '1:squat 100 | 2:run 5 km');
+  var w0 = writes, r3 = await C.syncDoc('doc.json', on('A'));
+  ok('safe sync: the first device picks the other one up, and writes nothing when they agree', r3.pulled && !r3.pushed && writes === w0 && ids(dev.A.doc) === '1:squat 100 | 2:run 5 km');
+  var r4 = await C.syncDoc('doc.json', on('C'));
+  ok('safe sync: a stale phone never overwrites newer data', ids(JSON.parse(box['doc.json'])) === '1:squat 100 | 2:run 5 km' && ids(dev.C.doc) === '1:squat 100 | 2:run 5 km');
+  dev.A.doc = { items: dev.A.doc.items.map(function (x) { return x.id === 2 ? { id: 2, deleted: true, updatedAt: 200 } : x; }) };
+  await C.syncDoc('doc.json', on('A'));
+  await C.syncDoc('doc.json', on('B'));
+  ok('safe sync: a deletion stays deleted on every device', ids(dev.B.doc) === '1:squat 100 | 2:deleted' && ids(JSON.parse(box['doc.json'])) === '1:squat 100 | 2:deleted');
+  ok('mergeRecords: equal times settle the same way whichever side is local', JSON.stringify(C.mergeRecords([{ id: 1, v: 'a', updatedAt: 5 }], [{ id: 1, v: 'b', updatedAt: 5 }])) === JSON.stringify(C.mergeRecords([{ id: 1, v: 'b', updatedAt: 5 }], [{ id: 1, v: 'a', updatedAt: 5 }])));
+  localStorage.removeItem(SK);
   C.use('google');
   ok('switching cloud signs the old one out and clears the choice', !signed && C.provider() === 'google' && !localStorage.getItem('maker-cloud'));
   // ISO dates and times (house standard 28)

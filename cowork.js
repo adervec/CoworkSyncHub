@@ -7,7 +7,9 @@
    --cowork-* custom properties listed in CSS below.
 
    Two adapters, because there are exactly two places this runs:
-     fs   — inside an app: File System Access API, drives a real cowork folder.
+     fs   — inside an app: drives the app's cowork files in the reader's own cloud folder (font.js
+            appFont.cloud), answered by the AI runner on the reader's computer (CoworkSyncHub/runner.py).
+            v5: the old method (a folder on this computer, File System Access) is retired.
      data — inside CoworkSyncHub's status.html (or an app with its own engine):
             fed a JSON snapshot, buttons dispatch `cowork-action` events.
 
@@ -43,7 +45,7 @@
 (function () {
   "use strict";
   var PORTAL = "https://adervec.github.io/";
-  var VERSION = 4; // 3: request files may be Blobs (images). 4: the reader's cloud can be the cowork folder
+  var VERSION = 5; // 3: Blob request files. 4: the reader's cloud as the folder. 5: cloud only, and one applied-list for every device
 
   // ---------- small helpers ----------
   function rel(sec) {
@@ -122,7 +124,7 @@
       };
     });
   }
-  var saveDir = function (app, h) { return store("readwrite", function (s) { return s.put(h, app); }); };
+  // v5: only read, to tell a reader with a folder from before that cowork moved to their cloud
   var loadDir = function (app) { return store("readonly", function (s) { return s.get(app); }); };
   var dropDir = function (app) { return store("readwrite", function (s) { return s.delete(app); }); };
 
@@ -396,12 +398,7 @@
         return;
       }
       var h = await loadDir(this._cfg.app).catch(function () { return null; });
-      if (!h) return;
-      var ok = await h.queryPermission({ mode: "readwrite" }).catch(function () { return "denied"; });
-      if (ok !== "granted") { this._note("folder needs re-connecting"); this.render(); return; }
-      this._root = h;
-      await this._readClaim();
-      this.refresh();
+      if (h) { this._note("AI cowork now goes through your own cloud, answered by the AI runner on your computer: press Use my cloud. Your old folder is no longer used; nothing in it was changed."); this.render(); }
     }
     _note(m, isErr) { this._msg = m; this._err = !!isErr; }
     // the cloud needs a signed-in reader; a browser shows the sign-in window only after a tap
@@ -437,24 +434,11 @@
       this.render();
     }
 
-    async connect() {
-      if (!window.showDirectoryPicker) {
-        this._note("this browser can't open folders — use Chrome or Edge on desktop", true);
-        return this.render();
-      }
-      try {
-        var h = await window.showDirectoryPicker({ id: "cowork-" + this._cfg.app, mode: "readwrite" });
-        await this.useFolder(h);
-      } catch (err) {
-        if (err && err.name !== "AbortError") this._note(String(err.message || err), true);
-        this.render();
-      }
-    }
-    /* connect a given folder handle (connect() asks the user for one) */
+    async connect() { return this.useCloud(); } // v5: there is no folder to pick any more
+    /* use a cowork root: the cloud (useCloud), or an in-memory stand-in in the self-tests */
     async useFolder(h) {
       if (!h.cloud) localStorage.removeItem(TRANSPORT(this._cfg.app));
       this._root = h;
-      if (!h.cloud) await saveDir(this._cfg.app, h).catch(function () {}); // the cloud is remembered by its own key
       this._note("");
       if (!(await this._readClaim())) await this.claim(); // the first device to connect runs the schedules
       await this.push();            // a fresh folder starts with a manifest + requests
@@ -557,6 +541,7 @@
         ch.stale = ch.pending && rq > 0 && (Date.now() / 1000 - rq) > 7 * 86400;
         if (!r.path || !rp) { ch.review = null; continue; }
         var text = await readFile(this._root, r.path), h = hash(text);
+        if (st.ledger.indexOf(h) < 0 && (await this._sharedLedger()).indexOf(h) >= 0) st.ledger.push(h); // handled on another device
         if (st.ledger.indexOf(h) >= 0) { ch.review = null; continue; }       // handled before: never twice
         var reply;
         try { reply = JSON.parse(text); } catch (err) { ch.note = "reply could not be read: " + (err.message || err); continue; }
@@ -582,6 +567,22 @@
       this.render();
     }
 
+    // The replies already handled on ANY device, kept beside the requests (applied.json), so a phone that was
+    // offline never applies a reply the desktop already applied. Read once per refresh, appended on apply.
+    async _sharedLedger(fresh) {
+      if (!this._root) return [];
+      if (!fresh && this._shared && Date.now() - this._shared.at < 3000) return this._shared.list;
+      var list = [];
+      try { var j = JSON.parse((await readFile(this._root, "applied.json")) || "{}"); if (Array.isArray(j.applied)) list = j.applied; } catch (e) { /* unreadable: start a new one */ }
+      this._shared = { at: Date.now(), list: list };
+      return list;
+    }
+    async _markShared(h) {
+      var list = (await this._sharedLedger(true)).filter(function (x) { return x !== h; }).concat([h]).slice(-500);
+      try { await writeFile(this._root, "applied.json", JSON.stringify({ protocol: "cowork-applied", protocolVersion: 1, applied: list }, null, 1)); } catch (e) { /* the local ledger still holds it */ }
+      this._shared = { at: Date.now(), list: list };
+    }
+
     /* apply a reply (all of it, or the ticked review rows), record it, archive it */
     async _apply(ch, item, accepted, auto) {
       var cc = this._chCfg(ch.channel), res = null;
@@ -595,6 +596,7 @@
       }
       res = res && typeof res === "object" ? res : {};
       this._st.ledger.push(item.hash);
+      await this._markShared(item.hash);
       var n = accepted ? accepted.length : null;
       this._log({ kind: "apply", channel: ch.channel, auto: !!auto, note: res.summary || (n != null ? n + " change(s) applied" : "applied"), undo: res.undo != null ? res.undo : undefined });
       ch.review = null; ch.justApplied = true;
@@ -606,6 +608,7 @@
       var ch = this._chs.filter(function (c) { return c.channel === chName; })[0];
       if (!ch || !ch.review) return;
       this._st.ledger.push(ch.review.hash);
+      await this._markShared(ch.review.hash);
       this._log({ kind: "discard", channel: ch.channel, note: "reply discarded unread" });
       await this._archive(ch, ch.review);
       ch.review = null;
@@ -679,11 +682,9 @@
       head.appendChild(el("h2", null, "AI cowork sync"));
       if (fs) {
         var inCloud = !!(this._root && this._root.cloud);
-        var conn = el("button", this._root ? "" : "primary", this._root && !inCloud ? "Change folder" : "Connect folder");
-        conn.onclick = function () { self.connect(); };
-        head.appendChild(conn);
+        if (!cloudApi() && !this._root) head.appendChild(el("span", "folder", "AI cowork needs the shared font.js on this page"));
         if (cloudApi() && !inCloud) {
-          var cl = el("button", this._root ? "" : "primary", "Use my cloud");
+          var cl = el("button", "primary", "Use my cloud");
           cl.title = "Keep requests and replies in your own " + cloudApi().label() + " folder, answered by the AI runner on your computer (no folder or open tab needed)";
           cl.onclick = function () { self.useCloud(); };
           head.appendChild(cl);
@@ -696,8 +697,7 @@
           chk.onclick = function () { self.refresh(true); };
           head.appendChild(chk);
         }
-        var label = this._st && this._st.pathLabel;
-        head.appendChild(el("span", "folder", this._root ? (this._root.cloud ? this._root.name : (label || this._root.name)) : "no folder connected"));
+        head.appendChild(el("span", "folder", this._root ? this._root.name : "not connected"));
       } else {
         (this._actions || []).forEach(function (ac) {
           var b = el("button", ac.primary ? "primary" : "", ac.label);
@@ -752,7 +752,7 @@
       }
 
       if (fs && this._root && this._st) {
-        // the sync device and the folder's full path (the browser only reveals the last folder name)
+        // the sync device: the one that sends scheduled requests
         var sd = el("details"), ss = el("summary", null, "Sync device: " + (this._claim ? this._claim.name + (this.isSyncDevice() ? " (this device)" : "") : "none"));
         sd.appendChild(ss);
         var set = el("div", "set");
@@ -762,9 +762,6 @@
           set.appendChild(cl);
         }
         set.appendChild(el("div", "when", "Schedules run only on the sync device; any device can send or check by hand."));
-        var pl = el("input"); pl.type = "text"; pl.placeholder = "Full folder path, for your own reference"; pl.value = this._st.pathLabel || "";
-        pl.onchange = function () { self._st.pathLabel = pl.value.trim(); saveState(self._cfg.app, self._st); self.render(); };
-        set.appendChild(pl);
         sd.appendChild(set);
         host.appendChild(sd);
         // the run history, newest first, with undo where the app gave undo data
@@ -797,7 +794,7 @@
       var foot = el("footer");
       foot.appendChild(el("span", null, fs
         ? (this._root && this._root.cloud ? "Requests and replies stay in your own cloud folder. The AI runner on your computer answers them."
-          : "Point this at a folder, or use your cloud, then let an agent answer in it. Nothing goes to the maker.")
+          : "Use your cloud: the AI runner on your computer answers there, and replies reach every device. Nothing goes to the maker.")
         : "Served by CoworkSyncHub."));
       var a = el("a", null, "how cowork sync works");
       a.href = PORTAL + "cowork"; a.target = "_blank"; a.rel = "noopener";
