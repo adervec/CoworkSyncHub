@@ -188,15 +188,33 @@ ok('sign out forgets the account on this device', await shown(p2, '#in') && awai
     '## 🗓️ Outlook', '| | Today | Tomorrow |', '|---|---|---|', '| Weather | 🟢 12° dry | 🟠 rain |', '',
     '## 🏃 Fitness', '- Load is fine', '### Readiness', 'Sleep 7 h 40', '',
     '## 🔔 Needs you', '- 🔴 **Pay rent** before noon', '- [ ] call the dentist', '- <img src=x onerror="window.pwned=1"> and [a trap](javascript:window.pwned=2) and [ok](https://example.com/x)', '',
-    '---', '*Made today by the runner.*'].join('\n');
+    '## 🎼 For pleasure', '- [Aria](https://adervec.github.io/classical-journey/#/w/bach-aria) by Bach', '',
+    '---', '*Made today by the runner.*', '',
+    '```runner-sources', JSON.stringify([{ name: 'calendar', state: 'ok', note: 'ok' }, { name: 'sleep last night', state: 'fail', note: 'FAILED: signed out' }, { name: 'web', state: 'off', note: 'not collected' }, { name: 'tachyread', state: 'stale', note: 'app brief 90 h old' }]), '```', '',
+    '```runner-todoist', JSON.stringify({ today: iso, tasks: [{ id: 'T1', content: 'Pay rent', dueDate: '2000-01-01', priority: 4 }, { id: 'T2', content: 'Call the dentist', dueDate: iso, priority: 1 }], suggest: [{ content: 'Book a deload week', why: '12 lifts in 14 days', due: '' }] }), '```'].join('\n');
+  await p2.route('https://adervec.github.io/classical-journey/**', (r) => r.fulfill({ contentType: 'text/html', body: '<p>the piece</p>' }));
   await p2.goto(new URL('brief.html', url).href);
   await p2.click('#show');
   await p2.waitForSelector('#brief .tile', { timeout: 8000 }).catch(() => {});
   const titles = await p2.$$eval('#brief .tile h2', (l) => l.map((x) => x.textContent));
-  ok('the brief shows as tiles, Needs you first', titles[0] === '🔔 Needs you' && titles.length === 3 && /Dentist at 14:00/.test(await p2.textContent('#brief h1')));
+  ok('the brief shows as tiles, Needs you first', titles[0] === '🔔 Needs you' && titles.length === 5 && /Dentist at 14:00/.test(await p2.textContent('#brief h1')));
   ok('severity colours the edge, a table makes a tile wide, drill-downs start closed', await p2.$eval('#brief .tile', (t) => t.classList.contains('red')) && await p2.$$eval('#brief .tile.wide', (l) => l.length === 1) && await p2.$eval('#brief details', (x) => !x.open));
   ok('nothing in a brief becomes markup or a script link', await p2.evaluate(() => !window.pwned && !document.querySelector('#brief img') && ![...document.querySelectorAll('#brief a')].some((a) => /^javascript:/i.test(a.getAttribute('href')))) && /onerror/.test(await p2.textContent('#brief')) && await p2.$$eval('#brief a[href^="https://example.com"]', (l) => l.length === 1));
   ok('the day list holds the brief', await p2.$$eval('#day option', (l) => l.length) === 1);
+  ok('sources show as lights, problems first, and no Sources prose', await p2.$$eval('#brief .lights button', (l) => l.map((b) => b.className + ':' + b.textContent).join()) === 'fail:sleep last night,stale:tachyread,off:web,ok:calendar' && !/runner-sources/.test(await p2.textContent('#brief')));
+  await p2.click('#brief .lights button.fail');
+  ok('tapping a light says why', /signed out/.test(await p2.textContent('#why')));
+  const td = await p2.$$eval('#brief .td li', (l) => l.map((x) => x.textContent));
+  ok('Todoist is drawn as Todoist, right after Needs you, with the suggestion', (await p2.$$eval('#brief .tile h2', (l) => l[1].textContent)) === 'Todoist' && /Pay rent.*overdue/.test(td[0]) && /Call the dentist.*today/.test(td[1]) && /Book a deload week/.test(td[2]) && await p2.$eval('#brief .td .c', (c) => c.classList.contains('p1')));
+  ok('each task links to it in Todoist', await p2.$eval('#brief .td a.t', (a) => a.href) === 'https://app.todoist.com/app/task/T1');
+  await p2.evaluate(() => localStorage.setItem('portal-installed', JSON.stringify({ 'classical-journey': Date.now() })));
+  await p2.click('#brief a[href*="classical-journey"]');
+  await p2.waitForURL(/classical-journey\/#\/w\/bach-aria/, { timeout: 5000 }).catch(() => {});
+  ok('a piece in an installed app opens in the same window (so the app can take it)', /classical-journey\/#\/w\/bach-aria/.test(p2.url()));
+  await p2.goBack();
+  await p2.evaluate(() => localStorage.removeItem('portal-installed'));
+  await p2.click('#show');
+  await p2.waitForSelector('#brief .tile', { timeout: 8000 }).catch(() => {});
   await p2.setViewportSize({ width: 390, height: 844 });
   ok('no sideways scroll on the brief page on a phone', await p2.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1);
   await p2.goto(url);

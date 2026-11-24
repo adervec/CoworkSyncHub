@@ -27,6 +27,20 @@ th, td { border-bottom: 1px solid var(--t-line); padding: 4px 8px; text-align: l
 code { font-family: ui-monospace, Consolas, monospace; background: var(--t-surface2); padding: 1px 4px; border-radius: 4px }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--t-surface2); padding: 8px; border-radius: 8px; font-size: .85rem }
 .foot { margin-top: 18px } .bad { color: var(--t-bad); font-weight: 600 }
+.lights { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 14px 0 4px; font-size: .85rem }
+.lights button { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 8px; border-radius: 14px; font-size: .85rem }
+.lights i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none }
+.lights .ok i { background: var(--t-good) } .lights .fail i { background: var(--t-bad) } .lights .stale i { background: var(--t-warn) } .lights .off i { background: var(--t-line); box-shadow: inset 0 0 0 1px var(--t-dim) }
+.lights .fail { border-color: var(--t-bad) } #why { min-height: 1.2em }
+/* Todoist's own look: priority-coloured circles, the task, its date */
+.td h2 { display: flex; align-items: center; gap: 8px } .td h2 i { width: 14px; height: 14px; border-radius: 4px; background: #e44332; display: inline-block }
+.td ul { list-style: none; padding: 0; margin: 0 } .td li { display: grid; grid-template-columns: 22px 1fr; gap: 2px 8px; padding: 7px 0; border-bottom: 1px solid var(--t-line) }
+.td .c { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #808080; margin-top: 2px; box-sizing: border-box }
+.td .p1 { border-color: #d1453b; background: color-mix(in srgb, #d1453b 12%, transparent) } .td .p2 { border-color: #eb8909; background: color-mix(in srgb, #eb8909 12%, transparent) }
+.td .p3 { border-color: #246fe0; background: color-mix(in srgb, #246fe0 12%, transparent) } .td .sg { border-style: dashed }
+.td a.t { color: var(--t-text); text-decoration: none } .td a.t:hover { text-decoration: underline }
+.td small { grid-column: 2; font-size: .8rem; color: var(--t-dim) } .td small.over { color: #d1453b } .td small.today { color: #058527 }
+.td h3 { font-size: .85rem; margin: 12px 0 2px; color: var(--t-dim) } .td button.cp { min-height: 26px; padding: 0 8px; font-size: .8rem; margin-left: 6px }
 #beta { margin: -16px -16px 12px; padding: 6px 12px; background: #b45309; color: #fff; font-weight: 600; text-align: center }
 </style></head><body>
 <p id="beta" hidden>BETA: the maker's preview</p>
@@ -40,6 +54,23 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--t-surfac
   var el = function (tag, text, cls) { var x = document.createElement(tag); if (text != null) x.textContent = text; if (cls) x.className = cls; return x; };
   if (/portal-beta/.test(location.pathname)) $('beta').hidden = false;
 
+  // A link into one of the maker's apps opens that app: in this window when the app is installed on this
+  // device (a top-level navigation is what lets the system hand it to the installed app, and an app that is
+  // already open moves to the piece if it declares launch_handler navigate-existing), otherwise in a new tab.
+  function installedApps() {
+    try { var m = JSON.parse(localStorage.getItem('portal-installed') || '{}'), cut = Date.now() - 90 * 864e5, out = {}; Object.keys(m).forEach(function (k) { if (m[k] > cut) out[k] = 1; }); return out; } catch (e) { return {}; }
+  }
+  function appLink(text, url) {
+    var a = el('a', text), m = /^https:\/\/adervec\.github\.io\/([^/?#]+)\//.exec(url);
+    a.href = url; a.rel = 'noopener noreferrer';
+    if (!m) { a.target = '_blank'; return a; }
+    a.addEventListener('click', function (ev) {
+      if (installedApps()[decodeURIComponent(m[1])]) { ev.preventDefault(); location.href = url; return; }
+      ev.preventDefault(); if (!window.open(url, '_blank', 'noopener')) location.href = url;
+    });
+    return a;
+  }
+
   // ---- a small markdown renderer that never builds HTML from the text: every piece is a DOM node ----
   // The brief is written by an AI from outside text (event titles, web results), so nothing in it may become markup.
   function inline(parent, text) {
@@ -49,7 +80,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--t-surfac
       if (m[2] != null) parent.appendChild(el('strong', m[2]));
       else if (m[3] != null) parent.appendChild(el('em', m[3]));
       else if (m[4] != null) parent.appendChild(el('code', m[4]));
-      else { var u = appFont.safeUrl(m[6]); if (u) { var a = el('a', m[5]); a.href = u; a.target = '_blank'; a.rel = 'noopener noreferrer'; parent.appendChild(a); } else parent.appendChild(document.createTextNode(m[5])); }
+      else { var u = appFont.safeUrl(m[6]); if (u) { parent.appendChild(appLink(m[5], u)); } else parent.appendChild(document.createTextNode(m[5])); }
       last = re.lastIndex;
     }
     if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
@@ -85,8 +116,58 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--t-surfac
     }
     return into;
   }
+  // the runner's source lights: a ```runner-sources block of [{ name, state: ok|fail|off|stale, note }]
+  function lights(list) {
+    var row = el('div', null, 'lights'), why = el('p', null, 'dim'); why.id = 'why';
+    var order = { fail: 0, stale: 1, off: 2, ok: 3 };
+    list.slice().sort(function (a, b) { return (order[a.state] - order[b.state]) || String(a.name).localeCompare(String(b.name)); }).forEach(function (l) {
+      var b = el('button', null, l.state); b.type = 'button'; b.title = l.name + ': ' + l.note;
+      b.setAttribute('aria-label', l.name + ', ' + ({ ok: 'working', fail: 'failed', off: 'not collected', stale: 'stale' }[l.state] || l.state) + ': ' + l.note);
+      b.append(el('i'), document.createTextNode(String(l.name)));
+      b.addEventListener('click', function () { why.textContent = l.name + ': ' + l.note; });
+      row.appendChild(b);
+    });
+    var wrap = el('div'); wrap.append(row, why); return wrap;
+  }
+  // Todoist, drawn the way Todoist draws it: open tasks by date and priority, each linking to the task, and the
+  // writer's suggestions with a Copy button (paste into Todoist's quick add; the runner never writes to Todoist).
+  function todoist(d) {
+    var c = el('section', null, 'tile td'), h = el('h2'); h.append(el('i'), document.createTextNode('Todoist')); c.appendChild(h);
+    var pr = function (t) { var p = t.priority; if (typeof p === 'string') p = 5 - (+p.replace(/\D/g, '') || 4); return p >= 4 ? 'p1' : p === 3 ? 'p2' : p === 2 ? 'p3' : ''; };
+    var due = function (t) { var x = t.dueDate || (t.due && (t.due.date || t.due)) || ''; return typeof x === 'string' ? x.slice(0, 10) : ''; };
+    var tasks = (d.tasks || []).slice().sort(function (a, b) { return (due(a) || '9') .localeCompare(due(b) || '9') || pr(a).localeCompare(pr(b)); });
+    var ul = el('ul');
+    tasks.slice(0, 12).forEach(function (t) {
+      var li = el('li'), dd = due(t), a = el('a', String(t.content || ''), 't');
+      a.href = t.id ? 'https://app.todoist.com/app/task/' + encodeURIComponent(t.id) : 'https://app.todoist.com/app/today';
+      a.target = '_blank'; a.rel = 'noopener noreferrer';
+      li.append(el('span', null, 'c ' + pr(t)), a);
+      if (dd) li.appendChild(el('small', dd < d.today ? 'overdue · ' + appFont.fmt.date(dd + 'T00:00:00') : dd === d.today ? 'today' : appFont.fmt.date(dd + 'T00:00:00', 'full'), dd < d.today ? 'over' : dd === d.today ? 'today' : ''));
+      ul.appendChild(li);
+    });
+    if (!tasks.length) ul.appendChild(el('li', 'Nothing due in the next two weeks.', 'dim'));
+    if (tasks.length > 12) { var more = el('a', (tasks.length - 12) + ' more in Todoist'); more.href = 'https://app.todoist.com/app/upcoming'; more.target = '_blank'; more.rel = 'noopener noreferrer'; var li2 = el('li'); li2.append(el('span'), more); ul.appendChild(li2); }
+    c.appendChild(ul);
+    if ((d.suggest || []).length) {
+      c.appendChild(el('h3', 'Suggested'));
+      var ul2 = el('ul');
+      d.suggest.forEach(function (s) {
+        var li = el('li'), t = el('span', s.content), cp = el('button', 'Copy', 'cp'); cp.type = 'button';
+        cp.addEventListener('click', function () { var txt = s.content + (s.due ? ' ' + s.due : ''); (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { cp.textContent = 'Copied'; }, function () { cp.textContent = 'Copy failed'; }); });
+        var top = el('span'); top.append(t, cp);
+        li.append(el('span', null, 'c sg'), top);
+        if (s.why || s.due) li.appendChild(el('small', [s.due ? appFont.fmt.date(s.due + 'T00:00:00', 'full') : '', s.why].filter(Boolean).join(' · ')));
+        ul2.appendChild(li);
+      });
+      c.appendChild(ul2);
+    }
+    return c;
+  }
   function render(md) {
     var box = $('brief'); box.textContent = '';
+    var src = null, todo = null;
+    md = md.replace(/```runner-todoist\s*\n([\s\S]*?)\n```\s*/, function (m, j) { try { todo = JSON.parse(j); } catch (e) { /* unreadable */ } return ''; });
+    md = String(md).replace(/```runner-sources\s*\n([\s\S]*?)\n```\s*$/, function (m, j) { try { src = JSON.parse(j); } catch (e) { /* unreadable: no lights */ } return ''; });
     var lines = String(md).replace(/\r/g, '').split('\n'), i = 0, head = [], tiles = [], tile = null, sub = null;
     for (; i < lines.length; i++) {
       var l = lines[i], h;
@@ -109,7 +190,9 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--t-surfac
       t.subs.forEach(function (s) { var d = el('details'); d.appendChild(inline(el('summary'), s.title)); blocks(s.lines, d); c.appendChild(d); });
       grid.appendChild(c);
     });
+    if (todo) grid.insertBefore(todoist(todo), grid.children[1] || null); // right after Needs you
     box.appendChild(grid);
+    if (Array.isArray(src) && src.length) box.appendChild(lights(src));
     if (foot.length) box.appendChild(blocks(foot.slice(1), el('div', null, 'foot dim')));
   }
 

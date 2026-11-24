@@ -4,7 +4,7 @@ The runner is a small program on your own computer. It does two jobs, each one o
 
 - **Answers your apps' AI requests** (a coach review of your week, a practice plan) through your private
   cloud folder, so no browser tab has to stay open and replies reach every device.
-- **The fitness feed**: reads your Garmin and Strava activities and weigh-ins about once an hour and saves
+- **The fitness feed**: reads your Garmin and Strava activities and weigh-ins every three hours and saves
   ONE combined list in your cloud folder, each workout counted once even when both services have it.
   The hub uses it for your weekly targets and character sheet, and the fitness apps can read it instead
   of each fetching the same data.

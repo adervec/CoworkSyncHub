@@ -243,7 +243,7 @@ sh = json.loads(g2.files["shared-activities.json"][0])
 assert r["state"] == "ok" and r["activities"] == 3 and sh["owner"] == "runner" and len(sh["activities"]) == 3 and sh["sources"]["Garmin"]["ok"], r
 assert json.loads(g2.files["shared-body.json"][0])["days"][0]["weight_kg"] == 84.54
 r = runner.job_fitness([cs2], {"connectors": {"garmin": {"read": True}}}, s0)
-assert r.get("unchanged"), "at most about hourly"
+assert r.get("unchanged"), "at most every three hours"
 def boom(cmd, days):
     raise RuntimeError("Garmin login failed")
 runner.collect_garmin = boom
@@ -272,7 +272,7 @@ g3.files[f"hub-brief-{old_day}.md"] = ("# old", 1)
 g3.files[f"hub-brief-{yday}.md"] = ("# yesterday\n## 🔔 Needs you\n- 🔴 renew passport", 2)
 g3.files["cowork-mise--BRIEF.md"] = ("## At a glance\n3 cooks this week", time.time())
 runner.collect_calendar = lambda exe, days=14: {"calendars": [{"summary": "Home"}], "events": [{"summary": "Dentist", "start": "14:00"}]}
-runner.collect_tasks = lambda exe, days=14: [{"tasks": [{"content": "Pay rent", "dueDate": "2026-11-21"}]}]
+runner.collect_tasks = lambda exe, days=14: [{"id": "6X7r", "content": "Pay rent", "dueDate": "2026-11-21", "priority": 4}]
 runner.collect_weather = lambda home: {"place": home["name"], "daily": {"temperature_2m_max": [12]}}
 def no_sleep(cmd):
     raise RuntimeError("Garmin sign-in ended")
@@ -280,16 +280,26 @@ runner.collect_sleep = no_sleep
 def never(*a, **k):
     raise AssertionError("a source without consent was collected")
 runner.collect_web = never
+runner.collect_pleasure = lambda: {"art": [{"title": "The Milkmaid", "by": "Vermeer", "url": "https://adervec.github.io/long-gallery/#/w/milkmaid"}], "music": [], "how": "pick from these"}
 v3 = runner.vendor_of(s3["engine"])
 full = {"engine": {"brief": {"allowed": True, "vendor": v3}}, "connectors": {k: {"read": True} for k in ("calendar", "todoist", "weather", "garmin")}}
 r = runner.job_brief([cs3], {"connectors": full["connectors"]}, s3, Fake([]), force=True)
 assert r["state"] == "skipped" and "no consent" in r["note"], "no brief without consent for the writer"
-eng3 = Fake(["Here it is:\n```markdown\n# Sat · Dentist at 14:00\n## 🔔 Needs you\n- 🔴 Pay rent\n## 🗓️ Outlook\n| | Today |\n|---|---|\n| Calendar | dentist 14:00 |\n```"])
+eng3 = Fake(["Here it is:\n```markdown\n# Sat · Dentist at 14:00\n## 🔔 Needs you\n- 🔴 Pay rent\n## 🗓️ Outlook\n| | Today |\n|---|---|\n| Calendar | dentist 14:00 |\n```\n```todoist-suggest\n[{\"content\": \"Book a deload week\", \"why\": \"12 lifts in 14 days\", \"due\": \"bad date\"}, {\"nope\": 1}]\n```"])
 r = runner.job_brief([cs3], full, s3, eng3, force=True)
 today = datetime.now().strftime("%Y-%m-%d")
 out3 = g3.files.get(f"hub-brief-{today}.md", ("",))[0]
 assert r["state"] == "partly" and "sleep_last_night" in r["note"] and r["sources"]["calendar"] == "ok" and r["sources"]["web"].startswith("not collected"), r
-assert out3.startswith("# Sat · Dentist at 14:00") and "```" not in out3 and "Made " in out3 and "sleep_last_night FAILED" in out3, "the brief is cleaned, stamped, and names failed sources"
+todo3 = json.loads(out3.split("```runner-todoist")[1].strip().strip("`").strip())
+assert todo3["tasks"][0]["id"] == "6X7r" and todo3["suggest"] == [{"content": "Book a deload week", "why": "12 lifts in 14 days", "due": ""}], todo3
+assert "todoist-suggest" not in out3, "the suggestions are lifted out of the text"
+out3 = out3.split("```runner-todoist")[0]
+body3, lights3 = out3.split("```runner-sources")
+assert out3.startswith("# Sat · Dentist at 14:00") and "```markdown" not in out3 and "Made " in body3, "the brief is cleaned and stamped"
+lt = json.loads(lights3.strip().strip("`").strip())
+st = {x["name"]: x["state"] for x in lt}
+assert st["sleep last night"] == "fail" and st["web"] == "off" and st["calendar"] == "ok" and st["mise"] == "ok" and st["pleasure"] == "ok", st
+assert "long-gallery/#/w/milkmaid" in eng3.prompts[0] and "ONLY from DATA.pleasure" in eng3.prompts[0] and "Do NOT write a Sources" in eng3.prompts[0]
 p3 = eng3.prompts[0]
 assert '"Dentist"' in p3 and "Pay rent" in p3 and "Testville" in p3 and "3 cooks this week" in p3 and "renew passport" in p3, "every allowed source reaches the writer"
 assert "never invent email items" in p3 and "DEFAULT" not in p3 and "Needs you; Outlook" in p3, "no mail; the built-in recipe when the reader has none"
@@ -301,4 +311,10 @@ try:
     raise AssertionError("a non-brief was accepted")
 except RuntimeError as e:
     assert "tile layout" in str(e)
+# the catalogues behind the art and music suggestions
+import random  # noqa: E402
+html = '<html><script id="db" type="application/json">{"works": [{"id": "olmec-head", "title": "Colossal Head", "artist": null, "culture": "Olmec", "year": "c. 900 BCE"}]}</script></html>'
+assert runner.parse_gallery(html, 3, random.Random(1)) == [{"title": "Colossal Head", "by": "Olmec", "year": "c. 900 BCE", "url": "https://adervec.github.io/long-gallery/#/w/olmec-head"}]
+js = 'window.DBJSON={"works": [{"id": "bach-aria", "title": "Aria", "composer": "bach", "year": "1741", "mins": "4"}], "composers": [{"id": "bach", "name": "J. S. Bach"}]};'
+assert runner.parse_classical(js, 3, random.Random(1))[0] == {"title": "Aria", "by": "J. S. Bach", "year": "1741", "minutes": "4", "url": "https://adervec.github.io/classical-journey/#/w/bach-aria"}
 print("OK")
