@@ -301,6 +301,16 @@ const CHECKS = [
     if (checks && merges) return warn('own version check and merge: prefer appFont.cloud.syncDoc');
     return fail('writes to the cloud without reading and merging it first: an old device can overwrite newer data (standard 30)');
   }],
+  ['reuse', 'Open for reuse: README with live link and licence', (a) => {
+    const f = a.files.find((x) => /^README(\.md|\.txt)?$/i.test(x));
+    if (!f) return fail('no README at the top of the repo');
+    let t = '';
+    try { t = readFileSync(path.join(a.root, f), 'utf8'); } catch { return fail('README could not be read'); }
+    const miss = [];
+    if (!new RegExp('adervec\\.github\\.io/' + a.app.slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/?', 'i').test(t)) miss.push('the live link');
+    if (!/licen[cs]e|MIT|GPL/i.test(t)) miss.push('the licence');
+    return miss.length ? warn('README lacks ' + miss.join(' and ') + ' (standard 31)') : ok();
+  }],
   ['notes', 'Agent notes import the house standards', (a) => {
     const here = path.join(a.root, 'CLAUDE.md'), up = path.join(path.dirname(a.root), 'CLAUDE.md');
     const f = existsSync(here) ? here : (path.basename(a.root) === 'site' && existsSync(up) ? up : null);

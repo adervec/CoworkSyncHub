@@ -1159,12 +1159,49 @@ demo.addEventListener("cowork-action",function(ev){{demo.data=Object.assign({{}}
     (SITE / "cowork-selftest.html").write_text(COWORK_SELFTEST, encoding="utf-8")
 
 
+def licence_of(app):
+    """'MIT', 'GPL-3.0', … from the app's LICENSE file, or '' when it cannot be read here."""
+    for name in ("LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"):
+        f = BASE.parent / app["dir"] / name
+        if f.exists():
+            head = f.read_text(encoding="utf-8", errors="replace")[:400].upper()
+            if "MIT LICENSE" in head:
+                return "MIT"
+            if "GNU GENERAL PUBLIC LICENSE" in head:
+                return "GPL-3.0" if "VERSION 3" in head else "GPL"
+            return "see LICENSE"
+    return ""
+
+
+def write_llms():
+    """/llms.txt: what is here, for AI agents (house standard 31). The maker wants the apps and their ideas
+    reused, so every app is listed with its live address, source, licence and what it does."""
+    lines = [f"# {USER}'s apps", "",
+             "> Free, open-source, local-first web apps by one maker, built with Claude Code. Each runs entirely in the browser",
+             "> with no account and no server of ours; data stays on the device and, if the reader signs in, in their own",
+             "> Google Drive app folder. Take whatever you like: the code, the ideas, the standards (licences below).", "",
+             "## Apps", ""]
+    for a in APPS:
+        lic = licence_of(a)
+        feats = "; ".join(a.get("features", [])[:6])
+        lines.append(f"- [{a['title']}]({app_url(a)}): {a['tagline']} {('Features: ' + feats + '.') if feats else ''}"
+                     f" Source: https://github.com/{USER}/{a['slug']}{(' (' + lic + ')') if lic else ''}.")
+    lines += ["", "## Shared pieces", "",
+              f"- [House standards](https://github.com/{USER}/CoworkSyncHub/blob/main/HOUSE-STANDARDS.md): the rules every app follows (sync without overwrites, security, languages, themes, data inventory, accessibility), each with an automated check.",
+              f"- [font.js](https://{USER}.github.io/font.js): one script every app loads for the house font, themes, languages, About panel, backup, the reader's cloud with safe sync, and the session ledger.",
+              f"- [cowork.js](https://{USER}.github.io/cowork.js) and [the protocol](https://github.com/{USER}/CoworkSyncHub/blob/main/COWORK-PROTOCOL.md): how an app hands work to an AI and reviews the answer.",
+              f"- [The AI runner](https://github.com/{USER}/CoworkSyncHub/blob/main/RUNNER.md): a small local program that answers apps' AI requests, merges Garmin and Strava, and writes a daily brief.",
+              f"- [The portal](https://{USER}.github.io/portal/): every app in one place.", ""]
+    (SITE / "llms.txt").write_text("\n".join(lines), encoding="utf-8")
+
+
 def write_site(data):
     SITE.mkdir(exist_ok=True)
     PORTAL_DIR.mkdir(exist_ok=True)
     if not BETA:
         write_root()  # first: it also migrates legacy root shots/ that the cards look for
         write_cowork()
+        write_llms()
     now = time.time()
     stamp = time.strftime("%Y%m%d%H%M")
     cards = "".join(_card(app, data.get(app["slug"], {})) for app in APPS)
@@ -1508,6 +1545,9 @@ def cmd_deploy(offline=False):
         "Claude-Session: https://claude.ai/code/session_01G24qcutUGDibaCB8TopeeU")
     git("push", "origin", "main")
     print(f"deploy: pushed — live at https://{USER}.github.io/{PORTAL_DIR.name}/ shortly")
+    if not BETA:  # house standard 31: GitHub descriptions, homepages and topics follow apps.json
+        r = subprocess.run([sys.executable, str(BASE / "repo-meta.py"), "--apply"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        print("repo-meta: " + ((r.stdout.strip().splitlines() or ["no output"])[-1] if r.returncode == 0 else "FAILED " + (r.stderr or r.stdout).strip()[:200]))
 
 
 def _git(d, *args):

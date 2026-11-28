@@ -389,4 +389,23 @@ wrong, fix the rule in `standards.mjs` rather than working around it.
     - The standards check's `syncsafe` column fails when the app writes to the cloud without
       syncDoc or a merge of its own, and warns on an own merge (prefer syncDoc).
 
+31. **Open for reuse.** The maker wants other people, and their agents, to take these apps and ideas:
+    each repo is public, licensed, and easy to find and understand.
+    - **A licence**: MIT unless something bundled requires otherwise (ChessRetabled is GPL-3.0 because
+      of Stockfish).
+    - **The description is the app's `tagline` in `../CoworkSyncHub/apps.json`**, and the homepage is its
+      live address. When what the app does changes, update its `tagline` and `features` there (one
+      sentence, what it does, for a stranger). The next hub deploy pushes the description, homepage and
+      topics to GitHub (`repo-meta.py`) and lists the app in `adervec.github.io/llms.txt`. Add topics for
+      a new app in `../CoworkSyncHub/repo-meta.json`. Never edit the GitHub description by hand: the next
+      deploy would put the tagline back.
+    - **A README that a stranger's agent can use**: what the app is and its live link first, then how
+      to run and test it, how it is built, and a line saying it was built with Claude Code and may be
+      reused under its licence. Link the house standards by URL
+      (`https://github.com/adervec/CoworkSyncHub/blob/main/HOUSE-STANDARDS.md`): the `@../CoworkSyncHub`
+      import in CLAUDE.md only works for someone who also has the hub checked out beside it.
+    - Nothing personal, ever (standard 26): reuse is why the leak check matters.
+    - The standards check's `reuse` column fails without a README and warns when it lacks the live
+      link or the licence line.
+
 ## Working habits
